@@ -15,7 +15,7 @@ const NodeRenderer = defineComponent({
   },
   setup(props) {
     const store = useUiTreeStore()
-    const { selectedNodeId, isPreviewMode } = storeToRefs(store)
+    const { selectedNodeIds, isPreviewMode } = storeToRefs(store)
 
     return () => {
       const { node } = props
@@ -23,16 +23,19 @@ const NodeRenderer = defineComponent({
 
       if (node.type === 'TEXT') {
         return h('span', {
-          style: 'pointer-events: none; display: inline-block;',
+          style: 'display: inline-block; min-width: 8px;',
+          'data-node-id': node.id,
+          onClick: isPreviewMode.value ? undefined : (e: MouseEvent) => { e.stopPropagation(); e.shiftKey || e.metaKey || e.ctrlKey ? store.toggleMultiSelect(node.id) : store.selectNode(node.id) },
           class: [
             ...(node.classes || []),
-            { 'is-selected': !isPreviewMode.value && selectedNodeId.value === node.id }
+            { 'ui-builder-element': !isPreviewMode.value },
+            { 'is-selected': !isPreviewMode.value && selectedNodeIds.value.includes(node.id) }
           ]
         }, node.name)
       }
 
       const VComponent = (Components as any)[node.type] || node.type
-      const isSelected = selectedNodeId.value === node.id
+      const isSelected = selectedNodeIds.value.includes(node.id)
       const isLeaf = getComponentDef(node.type)?.isLeaf ?? false
 
       const slots: Record<string, () => any> = {}
@@ -68,7 +71,7 @@ const NodeRenderer = defineComponent({
       }
 
       // ─── Canvas drag-and-drop (non-leaf containers only) ──────────────────
-      const dragHandlers = isLeaf ? {} : {
+      const dragHandlers = !store.canContain(node) ? {} : {
         onDragenter: (e: DragEvent) => {
           e.preventDefault()
           e.stopPropagation()
@@ -90,9 +93,7 @@ const NodeRenderer = defineComponent({
           canvasDragTargetId.value = null
           const type = e.dataTransfer?.getData('componenttype')
           if (!type) return
-          const newNode = store.createNode(type)
-          store.appendChild(node.id, newNode)
-          store.selectNode(newNode.id)
+          if (getComponentDef(type)) store.addComponent(type, node.id)
         },
         onDragend: () => {
           canvasDragTargetId.value = null
@@ -104,15 +105,16 @@ const NodeRenderer = defineComponent({
         {
           ...node.props,
           ...extraProps,
+          'data-node-id': node.id,
           class: [
             ...(node.classes || []),
             'ui-builder-element',
             { 'is-selected': isSelected },
             { 'is-drag-over': !isLeaf && canvasDragTargetId.value === node.id }
           ],
-          onClick: (e: Event) => {
+          onClick: (e: MouseEvent) => {
             e.stopPropagation()
-            store.selectNode(node.id)
+            e.shiftKey || e.metaKey || e.ctrlKey ? store.toggleMultiSelect(node.id) : store.selectNode(node.id)
           },
           ...dragHandlers
         },

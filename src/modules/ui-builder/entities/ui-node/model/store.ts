@@ -252,6 +252,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const card = createNode('VCard', kind === 'form' ? 'Contact form' : 'Welcome card')
     card.classes = ['pa-6', 'rounded-lg']
     const title = createNode('VCardTitle')
+    title.classes.push('text-wrap')
     title.children[0].name = kind === 'form' ? 'Get in touch' : 'Your next idea starts here'
     const text = createNode('VCardText')
     text.children[0].name = 'Select an element to edit its content and appearance.'

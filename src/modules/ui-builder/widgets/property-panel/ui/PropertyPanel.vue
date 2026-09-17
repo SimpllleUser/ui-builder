@@ -3,32 +3,79 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { getComponentDef, type PropField } from '../../../entities/ui-node/model/componentDefinitions'
+import { readSpacing, writeSpacing, readFlex, writeFlex } from '../../../entities/ui-node/model/layoutControls'
+import type { UiNode } from '../../../entities/ui-node/model/types'
 import { Icons } from '../../../../../shared/icons'
 
 const store = useUiTreeStore()
-const { selectedNodeId } = storeToRefs(store)
+const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
 
 const selectedNode = computed(() => {
-  if (!selectedNodeId.value) return null
+  if (!selectedNodeId.value || selectedNodeIds.value.length !== 1) return null
   return store.findNodeById(selectedNodeId.value)
 })
 
 const isRoot = computed(() => selectedNode.value?.id === 'root-canvas')
 
-const activeSections = computed(() => {
-  if (!selectedNode.value) return []
-  return getComponentDef(selectedNode.value.type)?.propertySections ?? []
+const activeTab = ref('content')
+const fieldTab = (field: PropField, title: string) => {
+  if (field.kind === 'custom-classes') return 'advanced'
+  if (['spacing', 'flex-layout', 'row'].includes(field.kind) || ['Layout', 'Grid Column'].includes(title)) return 'layout'
+  if (field.kind === 'textarea' || (field.kind === 'text' && ['title', 'subtitle', 'label', 'placeholder', 'hint', 'src', 'alt', 'image', 'value'].includes(field.prop))) return 'content'
+  return 'appearance'
+}
+const activeSections = computed(() => (selectedNode.value ? getComponentDef(selectedNode.value.type)?.propertySections ?? [] : [])
+  .map(section => ({ ...section, fields: section.fields.filter(field => field.kind !== 'custom-classes' && fieldTab(field, section.title ?? '') === activeTab.value) }))
+  .filter(section => section.fields.length))
+const textChild = computed(() => selectedNode.value?.children.find(node => node.type === 'TEXT'))
+const breadcrumb = computed(() => selectedNode.value ? store.pathTo(selectedNode.value.id) : [])
+const saveDialog = ref(false)
+const prefabName = ref('')
+const onSavePrefab = () => { prefabName.value = selectedNode.value?.name ?? ''; saveDialog.value = true }
+const savePrefab = () => { if (selectedNode.value && prefabName.value.trim()) { store.savePrefab(selectedNode.value.id, prefabName.value); saveDialog.value = false } }
+const moveDialog = ref(false)
+const moveTarget = ref('')
+const moveTargets = computed(() => {
+  const result: { title: string; value: string }[] = []
+  const visit = (node: UiNode, path: string[]) => {
+    if (node.id === selectedNodeId.value) return
+    const names = [...path, node.name]
+    if (store.canContain(node)) result.push({ title: names.join(' / '), value: JSON.stringify([node.id, null]) })
+    for (const slot of getComponentDef(node.type)?.slots ?? []) {
+      if (node.id !== 'root-canvas' && slot.name !== 'default') result.push({ title: `${names.join(' / ')} / ${slot.label}`, value: JSON.stringify([node.id, slot.name]) })
+    }
+    for (const child of [...node.children, ...Object.values(node.slots).flat()]) visit(child, names)
+  }
+  visit(store.rootNode, [])
+  return result
 })
-
-const onSavePrefab = () => {
-  if (!selectedNode.value) return
-  const name = window.prompt('Prefab name:', selectedNode.value.name)
-  if (!name?.trim()) return
-  store.savePrefab(selectedNode.value.id, name.trim())
+const moveSelected = () => {
+  if (!selectedNodeId.value || !moveTarget.value) return
+  const [parentId, slot] = JSON.parse(moveTarget.value)
+  if (store.moveNode(selectedNodeId.value, parentId, slot)) moveDialog.value = false
+}
+const commonSpacing = (side: string) => {
+  const values = selectedNodeIds.value.map(id => readSpacing(store.findNodeById(id)!.classes, activeSpacingType.value, side))
+  return values.every(v => v === values[0]) ? values[0] : null
+}
+const updateCommonSpacing = (side: string, value: number | string | null) => {
+  store.commit()
+  for (const id of selectedNodeIds.value) {
+    const node = store.findNodeById(id)!
+    node.classes = writeSpacing(node.classes, activeSpacingType.value, side, value)
+  }
+  store.commit()
 }
 
 const activeSpacingType = ref<'m' | 'p'>('m')
-watch(selectedNodeId, () => { activeSpacingType.value = 'm' })
+watch(selectedNodeId, () => {
+  activeSpacingType.value = 'm'
+  const node = selectedNode.value
+  const sections = node ? getComponentDef(node.type)?.propertySections ?? [] : []
+  if (node?.children.some(child => child.type === 'TEXT') || sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'content'))) activeTab.value = 'content'
+  else if (sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'layout'))) activeTab.value = 'layout'
+  else activeTab.value = 'appearance'
+}, { immediate: true })
 
 const spacingSides = [
   { label: 'All',      value: 'a' }, { label: 'Top',      value: 't' },
@@ -36,20 +83,11 @@ const spacingSides = [
   { label: 'Right',    value: 'r' }, { label: 'X (Horiz)', value: 'x' },
   { label: 'Y (Vert)', value: 'y' },
 ]
-const spacingSizes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16]
-
-const updateSpacing = (stype: 'm' | 'p', side: string, size: number) => {
-  if (!selectedNode.value) return
-  const prefix = `${stype}${side}-`
-  selectedNode.value.classes = selectedNode.value.classes.filter((c: string) => !c.startsWith(prefix))
-  if (size > 0) selectedNode.value.classes.push(`${prefix}${size}`)
+const spacingSizes = [{ title: 'Default / mixed', value: null }, ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16].map(n => ({ title: `${n * 4} px`, value: n }))]
+const updateSpacing = (type: 'm' | 'p', side: string, value: number | string | null) => {
+  if (selectedNode.value) selectedNode.value.classes = writeSpacing(selectedNode.value.classes, type, side, value)
 }
-
-const getSpacingValue = (stype: 'm' | 'p', side: string) => {
-  const prefix = `${stype}${side}-`
-  const cls = selectedNode.value?.classes.find((c: string) => c.startsWith(prefix))
-  return cls ? parseInt(cls.split('-')[1]) : 0
-}
+const getSpacingValue = (type: 'm' | 'p', side: string) => readSpacing(selectedNode.value?.classes ?? [], type, side)
 
 const allIcons = Object.entries(Icons).map(([name, value]) => ({ name, value }))
 
@@ -59,14 +97,9 @@ const flexOptions = [
   { title: 'Flex Column', value: 'd-flex flex-column' },
 ]
 
-const getFlexValue = () =>
-  selectedNode.value?.classes.find((c: string) => c.startsWith('d-')) ?? null
-
-const setFlexValue = (val: string) => {
-  if (!selectedNode.value) return
-  selectedNode.value.classes = selectedNode.value.classes
-    .filter((c: string) => !c.startsWith('d-') && !c.startsWith('flex-'))
-  if (val) selectedNode.value.classes.push(...val.split(' '))
+const getFlexValue = () => readFlex(selectedNode.value?.classes ?? [])
+const setFlexValue = (value: string) => {
+  if (selectedNode.value) selectedNode.value.classes = writeFlex(selectedNode.value.classes, value)
 }
 
 const getJustifyValue = () =>
@@ -101,7 +134,7 @@ const getTextAlign = () =>
     ['text-left', 'text-center', 'text-right'].includes(c)
   ) ?? null
 
-const setTextAlign = (val: string) => {
+const setTextAlign = (val: string | null) => {
   if (!selectedNode.value) return
   selectedNode.value.classes = selectedNode.value.classes
     .filter((c: string) => !['text-left', 'text-center', 'text-right'].includes(c))
@@ -133,7 +166,7 @@ const CLASS_GROUPS = [
 const classSearch = ref('')
 
 const filteredGroups = computed(() => {
-  const q = classSearch.value.trim().toLowerCase()
+  const q = (classSearch.value ?? '').trim().toLowerCase()
   if (!q) return CLASS_GROUPS
   return CLASS_GROUPS
     .map(g => ({ ...g, classes: g.classes.filter(c => c.includes(q)) }))
@@ -189,27 +222,35 @@ const toggleClass = (cls: string) => {
 }
 
 const addCustomClass = () => {
-  if (!classSearch.value.trim() || !selectedNode.value) return
-  classSearch.value.trim().split(/\s+/).filter(Boolean).forEach(toggleClass)
+  if (!(classSearch.value ?? '').trim() || !selectedNode.value) return
+  (classSearch.value ?? '').trim().split(/\s+/).filter(Boolean).forEach(toggleClass)
   classSearch.value = ''
 }
 </script>
 
 <template>
-  <VNavigationDrawer location="right" permanent width="320" border="s">
-    <div v-if="selectedNode" :key="selectedNode.id" class="pa-4 d-flex flex-column h-100">
+  <div class="property-panel">
+    <section v-if="selectedNodeIds.length > 1" class="pa-4">
+      <h2 class="text-subtitle-1 font-weight-bold">{{ selectedNodeIds.length }} elements selected</h2>
+      <p class="text-body-2 my-3">Shared spacing applies to every selected element. Select one layer to edit its content and appearance.</p>
+      <VBtnToggle v-model="activeSpacingType" mandatory density="compact" color="primary" variant="outlined" class="mb-4"><VBtn value="m">Margin</VBtn><VBtn value="p">Padding</VBtn></VBtnToggle>
+      <VSelect v-for="side in spacingSides" :key="side.value" :label="side.label" :items="spacingSizes" :model-value="commonSpacing(side.value)" variant="outlined" density="compact" hide-details class="mb-3" @update:model-value="value => updateCommonSpacing(side.value, value)" />
+    </section>
+    <div v-else-if="selectedNode" :key="selectedNode.id" class="pa-4">
 
       <div class="d-flex align-center justify-space-between mb-1">
-        <div class="text-subtitle-1 font-weight-bold">{{ selectedNode.type }}</div>
+        <div class="text-subtitle-1 font-weight-bold">{{ getComponentDef(selectedNode.type)?.label ?? selectedNode.type }}</div>
         <div v-if="!isRoot" class="d-flex align-center">
           <VBtn
             icon="mdi-content-save-outline"
+            aria-label="Save to My components" title="Save to My components"
             variant="text"
             size="small"
             @click="onSavePrefab"
           />
           <VBtn
             :icon="Icons.DeleteOutline"
+            aria-label="Delete element" title="Delete element"
             variant="text"
             color="error"
             size="small"
@@ -217,11 +258,16 @@ const addCustomClass = () => {
           />
         </div>
       </div>
-      <div class="text-caption text-medium-emphasis mb-4">ID: {{ selectedNode.id }}</div>
+      <nav aria-label="Element path" class="element-path"><button v-for="node in breadcrumb" :key="node.id" @click="store.selectNode(node.id)">{{ node.name }}</button></nav>
+      <VTextField v-if="selectedNode.type !== 'TEXT'" v-model="selectedNode.name" label="Element name" variant="outlined" density="compact" hide-details class="my-3" @blur="store.commit()" />
+      <VBtn v-if="!isRoot" variant="text" size="small" prepend-icon="mdi-folder-move-outline" class="mb-2" @click="moveTarget = ''; moveDialog = true">Move to…</VBtn>
+      <VTabs v-model="activeTab" density="compact" class="property-tabs"><VTab value="content">Content</VTab><VTab value="layout">Layout</VTab><VTab value="appearance">Style</VTab><VTab value="advanced">Advanced</VTab></VTabs>
 
       <VDivider class="mb-4" />
 
-      <div class="flex-grow-1 overflow-y-auto pr-1">
+      <div class="pt-4">
+        <VTextarea v-if="activeTab === 'content' && textChild" v-model="textChild.name" label="Text content" variant="outlined" density="compact" auto-grow rows="2" class="mb-4" hide-details />
+        <p v-if="activeTab !== 'advanced' && !activeSections.length && !(activeTab === 'content' && textChild)" class="text-body-2 text-medium-emphasis">No {{ activeTab }} settings for this element.</p>
         <template v-for="section in activeSections" :key="section.title">
           <div class="mb-6">
             <div v-if="section.title" class="text-overline mb-2 text-primary font-weight-bold">{{ section.title }}</div>
@@ -307,6 +353,7 @@ const addCustomClass = () => {
                   :min="field.min"
                   :max="field.max"
                   :step="field.step ?? 1"
+                  :aria-label="field.label"
                   thumb-label
                   color="primary"
                   class="mb-3"
@@ -392,9 +439,9 @@ const addCustomClass = () => {
                   :model-value="getTextAlign()"
                   @update:model-value="setTextAlign"
                 >
-                  <VBtn :value="'text-left'"   :icon="Icons.FormatAlignLeft"   size="small" />
-                  <VBtn :value="'text-center'"  :icon="Icons.FormatAlignCenter" size="small" />
-                  <VBtn :value="'text-right'"   :icon="Icons.FormatAlignRight"  size="small" />
+                  <VBtn :value="'text-left'"   :icon="Icons.FormatAlignLeft" aria-label="Align text left"   size="small" />
+                  <VBtn :value="'text-center'"  :icon="Icons.FormatAlignCenter" aria-label="Align text center" size="small" />
+                  <VBtn :value="'text-right'"   :icon="Icons.FormatAlignRight" aria-label="Align text right"  size="small" />
                 </VBtnToggle>
               </template>
 
@@ -428,7 +475,8 @@ const addCustomClass = () => {
         </template>
       </div>
 
-      <VDivider class="my-4" />
+      <template v-if="activeTab === 'advanced'">
+      <div class="text-caption mb-4">Component: {{ selectedNode.type }}<br />ID: {{ selectedNode.id }}</div>
 
       <div class="mb-2 text-overline text-primary font-weight-bold">Custom Classes</div>
 
@@ -437,7 +485,7 @@ const addCustomClass = () => {
         <VChip
           v-for="cls in selectedNode.classes"
           :key="cls"
-          size="x-small"
+          size="small"
           closable
           color="primary"
           variant="tonal"
@@ -450,6 +498,7 @@ const addCustomClass = () => {
       <!-- Search / add custom -->
       <VTextField
         v-model="classSearch"
+        label="Search or add CSS classes"
         placeholder="Search or type class name…"
         variant="outlined"
         density="compact"
@@ -468,7 +517,7 @@ const addCustomClass = () => {
             <VChip
               v-for="cls in group.classes"
               :key="cls"
-              size="x-small"
+              size="small"
               :variant="selectedNode.classes.includes(cls) ? 'flat' : 'tonal'"
               :color="selectedNode.classes.includes(cls) ? 'primary' : 'default'"
               class="preset-chip"
@@ -481,17 +530,34 @@ const addCustomClass = () => {
         </div>
       </div>
 
-      <div class="text-center mt-4 opacity-50 text-caption">FSD UI Builder v0.1</div>
+      </template>
     </div>
 
     <div v-else class="pa-10 text-center text-medium-emphasis mt-10">
       <VIcon :icon="Icons.CursorClick" size="x-large" class="mb-4 opacity-20" />
       <div class="text-body-2">Select an element to edit properties</div>
     </div>
-  </VNavigationDrawer>
+    <VDialog v-model="saveDialog" max-width="420">
+      <VCard title="Save component">
+        <VCardText><VTextField v-model="prefabName" label="Component name" autofocus variant="outlined" hide-details @keydown.enter="savePrefab" /></VCardText>
+        <VCardActions><VSpacer /><VBtn @click="saveDialog = false">Cancel</VBtn><VBtn color="primary" :disabled="!prefabName.trim()" @click="savePrefab">Save component</VBtn></VCardActions>
+      </VCard>
+    </VDialog>
+    <VDialog v-model="moveDialog" max-width="520">
+      <VCard title="Move element">
+        <VCardText><VSelect v-model="moveTarget" :items="moveTargets" label="Destination container or slot" variant="outlined" hide-details /></VCardText>
+        <VCardActions><VSpacer /><VBtn @click="moveDialog = false">Cancel</VBtn><VBtn color="primary" :disabled="!moveTarget" @click="moveSelected">Move</VBtn></VCardActions>
+      </VCard>
+    </VDialog>
+  </div>
 </template>
 
 <style scoped>
+.property-panel { flex: 1; min-height: 0; overflow-y: auto; }
+.element-path { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 8px; }
+.element-path button { font-size: 12px; min-height: 28px; color: rgb(var(--v-theme-primary)); overflow-wrap: anywhere; text-align: left; }
+.element-path button + button::before { content: '/'; padding-right: 4px; }
+.property-tabs :deep(.v-tab) { min-width: 0; padding-inline: 10px; font-size: 12px; text-transform: none; }
 .applied-chips {
   display: flex;
   flex-wrap: wrap;
@@ -513,11 +579,11 @@ const addCustomClass = () => {
 }
 
 .preset-group__title {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  opacity: 0.45;
+  opacity: 0.8;
   margin-bottom: 4px;
 }
 
@@ -529,7 +595,7 @@ const addCustomClass = () => {
 
 .preset-chip {
   cursor: pointer;
-  font-size: 10px !important;
+  font-size: 12px !important;
   transition: all 0.12s;
 }
 </style>

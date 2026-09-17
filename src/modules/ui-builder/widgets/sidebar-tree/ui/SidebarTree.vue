@@ -7,9 +7,10 @@ import SidebarTreeNode from './SidebarTreeNode.vue'
 import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
 
 const store = useUiTreeStore()
-const { rootNode, selectedNodeIds, selectedNodeId, prefabs } = storeToRefs(store)
+const { rootNode, selectedNodeIds, prefabs } = storeToRefs(store)
 
 const activeTab = ref<'tree' | 'prefabs'>('tree')
+const deletingPrefab = ref<string | null>(null)
 
 const canWrap = computed(() =>
   selectedNodeIds.value.length >= 2 && store.areNodesSiblings(selectedNodeIds.value)
@@ -24,37 +25,36 @@ const canUnwrap = computed(() => {
 })
 
 const onInsertPrefab = (prefabId: string) => {
-  const targetId = selectedNodeId.value ?? 'root-canvas'
-  store.insertPrefab(prefabId, targetId)
+  store.insertPrefab(prefabId)
 }
 </script>
 
 <template>
-  <VNavigationDrawer permanent width="300" border="e" class="flex-grow-1 sidebar-drawer">
+  <div class="sidebar-drawer">
     <div class="d-flex flex-column h-100">
 
       <ComponentsPalette />
 
       <VTabs v-model="activeTab" density="compact" grow class="flex-shrink-0">
-        <VTab value="tree">UI Tree</VTab>
-        <VTab value="prefabs">My Components</VTab>
+        <VTab value="tree">Layers</VTab>
+        <VTab value="prefabs">My components</VTab>
       </VTabs>
 
       <VWindow v-model="activeTab" class="flex-grow-1 overflow-y-auto">
 
         <VWindowItem value="tree" class="pa-2">
-          <div class="text-h6 px-2 mb-4 mt-2">UI Tree</div>
-          <VList density="compact" nav class="pa-0">
+          <p class="text-caption px-2 my-2">Shift-click to select several elements. Use arrow keys to navigate.</p>
+          <div role="tree" aria-label="Page layers" aria-multiselectable="true" class="pa-0">
             <SidebarTreeNode :node="rootNode" :depth="0" />
-          </VList>
+          </div>
         </VWindowItem>
 
         <VWindowItem value="prefabs" class="pa-2">
-          <div class="text-h6 px-2 mb-4 mt-2">My Components</div>
+          <div class="text-h6 px-2 mb-4 mt-2">My components</div>
 
           <div v-if="prefabs.length === 0" class="text-center pa-8">
             <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
-            <div class="text-body-2 text-medium-emphasis">No saved presets yet</div>
+            <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
             <div class="text-caption text-medium-emphasis mt-1 opacity-70">
               Select a node and click
               <VIcon icon="mdi-content-save-outline" size="12" />
@@ -77,16 +77,18 @@ const onInsertPrefab = (prefabId: string) => {
               <div class="prefab-actions">
                 <VBtn
                   icon="mdi-plus"
+                  :aria-label="`Insert ${prefab.name}`"
                   variant="text"
                   size="x-small"
                   @click="onInsertPrefab(prefab.prefabId)"
                 />
                 <VBtn
                   icon="mdi-trash-can-outline"
+                  :aria-label="`Delete saved component ${prefab.name}`"
                   variant="text"
                   size="x-small"
                   color="error"
-                  @click="store.deletePrefab(prefab.prefabId)"
+                  @click="deletingPrefab = prefab.prefabId"
                 />
               </div>
             </div>
@@ -114,9 +116,11 @@ const onInsertPrefab = (prefabId: string) => {
 
           <template v-else-if="canUnwrap">
             <span class="wrap-label">Unwrap:</span>
+            <p v-if="store.unwrapReason(selectedNodeIds[0])" class="text-caption">{{ store.unwrapReason(selectedNodeIds[0]) }}</p>
             <div class="wrap-chips">
               <button
                 class="wrap-chip wrap-chip--unwrap"
+                :disabled="!!store.unwrapReason(selectedNodeIds[0])"
                 @click="store.unwrapNode(selectedNodeIds[0])"
               >
                 <VIcon icon="mdi-arrow-expand-all" size="12" class="mr-1" />
@@ -126,13 +130,21 @@ const onInsertPrefab = (prefabId: string) => {
           </template>
         </div>
       </VSlideYReverseTransition>
+      <VDialog :model-value="!!deletingPrefab" max-width="400" @update:model-value="deletingPrefab = null">
+        <VCard title="Delete saved component?" text="Existing copies on your page will remain. This removes the component from your library.">
+          <VCardActions><VSpacer /><VBtn @click="deletingPrefab = null">Cancel</VBtn><VBtn color="error" @click="store.deletePrefab(deletingPrefab!); deletingPrefab = null">Delete</VBtn></VCardActions>
+        </VCard>
+      </VDialog>
 
     </div>
-  </VNavigationDrawer>
+  </div>
 </template>
 
 <style scoped>
 .sidebar-drawer {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   :deep(.v-slide-group) {
@@ -160,7 +172,7 @@ const onInsertPrefab = (prefabId: string) => {
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 
-.prefab-row:hover .prefab-actions {
+.prefab-row:hover .prefab-actions, .prefab-row:focus-within .prefab-actions {
   opacity: 1;
 }
 
@@ -181,13 +193,13 @@ const onInsertPrefab = (prefabId: string) => {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.1s;
 }
 
 .wrap-toolbar {
   padding: 8px 10px;
-  background: rgb(var(--v-theme-surface-variant));
+  background: rgb(var(--v-theme-surface-light));
   border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   display: flex;
   flex-direction: column;
@@ -196,7 +208,7 @@ const onInsertPrefab = (prefabId: string) => {
 }
 
 .wrap-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   opacity: 0.7;
@@ -212,9 +224,9 @@ const onInsertPrefab = (prefabId: string) => {
 .wrap-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 6px 10px;
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
   background: rgba(var(--v-theme-surface), 0.9);
   color: rgb(var(--v-theme-on-surface));
@@ -233,4 +245,5 @@ const onInsertPrefab = (prefabId: string) => {
   border-color: rgb(var(--v-theme-warning));
   color: rgb(var(--v-theme-warning));
 }
+.wrap-chip:disabled { opacity: .6; cursor: not-allowed; }
 </style>
