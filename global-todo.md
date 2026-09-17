@@ -2,15 +2,16 @@
 
 ## Мета і базовий контракт
 
-Створити visual UI builder, у якому редактор змінює Project AST, dev preview показує **реально зібраний застосунок в iframe**, а publish збирає той самий AST у версійований production artifact.
+Створити visual UI builder, у якому редактор змінює Project AST, dev preview показує **реально зібраний застосунок в iframe (через in-browser компіляцію)**, а publish збирає той самий AST у версійований production artifact на сервері.
 
 ```text
-Builder → mutations → Project AST → compiler → virtual files → Vite/HMR → iframe
-                                  └────────────→ production build → release → CDN
+Builder → mutations → Project AST → Web Worker (compiler) → Service Worker (VFS) → iframe
+                                  └───────────────────────→ backend build jobs → CDN
+
 ```
 
 - [ ] Зафіксувати версійний контракт Project AST як єдине джерело правди для редактора, preview і publish.
-- [ ] Усі зміни документа проводити через типізовані mutations; dev і production мають використовувати спільний compiler.
+- [ ] Усі зміни документа проводити через типізовані mutations; dev (в браузері) і production (на сервері) мають використовувати спільний compiler.
 - [ ] Зберегти можливість додати інші targets згодом, не вводячи їх у першу версію.
 
 ## Поточний стан і перехід
@@ -26,79 +27,76 @@ Builder → mutations → Project AST → compiler → virtual files → Vite/HM
 
 ```text
 apps/
-  builder/           редактор
+  builder/           редактор (головний потік)
   preview-runtime/   застосунок в iframe та bridge
+  compiler-worker/   Web Worker для in-browser генерації коду
+  network-worker/    Service Worker для перехоплення запитів iframe (віртуальна файлова система)
   api/               проєкти, snapshots, assets, releases
-  build-service/     build sessions і Vite dev server
-  worker/            production build jobs
+  worker/            production build jobs (серверна збірка)
 packages/
-  ast/               модель, валідація, міграції, mutations
+  ast/               модель, валідація, міграції, mutations (плоска структура)
   schemas/           metadata компонентів і полів inspector
   components/        доступні UI компоненти
-  compiler/          AST → virtual file system
+  compiler/          AST → Vue/JS код (спільний для браузера і сервера)
   runtime/           bindings, actions, state
-  protocol/          повідомлення builder ↔ preview/build service
+  protocol/          повідомлення builder ↔ preview/workers
   types/             спільні типи
+
 ```
 
-- [ ] Для MVP дозволити API/build worker в одному Node процесі, але залишити явні інтерфейси сервісів.
-- [ ] Визначити монорепозиторій та межі залежностей: compiler не залежить від UI редактора чи Nuxt.
+- [ ] Для MVP побудувати архітектуру Zero-compute backend для dev-середовища: уся робота з preview відбувається локально в браузері клієнта.
+- [ ] Визначити монорепозиторій та межі залежностей: compiler не залежить від UI редактора.
 
-## Phase 1 — AST → зібраний застосунок → iframe
+## Phase 1 — AST → in-browser VFS → iframe
 
-**Критерій завершення:** JSON проєкту компілюється в робочий Vue застосунок, який відкривається в iframe редактора; зміна документа відображається в preview.
+**Критерій завершення:** JSON проєкту компілюється в робочий Vue застосунок безпосередньо в браузері, який відкривається в iframe редактора; зміна документа відображається в preview.
 
 - [ ] Ввести `Project { id, version, pages, nodes, components, theme, dataSources, actions }` та `Page { id, path, rootNodeId }`.
-- [ ] Нормалізувати вузли за ID: `nodes[id]` з `type`, `props`, `children: string[]`, named slots, `bindings`, `events`, styles/classes. Визначити правила унікальності ID, порядку дітей, посилань і видалення піддерева.
+- [ ] Нормалізувати вузли за ID: плоска структура `nodes[id]` з `type`, `props`, `children: string[]`, named slots, `bindings`, `events`, styles/classes. Визначити правила унікальності ID, порядку дітей та видалення піддерева.
 - [ ] Описати schema/versioning, валідацію, серіалізацію та міграції AST; окремо перевіряти дозволені типи компонентів і props.
-- [ ] Зробити Component Registry єдиним джерелом metadata для палітри, inspector, compiler та runtime; використати наявні component definitions як початковий набір.
-- [ ] Реалізувати незалежний compiler: `Project AST → VirtualFS` з файлами сторінок, компонентів, app entry та theme CSS. Детермінований output для однакового snapshot.
-- [ ] Зробити `VirtualFS` з `read/write/delete/exists` і підключити до Vite через plugin або інший чіткий adapter.
-- [ ] Запустити dev server для згенерованого застосунку та показати його в iframe. Preview повинен запускати згенерований код, а не поточний renderer редактора.
+- [ ] Зробити Component Registry єдиним джерелом metadata для палітри, inspector, compiler та runtime.
+- [ ] Реалізувати незалежний in-browser compiler (Web Worker): `Project AST → VirtualFS`. Використати `@vue/compiler-sfc` для генерації коду без Vite-сервера.
+- [ ] Налаштувати Service Worker, який перехоплює HTTP-запити від iframe і віддає згенеровані файли з пам'яті як реальні модулі.
 - [ ] Додавати до DOM `data-builder-node="<node-id>"` для відповідності AST ↔ елемент; перевірити вкладені компоненти й named slots.
-- [ ] Написати інтеграційний сценарій: імпортоване дерево → compiler → iframe → той самий візуальний результат для базових компонентів.
+- [ ] Написати інтеграційний сценарій: імпортоване дерево → Web Worker → Service Worker → iframe → візуальний результат.
 
-## Phase 2 — керування реальним preview з редактора
+## Phase 2 — продуктивне керування preview з редактора
 
-**Критерій завершення:** додавання, вибір, переміщення, видалення й редагування props у наявному editor змінюють AST та preview; клік у preview вибирає вузол у редакторі.
+**Критерій завершення:** редагування в editor змінює AST та preview. Безперервні взаємодії (Drag&Drop, ресайз) працюють на 60 FPS без лагів.
 
+- [ ] Розділити мутації на **Transient** (тимчасові прямі DOM-маніпуляції для Drag&Drop/ресайзу без HMR) та **Committed** (фіксація в AST та тригер компіляції при відпусканні миші/кліку).
 - [ ] Визначити типізовані mutations: `add_node`, `remove_node`, `move_node`, `update_props`, `update_binding`, `update_event`, `update_style`, `update_page`.
-- [ ] Централізовано застосовувати й валідувати mutations з `projectId`, базовою версією та результатною версією; конфлікти версій обробляти явно.
-- [ ] Перевести палітру, canvas/layers, inspector і selection на AST та mutations.
-- [ ] Зберегти undo/redo; визначити inverse mutation або snapshots/checkpoints для складних операцій.
-- [ ] Додати `postMessage` bridge з контрактом `SELECT_NODE`, `NODE_CLICKED`, hover/inspect, viewport і runtime error; перевіряти `origin`, `source`, session ID і формат повідомлень.
-- [ ] Розмістити iframe на окремому origin у цільовому deployment; для локальної розробки використовувати окремий порт/origin. Не надавати preview доступ до стану builder.
-- [ ] Підтримати responsive viewport, click-to-select і підсвічування вибраного DOM вузла.
+- [ ] Використати `shallowReactive` або `shallowRef` для стану редактора (AST), щоб уникнути оверхеду реактивності Vue на великих деревах.
+- [ ] Перевести палітру, canvas/layers, inspector і selection на AST та mutations. Зберегти undo/redo.
+- [ ] Додати `postMessage` bridge з контрактом `SELECT_NODE`, `NODE_CLICKED`, hover/inspect. Надсилати між вікнами лише атомарні diffs, а не весь AST.
+- [ ] Візуальне виділення (highlight) рендерити поверх iframe в редакторі на основі `DOMRect` координат з iframe, щоб не забруднювати згенерований DOM.
 
-## Phase 3 — mutations → incremental compilation → Vite HMR
+## Phase 3 — mutations → in-browser incremental compilation → HMR
 
-**Критерій завершення:** редагування однієї сторінки оновлює лише її залежні модулі через HMR без перезапуску preview; інші сторінки не перебудовуються.
+**Критерій завершення:** редагування однієї сторінки оновлює лише її залежні модулі через in-browser HMR без перезапуску preview; інші сторінки не перебудовуються.
 
-- [ ] Ввести `BuildSession { projectId, version, status, virtualFS, moduleGraph, compilerCache, devServer }` для активного проєкту.
 - [ ] Побудувати dependency graph від AST nodes/components/pages до generated modules; фіксувати набір affected modules для кожної mutation.
-- [ ] Генерувати стабільні шляхи модулів і змінювати тільки відповідні virtual files, щоб Vite отримував точний HMR update.
-- [ ] Кешувати результат генерації/збірки за hash джерела та залежностей; інвалідувати кеш при зміні registry, theme і compiler version.
-- [ ] Передавати mutations до build session через типізований протокол (WebSocket, якщо потрібні live updates); підтримати reconnect, version sync і full refresh при розходженні версій.
-- [ ] Зберігати checkpoints/snapshots і журнал mutations для recovery та audit; autosave не має губити незастосовані зміни.
-- [ ] Виміряти latency зміна → HMR → готовий iframe і кількість перебудованих модулів; перевірити props, move, delete, theme і cross-page dependencies.
+- [ ] Дробити генерацію: компілювати складні вузли/секції в окремі віртуальні компоненти, а не генерувати сторінку монолітом.
+- [ ] Реалізувати кешування (`memoization`) на рівні компілятора: якщо `nodeId` + `version` не змінилися, миттєво віддавати закешований рядок коду.
+- [ ] Надсилати HMR-патчі в iframe (через `postMessage` або легкий WebSocket клієнт) для точкового оновлення змінених модулів.
+- [ ] Зберігати checkpoints/snapshots і журнал mutations для recovery та audit.
+- [ ] Виміряти latency: зміна → Web Worker diffing → Service Worker → HMR → готовий iframe.
 
 ## Phase 4 — збереження, assets і production publish
 
-**Критерій завершення:** publish фіксує конкретну версію AST, створює відтворюваний artifact і release URL; rollback перемикає production на попередній release.
+**Критерій завершення:** publish фіксує конкретну версію AST, створює відтворюваний artifact на сервері і release URL.
 
 - [ ] API для проєктів, версій, snapshots, mutations, sessions, builds та releases з перевіркою прав доступу.
 - [ ] PostgreSQL для metadata і snapshots; object storage для assets, generated source, artifacts та published releases.
-- [ ] Asset pipeline: upload → asset ID → storage/CDN; AST зберігає `asset://...`, compiler перетворює його на URL або локальний ресурс build.
-- [ ] Черга production jobs і окремий worker; для MVP допустимий in-process adapter з тим самим контрактом.
-- [ ] Publish: immutable snapshot → shared compiler → Vite/Nuxt production target → artifact → object storage/CDN → release URL. Nuxt додавати, коли потрібні SSR/SSG; для статичного MVP достатньо Vite.
-- [ ] Версійовані releases без перезапису (`release-150`, `release-151`); production вказує на обраний release. Додати rollback і preview URL для release.
-- [ ] Перевірити, що dev preview та production artifact однаково відтворюють один snapshot.
+- [ ] Asset pipeline: upload → asset ID → storage/CDN; AST зберігає `asset://...`, compiler перетворює його на URL.
+- [ ] Черга production jobs і окремий Node.js worker (наприклад, Railway/Vercel/Cloudflare Workers), який бере JSON AST і запускає справжній Vite/Nuxt build для production.
+- [ ] Publish: immutable snapshot → shared compiler → Vite/Nuxt production target → artifact → object storage/CDN → release URL.
+- [ ] Версійовані releases без перезапису (`release-150`, `release-151`); production вказує на обраний release. Додати rollback.
 
 ## Розширення після базового циклу
 
 - [ ] DataSources (REST/GraphQL), bindings та runtime data state.
 - [ ] Actions для events, API викликів, навігації та оновлення state; визначити дозволені можливості й безпечне виконання.
 - [ ] Модель state: local, page, global, URL і data.
-- [ ] Для кількох worker instances додати маршрутизацію `projectId → workerId` через Redis, щоб mutation потрапляла до session з теплим кешем.
-- [ ] Collaboration і спільне редагування поверх версійованого mutation log.
-- [ ] Розглядати WASM лише після вимірювання bottleneck; кандидатами є normalization, dependency analysis, template/CSS generation, hashing і diffing.
+- [ ] Collaboration і спільне редагування поверх версійованого mutation log (CRDT/Yjs).
+- [ ] Розглядати WebAssembly (WASM) **виключно** після профілювання на великих проєктах, якщо JS Web Worker стане вузьким місцем (кандидати: normalization, dependency analysis, template/CSS generation). На етапі MVP — не застосовувати.
