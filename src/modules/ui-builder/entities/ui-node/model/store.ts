@@ -5,6 +5,7 @@ import { getComponentDef } from './componentDefinitions'
 import { HISTORY_COMMIT_DELAY_MS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
 import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from './document'
 import { cloneNode, cloneNodeWithNewIds, createNodeId } from './nodeUtils'
+import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
 import type { UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
@@ -66,14 +67,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const pending = computed(() => JSON.stringify(rootNode.value) !== history.value[historyIndex.value])
   const canUndo = computed(() => pending.value || historyIndex.value > 0)
   const canRedo = computed(() => !pending.value && historyIndex.value < history.value.length - 1)
-  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => {
-    if (node.id === id) return node
-    for (const child of [...node.children, ...Object.values(node.slots).flat()]) {
-      const found = findNodeById(id, child)
-      if (found) return found
-    }
-    return null
-  }
+  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null =>
+    findNodeByIdInTree(id, node)
   const restore = () => {
     restoring = true
     rootNode.value = JSON.parse(history.value[historyIndex.value])
@@ -83,21 +78,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const undo = () => { commit(); if (historyIndex.value > 0) { historyIndex.value--; restore() } }
   const redo = () => { if (canRedo.value) { historyIndex.value++; restore() } }
 
-  type Location = { parent: UiNode; index: number; slotName: string | null }
-  const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): Location | null => {
-    const index = parent.children.findIndex(c => c.id === id)
-    if (index !== -1) return { parent, index, slotName: null }
-    for (const [slotName, nodes] of Object.entries(parent.slots)) {
-      const index = nodes.findIndex(c => c.id === id)
-      if (index !== -1) return { parent, index, slotName }
-    }
-    for (const child of [...parent.children, ...Object.values(parent.slots).flat()]) {
-      const found = findParentAndIndex(id, child)
-      if (found) return found
-    }
-    return null
-  }
-  const listAt = (loc: Location) => loc.slotName ? loc.parent.slots[loc.slotName] : loc.parent.children
+  const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): NodeLocation | null =>
+    findParentAndIndexInTree(id, parent)
   const canContain = (node: UiNode, slotName: string | null = null) => {
     const def = getComponentDef(node.type)
     return !!def && (slotName
@@ -150,7 +132,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const loc = findParentAndIndex(id)
     if (!loc) return
     commit()
-    const list = listAt(loc)
+    const list = getNodeList(loc)
     const clone = cloneNodeWithNewIds(list[loc.index])
     list.splice(loc.index + 1, 0, clone)
     selectNode(clone.id)
@@ -161,7 +143,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const loc = findParentAndIndex(id)
     if (!loc) return false
     commit()
-    listAt(loc).splice(loc.index, 1)
+    getNodeList(loc).splice(loc.index, 1)
     selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
     commit()
     notice.value = 'Element deleted. Use Undo to restore it.'
@@ -175,7 +157,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (!areNodesSiblings(ids) || !getComponentDef(type)?.isWrapContainer) return
     commit()
     const locs = ids.map(id => findParentAndIndex(id)!).sort((a, b) => a.index - b.index)
-    const list = listAt(locs[0])
+    const list = getNodeList(locs[0])
     const wrapper = createNode(type)
     wrapper.children = locs.map(l => list[l.index])
     for (const loc of [...locs].reverse()) list.splice(loc.index, 1)
@@ -195,7 +177,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (reason) { notice.value = reason; return false }
     const loc = findParentAndIndex(id)!
     commit()
-    const list = listAt(loc)
+    const list = getNodeList(loc)
     const children = list[loc.index].children
     list.splice(loc.index, 1, ...children)
     selectedNodeIds.value = children.map(n => n.id)
@@ -214,7 +196,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const parent = findNodeById(parentId)
     if (!node || !loc || !parent || !canContain(parent, slotName) || findNodeById(parentId, node)) return false
     commit()
-    listAt(loc).splice(loc.index, 1)
+    getNodeList(loc).splice(loc.index, 1)
     if (slotName) (parent.slots[slotName] ??= []).push(node)
     else parent.children.push(node)
     commit()
@@ -224,13 +206,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const canReorder = (id: string, direction: number) => {
     const loc = findParentAndIndex(id)
-    return !!loc && loc.index + direction >= 0 && loc.index + direction < listAt(loc).length
+    return !!loc && loc.index + direction >= 0 && loc.index + direction < getNodeList(loc).length
   }
   const reorderNode = (id: string, direction: number) => {
     if (!canReorder(id, direction)) return
     commit()
     const loc = findParentAndIndex(id)!
-    const list = listAt(loc)
+    const list = getNodeList(loc)
     list.splice(loc.index + direction, 0, list.splice(loc.index, 1)[0])
     commit()
   }
