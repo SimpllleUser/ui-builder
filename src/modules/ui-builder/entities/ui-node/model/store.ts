@@ -6,6 +6,7 @@ import { HISTORY_COMMIT_DELAY_MS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_T
 import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from './document'
 import { cloneNode, cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
+import { createHistory } from './history'
 import type { UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
@@ -26,11 +27,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const selectedNodeId = computed(() => selectedNodeIds.value[0] ?? null)
   const isPreviewMode = ref(false)
   const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
-  const history = ref<string[]>([JSON.stringify(initial)])
-  const historyIndex = ref(0)
   let historyTimer: ReturnType<typeof setTimeout> | undefined
   let saveTimer: ReturnType<typeof setTimeout> | undefined
-  let restoring = false
 
   const saveDocument = () => {
     clearTimeout(saveTimer)
@@ -43,40 +41,41 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       notice.value = 'Could not save in this browser. Export your page to keep a backup.'
     }
   }
+  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null =>
+    findNodeByIdInTree(id, node)
+
+  const history = createHistory(
+    () => JSON.stringify(rootNode.value),
+    snapshot => {
+      rootNode.value = JSON.parse(snapshot)
+      selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
+    },
+    MAX_HISTORY_ENTRIES,
+  )
+  const { canUndo, canRedo, commit: commitHistory } = history
   const commit = () => {
     clearTimeout(historyTimer)
-    if (restoring) return
-    const snapshot = JSON.stringify(rootNode.value)
-    if (history.value[historyIndex.value] === snapshot) return
-    history.value = history.value.slice(0, historyIndex.value + 1)
-    history.value.push(snapshot)
-    if (history.value.length > MAX_HISTORY_ENTRIES) history.value.shift()
-    historyIndex.value = history.value.length - 1
+    if (!history.isRestoring.value) commitHistory()
   }
+  const undo = () => {
+    clearTimeout(historyTimer)
+    history.undo()
+  }
+  const redo = () => {
+    clearTimeout(historyTimer)
+    history.redo()
+  }
+
   watch(rootNode, () => {
     saveState.value = 'saving'
     clearTimeout(saveTimer)
     saveTimer = setTimeout(saveDocument, 250)
-    if (!restoring) {
+    if (!history.isRestoring.value) {
       clearTimeout(historyTimer)
       historyTimer = setTimeout(commit, HISTORY_COMMIT_DELAY_MS)
     }
   }, { deep: true, flush: 'sync' })
   onScopeDispose(() => { clearTimeout(historyTimer); clearTimeout(saveTimer) })
-
-  const pending = computed(() => JSON.stringify(rootNode.value) !== history.value[historyIndex.value])
-  const canUndo = computed(() => pending.value || historyIndex.value > 0)
-  const canRedo = computed(() => !pending.value && historyIndex.value < history.value.length - 1)
-  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null =>
-    findNodeByIdInTree(id, node)
-  const restore = () => {
-    restoring = true
-    rootNode.value = JSON.parse(history.value[historyIndex.value])
-    selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
-    restoring = false
-  }
-  const undo = () => { commit(); if (historyIndex.value > 0) { historyIndex.value--; restore() } }
-  const redo = () => { if (canRedo.value) { historyIndex.value++; restore() } }
 
   const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): NodeLocation | null =>
     findParentAndIndexInTree(id, parent)
