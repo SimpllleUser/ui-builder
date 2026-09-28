@@ -100,8 +100,9 @@ const getNumberProp = (prop: string) => {
   return typeof value === 'number' ? value : 0
 }
 
+const getBooleanProp = (prop: string) => selectedNode.value?.props[prop] === true
 const updateProp = (prop: string, value: unknown) => {
-  if (selectedNode.value) selectedNode.value.props[prop] = value
+  if (selectedNode.value) store.updateNodeProp(selectedNode.value.id, prop, value)
 }
 
 const allIcons = Object.entries(Icons).map(([name, value]) => ({ name, value }))
@@ -277,14 +278,14 @@ const addCustomClass = () => {
         </div>
       </div>
       <nav aria-label="Element path" class="element-path"><button v-for="node in breadcrumb" :key="node.id" @click="store.selectNode(node.id)">{{ node.name }}</button></nav>
-      <VTextField v-if="selectedNode.type !== TEXT_NODE_TYPE" v-model="selectedNode.name" label="Element name" variant="outlined" density="compact" hide-details class="my-3" @blur="store.commit()" />
+      <VTextField v-if="selectedNode.type !== TEXT_NODE_TYPE" :model-value="selectedNode.name" @update:model-value="value => store.updateNodeName(selectedNode.id, value)" label="Element name" variant="outlined" density="compact" hide-details class="my-3" @blur="store.commit()" />
       <VBtn v-if="!isRoot" variant="text" size="small" prepend-icon="mdi-folder-move-outline" class="mb-2" @click="moveTarget = ''; moveDialog = true">Move to…</VBtn>
       <VTabs v-model="activeTab" density="compact" class="property-tabs"><VTab value="content">Content</VTab><VTab value="layout">Layout</VTab><VTab value="appearance">Style</VTab><VTab value="advanced">Advanced</VTab></VTabs>
 
       <VDivider class="mb-4" />
 
       <div class="pt-4">
-        <VTextarea v-if="activeTab === 'content' && textChild" v-model="textChild.name" label="Text content" variant="outlined" density="compact" auto-grow rows="2" class="mb-4" hide-details />
+        <VTextarea v-if="activeTab === 'content' && textChild" :model-value="textChild.name" @update:model-value="value => store.updateNodeName(textChild.id, value)" label="Text content" variant="outlined" density="compact" auto-grow rows="2" class="mb-4" hide-details />
         <p v-if="activeTab !== 'advanced' && !activeSections.length && !(activeTab === 'content' && textChild)" class="text-body-2 text-medium-emphasis">No {{ activeTab }} settings for this element.</p>
         <template v-for="section in activeSections" :key="section.title">
           <div class="mb-6">
@@ -294,7 +295,8 @@ const addCustomClass = () => {
 
               <VTextField
                 v-if="field.kind === 'text'"
-                v-model="selectedNode.props[field.prop]"
+                :model-value="getStringProp(field.prop)"
+                @update:model-value="value => updateProp(field.prop, value)"
                 :label="field.label"
                 :placeholder="field.placeholder"
                 :clearable="field.clearable"
@@ -306,7 +308,8 @@ const addCustomClass = () => {
 
               <VTextarea
                 v-else-if="field.kind === 'textarea'"
-                v-model="selectedNode.name"
+                :model-value="selectedNode.name"
+                @update:model-value="value => store.updateNodeName(selectedNode.id, value)"
                 :label="field.label"
                 variant="outlined"
                 density="compact"
@@ -329,7 +332,8 @@ const addCustomClass = () => {
 
               <VSwitch
                 v-else-if="field.kind === 'switch'"
-                v-model="selectedNode.props[field.prop]"
+                :model-value="getBooleanProp(field.prop)"
+                @update:model-value="value => updateProp(field.prop, value)"
                 :label="field.label"
                 density="compact"
                 color="primary"
@@ -339,7 +343,8 @@ const addCustomClass = () => {
 
               <VAutocomplete
                 v-else-if="field.kind === 'icon-picker'"
-                v-model="selectedNode.props[field.prop]"
+                :model-value="getStringProp(field.prop)"
+                @update:model-value="value => updateProp(field.prop, value)"
                 :items="allIcons"
                 item-title="name"
                 item-value="value"
@@ -384,7 +389,8 @@ const addCustomClass = () => {
                 <VTextField
                   v-for="f in field.fields"
                   :key="f.prop"
-                  v-model="selectedNode.props[f.prop]"
+                  :model-value="getStringProp(f.prop)"
+                  @update:model-value="value => updateProp(f.prop, value)"
                   :label="f.label"
                   :placeholder="f.placeholder"
                   variant="outlined"
@@ -397,7 +403,8 @@ const addCustomClass = () => {
                 <VAutocomplete
                   v-for="s in field.slots"
                   :key="s.prop"
-                  v-model="selectedNode.props[s.prop]"
+                  :model-value="getStringProp(s.prop)"
+                  @update:model-value="value => updateProp(s.prop, value)"
                   :items="allIcons"
                   item-title="name"
                   item-value="value"
