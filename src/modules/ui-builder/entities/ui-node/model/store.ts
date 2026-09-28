@@ -7,6 +7,7 @@ import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from '.
 import { cloneNode, cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
 import { createHistory } from './history'
+import { appendNode, canReorder as canReorderNode, deleteNode as deleteNodeMutation, duplicateNode as duplicateNodeMutation, moveNode as moveNodeMutation, reorderNode as reorderNodeMutation, type NodeMutationContext } from './nodeMutations'
 import type { UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
@@ -91,6 +92,19 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     return node ?? rootNode.value
   })
   const selectNode = (id: string | null) => { selectedNodeIds.value = id && findNodeById(id) ? [id] : [] }
+  const mutationContext: NodeMutationContext = {
+    findNodeById,
+    findParentAndIndex,
+    getNodeList,
+    canContain,
+    cloneNodeWithNewIds,
+    commit,
+    selectNode,
+    setNotice: message => { notice.value = message },
+    clearDeletedSelection: () => {
+      selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
+    },
+  }
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
     if (!def) throw new Error('Unknown component type')
@@ -102,17 +116,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
         : (def.defaultChildren ?? []).map(type => createNode(type)),
     }
   }
-  const append = (parentId: string, node: UiNode, slotName: string | null = null) => {
-    const parent = findNodeById(parentId)
-    if (!parent || !canContain(parent, slotName)) { notice.value = 'Choose a container that accepts this content.'; return false }
-    commit()
-    if (slotName) (parent.slots[slotName] ??= []).push(node)
-    else parent.children.push(node)
-    selectNode(node.id)
-    commit()
-    notice.value = `Added ${node.name} to ${parent.name}${slotName ? ` / ${slotName}` : ''}.`
-    return true
-  }
+  const append = (parentId: string, node: UiNode, slotName: string | null = null) =>
+    appendNode(mutationContext, parentId, node, slotName)
   const addComponent = (type: string, parentId = insertionTarget.value.id) => append(parentId, createNode(type))
   const savePrefab = (nodeId: string, name: string) => {
     const node = findNodeById(nodeId)
@@ -127,27 +132,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (!slotName) while (parent && !canContain(parent)) parent = findParentAndIndex(parent.id)?.parent ?? null
     return append(parent?.id ?? ROOT_NODE_ID, cloneNodeWithNewIds(prefab.node), slotName)
   }
-  const duplicateNode = (id: string) => {
-    const loc = findParentAndIndex(id)
-    if (!loc) return
-    commit()
-    const list = getNodeList(loc)
-    const clone = cloneNodeWithNewIds(list[loc.index])
-    list.splice(loc.index + 1, 0, clone)
-    selectNode(clone.id)
-    commit()
-    return clone.id
-  }
-  const deleteNode = (id: string) => {
-    const loc = findParentAndIndex(id)
-    if (!loc) return false
-    commit()
-    getNodeList(loc).splice(loc.index, 1)
-    selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
-    commit()
-    notice.value = 'Element deleted. Use Undo to restore it.'
-    return true
-  }
+  const duplicateNode = (id: string) => duplicateNodeMutation(mutationContext, id)
+  const deleteNode = (id: string) => deleteNodeMutation(mutationContext, id)
   const areNodesSiblings = (ids: string[]) => {
     const locs = ids.map(id => findParentAndIndex(id))
     return locs.length > 0 && locs.every(l => l && l.parent.id === locs[0]?.parent.id && l.slotName === locs[0]?.slotName)
@@ -189,32 +175,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const parent = findParentAndIndex(id)?.parent
     return [...(parent ? pathTo(parent.id) : []), node]
   }
-  const moveNode = (id: string, parentId: string, slotName: string | null = null) => {
-    const node = findNodeById(id)
-    const loc = findParentAndIndex(id)
-    const parent = findNodeById(parentId)
-    if (!node || !loc || !parent || !canContain(parent, slotName) || findNodeById(parentId, node)) return false
-    commit()
-    getNodeList(loc).splice(loc.index, 1)
-    if (slotName) (parent.slots[slotName] ??= []).push(node)
-    else parent.children.push(node)
-    commit()
-    selectNode(id)
-    notice.value = `Moved ${node.name} to ${parent.name}.`
-    return true
-  }
-  const canReorder = (id: string, direction: number) => {
-    const loc = findParentAndIndex(id)
-    return !!loc && loc.index + direction >= 0 && loc.index + direction < getNodeList(loc).length
-  }
-  const reorderNode = (id: string, direction: number) => {
-    if (!canReorder(id, direction)) return
-    commit()
-    const loc = findParentAndIndex(id)!
-    const list = getNodeList(loc)
-    list.splice(loc.index + direction, 0, list.splice(loc.index, 1)[0])
-    commit()
-  }
+  const moveNode = (id: string, parentId: string, slotName: string | null = null) =>
+    moveNodeMutation(mutationContext, id, parentId, slotName)
+  const canReorder = (id: string, direction: number) => canReorderNode(mutationContext, id, direction)
+  const reorderNode = (id: string, direction: number) => reorderNodeMutation(mutationContext, id, direction)
   const importDocument = (text: string) => {
     const document = parseDocument(text)
     commit()
