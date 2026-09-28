@@ -70,10 +70,23 @@ const moveTargets = computed(() => {
   visit(store.rootNode, [])
   return result
 })
+
+type MoveDestination = { parentId: string; slot: string | null }
+const parseMoveDestination = (value: string): MoveDestination | null => {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed) || typeof parsed[0] !== 'string') return null
+    if (parsed[1] !== null && typeof parsed[1] !== 'string') return null
+    return { parentId: parsed[0], slot: parsed[1] }
+  } catch {
+    return null
+  }
+}
 const moveSelected = () => {
   if (!selectedNodeId.value || !moveTarget.value) return
-  const [parentId, slot] = JSON.parse(moveTarget.value)
-  if (store.moveNode(selectedNodeId.value, parentId, slot)) moveDialog.value = false
+  const destination = parseMoveDestination(moveTarget.value)
+  if (!destination) return
+  if (store.moveNode(selectedNodeId.value, destination.parentId, destination.slot)) moveDialog.value = false
 }
 watch(selectedNodeId, () => {
   activeSpacingType.value = 'm'
