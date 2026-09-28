@@ -90,6 +90,20 @@ const updateSpacing = (type: 'm' | 'p', side: string, value: number | string | n
 }
 const getSpacingValue = (type: 'm' | 'p', side: string) => readSpacing(selectedNode.value?.classes ?? [], type, side)
 
+const getStringProp = (prop: string) => {
+  const value = selectedNode.value?.props[prop]
+  return typeof value === 'string' ? value : null
+}
+
+const getNumberProp = (prop: string) => {
+  const value = selectedNode.value?.props[prop]
+  return typeof value === 'number' ? value : 0
+}
+
+const updateProp = (prop: string, value: unknown) => {
+  if (selectedNode.value) selectedNode.value.props[prop] = value
+}
+
 const allIcons = Object.entries(Icons).map(([name, value]) => ({ name, value }))
 
 const flexOptions = [
@@ -300,7 +314,8 @@ const addCustomClass = () => {
 
               <VSelect
                 v-else-if="field.kind === 'select'"
-                v-model="selectedNode.props[field.prop]"
+                :model-value="getStringProp(field.prop)"
+                @update:model-value="value => updateProp(field.prop, value)"
                 :label="field.label"
                 :items="field.options"
                 variant="outlined"
@@ -337,8 +352,8 @@ const addCustomClass = () => {
                 </template>
                 <template #prepend-inner>
                   <VIcon
-                    v-if="selectedNode.props[field.prop]"
-                    :icon="selectedNode.props[field.prop]"
+                    v-if="getStringProp(field.prop)"
+                    :icon="getStringProp(field.prop) ?? undefined"
                     size="18"
                     class="mr-1"
                   />
@@ -350,7 +365,8 @@ const addCustomClass = () => {
                   {{ field.label }}: {{ selectedNode.props[field.prop] ?? field.min }}
                 </div>
                 <VSlider
-                  v-model="selectedNode.props[field.prop]"
+                  :model-value="getNumberProp(field.prop)"
+                  @update:model-value="value => updateProp(field.prop, value)"
                   :min="field.min"
                   :max="field.max"
                   :step="field.step ?? 1"

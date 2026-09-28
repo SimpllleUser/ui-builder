@@ -6,7 +6,7 @@ export interface UiNode {
   id: string
   type: ComponentType | string
   name: string
-  props: Record<string, any>
+  props: Record<string, unknown>
   classes: string[]
   children: UiNode[]
   slots: Record<string, UiNode[]>
