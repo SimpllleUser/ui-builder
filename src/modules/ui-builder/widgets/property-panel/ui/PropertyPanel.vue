@@ -10,6 +10,7 @@ import { useClassEditor } from '../model/useClassEditor'
 import { useSpacingEditor } from '../model/useSpacingEditor'
 import { useStyleEditor } from '../model/useStyleEditor'
 import AdvancedProperties from './AdvancedProperties.vue'
+import MoveNodeDialog from './MoveNodeDialog.vue'
 
 const store = useUiTreeStore()
 const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
@@ -386,12 +387,13 @@ const fieldKey = (field: PropField) =>
         <VCardActions><VSpacer /><VBtn @click="saveDialog = false">Cancel</VBtn><VBtn color="primary" :disabled="!prefabName.trim()" @click="savePrefab">Save component</VBtn></VCardActions>
       </VCard>
     </VDialog>
-    <VDialog v-model="moveDialog" max-width="520">
-      <VCard title="Move element">
-        <VCardText><VSelect v-model="moveTarget" :items="moveTargets" label="Destination container or slot" variant="outlined" hide-details /></VCardText>
-        <VCardActions><VSpacer /><VBtn @click="moveDialog = false">Cancel</VBtn><VBtn color="primary" :disabled="!moveTarget" @click="moveSelected">Move</VBtn></VCardActions>
-      </VCard>
-    </VDialog>
+    <MoveNodeDialog
+      v-model="moveDialog"
+      :target="moveTarget"
+      :targets="moveTargets"
+      @update:target="moveTarget = $event"
+      @move="moveSelected"
+    />
   </div>
 </template>
 
