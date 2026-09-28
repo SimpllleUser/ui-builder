@@ -7,7 +7,8 @@ import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from '.
 import { cloneNode, cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
 import { createHistory } from './history'
-import { appendNode, canReorder as canReorderNode, deleteNode as deleteNodeMutation, duplicateNode as duplicateNodeMutation, moveNode as moveNodeMutation, reorderNode as reorderNodeMutation, type NodeMutationContext } from './nodeMutations'
+import { appendNode, canReorder as canReorderNode, deleteNode as deleteNodeMutation, duplicateNode as duplicateNodeMutation, moveNode as moveNodeMutation, reorderNode as reorderNodeMutation } from './nodeMutations'
+import { areNodesSiblings as areNodesSiblingsMutation, getUnwrapReason, unwrapNode as unwrapNodeMutation, wrapNodes as wrapNodesMutation, type ContainerMutationContext } from './containerMutations'
 import type { UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
@@ -92,7 +93,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     return node ?? rootNode.value
   })
   const selectNode = (id: string | null) => { selectedNodeIds.value = id && findNodeById(id) ? [id] : [] }
-  const mutationContext: NodeMutationContext = {
+  const mutationContext: ContainerMutationContext = {
     findNodeById,
     findParentAndIndex,
     getNodeList,
@@ -104,6 +105,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     clearDeletedSelection: () => {
       selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
     },
+    createNode: type => createNode(type),
+    getComponentDef,
+    setSelectedNodeIds: ids => { selectedNodeIds.value = ids },
   }
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
@@ -134,41 +138,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const duplicateNode = (id: string) => duplicateNodeMutation(mutationContext, id)
   const deleteNode = (id: string) => deleteNodeMutation(mutationContext, id)
-  const areNodesSiblings = (ids: string[]) => {
-    const locs = ids.map(id => findParentAndIndex(id))
-    return locs.length > 0 && locs.every(l => l && l.parent.id === locs[0]?.parent.id && l.slotName === locs[0]?.slotName)
-  }
-  const wrapNodes = (ids: string[], type: string) => {
-    if (!areNodesSiblings(ids) || !getComponentDef(type)?.isWrapContainer) return
-    commit()
-    const locs = ids.map(id => findParentAndIndex(id)!).sort((a, b) => a.index - b.index)
-    const list = getNodeList(locs[0])
-    const wrapper = createNode(type)
-    wrapper.children = locs.map(l => list[l.index])
-    for (const loc of [...locs].reverse()) list.splice(loc.index, 1)
-    list.splice(locs[0].index, 0, wrapper)
-    selectNode(wrapper.id)
-    commit()
-  }
-  const unwrapReason = (id: string): string => {
-    const node = findNodeById(id)
-    if (!node || id === ROOT_NODE_ID || !getComponentDef(node.type)?.isWrapContainer) return 'Choose a container to unwrap.'
-    if (Object.values(node.slots).some(nodes => nodes.length)) return 'Move content out of named slots before unwrapping this container.'
-    if (!node.children.length) return 'This container has no children to unwrap.'
-    return ''
-  }
-  const unwrapNode = (id: string) => {
-    const reason = unwrapReason(id)
-    if (reason) { notice.value = reason; return false }
-    const loc = findParentAndIndex(id)!
-    commit()
-    const list = getNodeList(loc)
-    const children = list[loc.index].children
-    list.splice(loc.index, 1, ...children)
-    selectedNodeIds.value = children.map(n => n.id)
-    commit()
-    return true
-  }
+  const areNodesSiblings = (ids: string[]) => areNodesSiblingsMutation(mutationContext, ids)
+  const wrapNodes = (ids: string[], type: string) => wrapNodesMutation(mutationContext, ids, type)
+  const unwrapReason = (id: string) => getUnwrapReason(mutationContext, id)
+  const unwrapNode = (id: string) => unwrapNodeMutation(mutationContext, id)
   const pathTo = (id: string): UiNode[] => {
     const node = findNodeById(id)
     if (!node) return []
