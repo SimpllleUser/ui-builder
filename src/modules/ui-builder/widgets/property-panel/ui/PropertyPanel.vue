@@ -63,7 +63,7 @@ const updateCommonSpacing = (side: string, value: number | string | null) => {
   store.commit()
   for (const id of selectedNodeIds.value) {
     const node = store.findNodeById(id)!
-    node.classes = writeSpacing(node.classes, activeSpacingType.value, side, value)
+    store.updateNodeClasses(id, writeSpacing(node.classes, activeSpacingType.value, side, value))
   }
   store.commit()
 }
@@ -86,7 +86,7 @@ const spacingSides = [
 ]
 const spacingSizes = [{ title: 'Default / mixed', value: null }, ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16].map(n => ({ title: `${n * 4} px`, value: n }))]
 const updateSpacing = (type: 'm' | 'p', side: string, value: number | string | null) => {
-  if (selectedNode.value) selectedNode.value.classes = writeSpacing(selectedNode.value.classes, type, side, value)
+  if (selectedNode.value) store.updateNodeClasses(selectedNode.value.id, writeSpacing(selectedNode.value.classes, type, side, value))
 }
 const getSpacingValue = (type: 'm' | 'p', side: string) => readSpacing(selectedNode.value?.classes ?? [], type, side)
 
@@ -114,7 +114,7 @@ const flexOptions = [
 
 const getFlexValue = () => readFlex(selectedNode.value?.classes ?? [])
 const setFlexValue = (value: string) => {
-  if (selectedNode.value) selectedNode.value.classes = writeFlex(selectedNode.value.classes, value)
+  if (selectedNode.value) store.updateNodeClasses(selectedNode.value.id, writeFlex(selectedNode.value.classes, value))
 }
 
 const getJustifyValue = () =>
@@ -122,9 +122,10 @@ const getJustifyValue = () =>
 
 const setJustifyValue = (val: string) => {
   if (!selectedNode.value) return
-  selectedNode.value.classes = selectedNode.value.classes
-    .filter((c: string) => !c.startsWith('justify-'))
-  selectedNode.value.classes.push(val)
+  store.updateNodeClasses(selectedNode.value.id, [
+    ...selectedNode.value.classes.filter((c: string) => !c.startsWith('justify-')),
+    val,
+  ])
 }
 
 const fontWeights = [
@@ -139,9 +140,10 @@ const getFontWeight = () =>
 
 const setFontWeight = (val: string) => {
   if (!selectedNode.value) return
-  selectedNode.value.classes = selectedNode.value.classes
-    .filter((c: string) => !c.startsWith('font-weight-'))
-  if (val) selectedNode.value.classes.push(val)
+  store.updateNodeClasses(selectedNode.value.id, [
+    ...selectedNode.value.classes.filter((c: string) => !c.startsWith('font-weight-')),
+    ...(val ? [val] : []),
+  ])
 }
 
 const getTextAlign = () =>
@@ -151,9 +153,10 @@ const getTextAlign = () =>
 
 const setTextAlign = (val: string | null) => {
   if (!selectedNode.value) return
-  selectedNode.value.classes = selectedNode.value.classes
-    .filter((c: string) => !['text-left', 'text-center', 'text-right'].includes(c))
-  if (val) selectedNode.value.classes.push(val)
+  store.updateNodeClasses(selectedNode.value.id, [
+    ...selectedNode.value.classes.filter((c: string) => !['text-left', 'text-center', 'text-right'].includes(c)),
+    ...(val ? [val] : []),
+  ])
 }
 
 const fieldKey = (field: PropField) =>
@@ -233,7 +236,7 @@ const toggleClass = (cls: string) => {
     }
   }
   filtered.push(cls)
-  selectedNode.value.classes = filtered
+  store.updateNodeClasses(selectedNode.value.id, filtered)
 }
 
 const addCustomClass = () => {
