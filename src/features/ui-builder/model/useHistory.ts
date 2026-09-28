@@ -23,7 +23,7 @@ export function useHistory(canvas: Ref<PaletteItem[]>) {
 
   if (!past.value.length) past.value.push(serialize());
 
-  let t: any;
+  let t: ReturnType<typeof setTimeout> | undefined;
   watch(
     canvas,
     () => {
