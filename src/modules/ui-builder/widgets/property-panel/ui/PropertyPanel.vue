@@ -9,6 +9,7 @@ import { Icons } from '../../../../../shared/icons'
 import { useClassEditor } from '../model/useClassEditor'
 import { useSpacingEditor } from '../model/useSpacingEditor'
 import { useStyleEditor } from '../model/useStyleEditor'
+import AdvancedProperties from './AdvancedProperties.vue'
 
 const store = useUiTreeStore()
 const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
@@ -364,62 +365,15 @@ const fieldKey = (field: PropField) =>
         </template>
       </div>
 
-      <template v-if="activeTab === 'advanced'">
-      <div class="text-caption mb-4">Component: {{ selectedNode.type }}<br />ID: {{ selectedNode.id }}</div>
-
-      <div class="mb-2 text-overline text-primary font-weight-bold">Custom Classes</div>
-
-      <!-- Applied classes -->
-      <div v-if="selectedNode.classes.length" class="applied-chips mb-2">
-        <VChip
-          v-for="cls in selectedNode.classes"
-          :key="cls"
-          size="small"
-          closable
-          color="primary"
-          variant="tonal"
-          class="ma-1"
-          @click:close="toggleClass(cls)"
-        >{{ cls }}</VChip>
-      </div>
-      <div v-else class="text-caption text-medium-emphasis mb-2">No classes applied</div>
-
-      <!-- Search / add custom -->
-      <VTextField
-        v-model="classSearch"
-        label="Search or add CSS classes"
-        placeholder="Search or type class name…"
-        variant="outlined"
-        density="compact"
-        hide-details
-        clearable
-        class="mb-2"
-        prepend-inner-icon="mdi-magnify"
-        @keydown.enter.prevent="addCustomClass"
+      <AdvancedProperties
+        v-if="activeTab === 'advanced'"
+        :node="selectedNode"
+        :class-search="classSearch"
+        :filtered-groups="filteredGroups"
+        @update:class-search="classSearch = $event"
+        @toggle-class="toggleClass"
+        @add-custom-class="addCustomClass"
       />
-
-      <!-- Preset groups -->
-      <div class="preset-groups">
-        <div v-for="group in filteredGroups" :key="group.title" class="preset-group">
-          <div class="preset-group__title">{{ group.title }}</div>
-          <div class="preset-group__chips">
-            <VChip
-              v-for="cls in group.classes"
-              :key="cls"
-              size="small"
-              :variant="selectedNode.classes.includes(cls) ? 'flat' : 'tonal'"
-              :color="selectedNode.classes.includes(cls) ? 'primary' : 'default'"
-              class="preset-chip"
-              @click="toggleClass(cls)"
-            >{{ cls }}</VChip>
-          </div>
-        </div>
-        <div v-if="filteredGroups.length === 0" class="text-caption text-medium-emphasis text-center py-4">
-          No matches — press Enter to add "{{ classSearch }}"
-        </div>
-      </div>
-
-      </template>
     </div>
 
     <div v-else class="pa-10 text-center text-medium-emphasis mt-10">
@@ -447,44 +401,4 @@ const fieldKey = (field: PropField) =>
 .element-path button { font-size: 12px; min-height: 28px; color: rgb(var(--v-theme-primary)); overflow-wrap: anywhere; text-align: left; }
 .element-path button + button::before { content: '/'; padding-right: 4px; }
 .property-tabs :deep(.v-tab) { min-width: 0; padding-inline: 10px; font-size: 12px; text-transform: none; }
-.applied-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-}
-
-.preset-groups {
-  max-height: 260px;
-  overflow-y: auto;
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 8px;
-  padding: 6px 8px;
-}
-
-.preset-group + .preset-group {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(var(--v-border-color), calc(var(--v-border-opacity) * 0.5));
-}
-
-.preset-group__title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.8;
-  margin-bottom: 4px;
-}
-
-.preset-group__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
-
-.preset-chip {
-  cursor: pointer;
-  font-size: 12px !important;
-  transition: all 0.12s;
-}
 </style>
