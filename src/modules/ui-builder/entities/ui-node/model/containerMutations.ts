@@ -3,7 +3,7 @@ import type { UiNode } from './types'
 import type { NodeMutationContext } from './nodeMutations'
 
 export interface ContainerMutationContext extends NodeMutationContext {
-  createNode(type: string): UiNode
+  createNode(type: string, name?: string): UiNode
   getComponentDef(type: string): ComponentDef | undefined
   setSelectedNodeIds(ids: string[]): void
 }

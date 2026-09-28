@@ -4,11 +4,13 @@ import { useStorage } from '@vueuse/core'
 import { getComponentDef } from './componentDefinitions'
 import { HISTORY_COMMIT_DELAY_MS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
 import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from './document'
-import { cloneNode, cloneNodeWithNewIds, createNodeId } from './nodeUtils'
+import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
 import { createHistory } from './history'
 import { appendNode, canReorder as canReorderNode, deleteNode as deleteNodeMutation, duplicateNode as duplicateNodeMutation, moveNode as moveNodeMutation, reorderNode as reorderNodeMutation } from './nodeMutations'
 import { areNodesSiblings as areNodesSiblingsMutation, getUnwrapReason, unwrapNode as unwrapNodeMutation, wrapNodes as wrapNodesMutation, type ContainerMutationContext } from './containerMutations'
+import { deletePrefab as deletePrefabMutation, insertPrefab as insertPrefabMutation, savePrefab as savePrefabMutation, type PrefabMutationContext } from './prefabMutations'
+import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateKind } from './templateFactory'
 import type { UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
@@ -93,7 +95,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     return node ?? rootNode.value
   })
   const selectNode = (id: string | null) => { selectedNodeIds.value = id && findNodeById(id) ? [id] : [] }
-  const mutationContext: ContainerMutationContext = {
+  const mutationContext: ContainerMutationContext & PrefabMutationContext & TemplateContext = {
     findNodeById,
     findParentAndIndex,
     getNodeList,
@@ -105,9 +107,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     clearDeletedSelection: () => {
       selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
     },
-    createNode: type => createNode(type),
+    createNode: (type, name) => createNode(type, name),
     getComponentDef,
     setSelectedNodeIds: ids => { selectedNodeIds.value = ids },
+    getPrefabs: () => prefabs.value,
+    setPrefabs: value => { prefabs.value = value },
+    getInsertionTargetId: () => insertionTarget.value.id,
+    appendNode: (parentId, node, slotName) => appendNode(mutationContext, parentId, node, slotName),
   }
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
@@ -123,19 +129,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const append = (parentId: string, node: UiNode, slotName: string | null = null) =>
     appendNode(mutationContext, parentId, node, slotName)
   const addComponent = (type: string, parentId = insertionTarget.value.id) => append(parentId, createNode(type))
-  const savePrefab = (nodeId: string, name: string) => {
-    const node = findNodeById(nodeId)
-    if (!node || !name.trim()) return
-    prefabs.value = [...prefabs.value, { prefabId: createNodeId('prefab'), name: name.trim(), node: cloneNode(node) }]
-    notice.value = `Saved ${name.trim()} to My components.`
-  }
-  const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) => {
-    const prefab = prefabs.value.find(p => p.prefabId === prefabId)
-    if (!prefab) return false
-    let parent = findNodeById(parentId)
-    if (!slotName) while (parent && !canContain(parent)) parent = findParentAndIndex(parent.id)?.parent ?? null
-    return append(parent?.id ?? ROOT_NODE_ID, cloneNodeWithNewIds(prefab.node), slotName)
-  }
+  const savePrefab = (nodeId: string, name: string) => savePrefabMutation(mutationContext, nodeId, name)
+  const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) =>
+    insertPrefabMutation(mutationContext, prefabId, parentId, slotName)
   const duplicateNode = (id: string) => duplicateNodeMutation(mutationContext, id)
   const deleteNode = (id: string) => deleteNodeMutation(mutationContext, id)
   const areNodesSiblings = (ids: string[]) => areNodesSiblingsMutation(mutationContext, ids)
@@ -161,37 +157,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     saveDocument()
     notice.value = 'Page imported. Use Undo to return to the previous page.'
   }
-  const addTemplate = (kind: 'card' | 'form' | 'columns') => {
-    const card = createNode('VCard', kind === 'form' ? 'Contact form' : 'Welcome card')
-    card.classes = ['pa-6', 'rounded-lg']
-    const title = createNode('VCardTitle')
-    title.classes.push('text-wrap')
-    title.children[0].name = kind === 'form' ? 'Get in touch' : 'Your next idea starts here'
-    const text = createNode('VCardText')
-    text.children[0].name = 'Select an element to edit its content and appearance.'
-    const button = createNode('VBtn')
-    button.props = { color: 'primary', variant: 'flat' }
-    button.children[0].name = kind === 'form' ? 'Send message' : 'Get started'
-    card.children = [title, text]
-    if (kind === 'form') {
-      for (const label of ['Name', 'Email', 'Message']) {
-        const input = createNode('VTextField')
-        input.props = { label, variant: 'outlined', type: label === 'Email' ? 'email' : 'text' }
-        card.children.push(input)
-      }
-    }
-    card.children.push(button)
-    if (kind === 'columns') {
-      const row = createNode('VRow', 'Two columns')
-      row.children = [1, 2].map(n => {
-        const col = createNode('VCol', `Column ${n}`)
-        col.props = { cols: 12, md: 6 }
-        col.children = [cloneNodeWithNewIds(card)]
-        return col
-      })
-      append(ROOT_NODE_ID, row)
-    } else append(ROOT_NODE_ID, card)
-  }
+  const addTemplate = (kind: TemplateKind) => addTemplateMutation(mutationContext, kind)
 
   return {
     rootNode, selectedNodeIds, selectedNodeId, isPreviewMode, prefabs, notice, saveState,
@@ -199,7 +165,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     exportDocument: () => serializeDocument(rootNode.value),
     findNodeById, findParentAndIndex, pathTo, createNode, canContain, insertionTarget,
     addComponent, addTemplate, duplicateNode, deleteNode, savePrefab, insertPrefab,
-    deletePrefab: (id: string) => { prefabs.value = prefabs.value.filter(p => p.prefabId !== id); notice.value = 'Saved component deleted.' },
+    deletePrefab: (id: string) => deletePrefabMutation(mutationContext, id),
     selectNode,
     toggleMultiSelect: (id: string) => {
       if (!findNodeById(id)) return
