@@ -4,10 +4,11 @@ import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { getComponentDef, type PropField } from '../../../entities/ui-node/model/componentDefinitions'
 import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
-import { readSpacing, writeSpacing, readFlex, writeFlex } from '../../../entities/ui-node/model/layoutControls'
+import { readFlex, writeFlex } from '../../../entities/ui-node/model/layoutControls'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { Icons } from '../../../../../shared/icons'
 import { useClassEditor } from '../model/useClassEditor'
+import { useSpacingEditor } from '../model/useSpacingEditor'
 
 const store = useUiTreeStore()
 const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
@@ -19,6 +20,13 @@ const selectedNode = computed(() => {
 const { classSearch, filteredGroups, toggleClass, addCustomClass } = useClassEditor(
   selectedNode,
   (id, classes) => store.updateNodeClasses(id, classes),
+)
+const { activeSpacingType, spacingSides, spacingSizes, commonSpacing, updateCommonSpacing, updateSpacing, getSpacingValue } = useSpacingEditor(
+  selectedNode,
+  selectedNodeIds,
+  id => store.findNodeById(id),
+  (id, classes) => store.updateNodeClasses(id, classes),
+  () => store.commit(),
 )
 
 const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
@@ -60,20 +68,6 @@ const moveSelected = () => {
   const [parentId, slot] = JSON.parse(moveTarget.value)
   if (store.moveNode(selectedNodeId.value, parentId, slot)) moveDialog.value = false
 }
-const commonSpacing = (side: string) => {
-  const values = selectedNodeIds.value.map(id => readSpacing(store.findNodeById(id)!.classes, activeSpacingType.value, side))
-  return values.every(v => v === values[0]) ? values[0] : null
-}
-const updateCommonSpacing = (side: string, value: number | string | null) => {
-  store.commit()
-  for (const id of selectedNodeIds.value) {
-    const node = store.findNodeById(id)!
-    store.updateNodeClasses(id, writeSpacing(node.classes, activeSpacingType.value, side, value))
-  }
-  store.commit()
-}
-
-const activeSpacingType = ref<'m' | 'p'>('m')
 watch(selectedNodeId, () => {
   activeSpacingType.value = 'm'
   const node = selectedNode.value
@@ -82,18 +76,6 @@ watch(selectedNodeId, () => {
   else if (sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'layout'))) activeTab.value = 'layout'
   else activeTab.value = 'appearance'
 }, { immediate: true })
-
-const spacingSides = [
-  { label: 'All',      value: 'a' }, { label: 'Top',      value: 't' },
-  { label: 'Bottom',   value: 'b' }, { label: 'Left',      value: 'l' },
-  { label: 'Right',    value: 'r' }, { label: 'X (Horiz)', value: 'x' },
-  { label: 'Y (Vert)', value: 'y' },
-]
-const spacingSizes = [{ title: 'Default / mixed', value: null }, ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16].map(n => ({ title: `${n * 4} px`, value: n }))]
-const updateSpacing = (type: 'm' | 'p', side: string, value: number | string | null) => {
-  if (selectedNode.value) store.updateNodeClasses(selectedNode.value.id, writeSpacing(selectedNode.value.classes, type, side, value))
-}
-const getSpacingValue = (type: 'm' | 'p', side: string) => readSpacing(selectedNode.value?.classes ?? [], type, side)
 
 const getStringProp = (prop: string) => {
   const value = selectedNode.value?.props[prop]
