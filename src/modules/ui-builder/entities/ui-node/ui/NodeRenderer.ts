@@ -4,6 +4,7 @@ import * as Components from 'vuetify/components'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../model/store'
 import { getComponentDef } from '../model/componentDefinitions'
+import { TEXT_NODE_TYPE } from '../model/constants'
 
 /** Currently highlighted drop target on the canvas. Exported so MainCanvas can clear it. */
 export const canvasDragTargetId = ref<string | null>(null)
@@ -21,7 +22,7 @@ const NodeRenderer = defineComponent({
       const { node } = props
       if (!node || !node.id) return null
 
-      if (node.type === 'TEXT') {
+      if (node.type === TEXT_NODE_TYPE) {
         return h('span', {
           style: 'display: inline-block; min-width: 8px;',
           'data-node-id': node.id,

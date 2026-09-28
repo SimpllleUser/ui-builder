@@ -2,15 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch, onScopeDispose } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { getComponentDef } from './componentDefinitions'
+import { HISTORY_COMMIT_DELAY_MS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
 import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from './document'
+import { cloneNode, cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import type { UiNode, Prefab } from './types'
-
-const regenIds = (node: UiNode): UiNode => ({
-  ...node,
-  id: `ui_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`,
-  children: node.children.map(regenIds),
-  slots: Object.fromEntries(Object.entries(node.slots).map(([key, nodes]) => [key, nodes.map(regenIds)])),
-})
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
@@ -54,7 +49,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (history.value[historyIndex.value] === snapshot) return
     history.value = history.value.slice(0, historyIndex.value + 1)
     history.value.push(snapshot)
-    if (history.value.length > 50) history.value.shift()
+    if (history.value.length > MAX_HISTORY_ENTRIES) history.value.shift()
     historyIndex.value = history.value.length - 1
   }
   watch(rootNode, () => {
@@ -63,7 +58,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     saveTimer = setTimeout(saveDocument, 250)
     if (!restoring) {
       clearTimeout(historyTimer)
-      historyTimer = setTimeout(commit, 600)
+      historyTimer = setTimeout(commit, HISTORY_COMMIT_DELAY_MS)
     }
   }, { deep: true, flush: 'sync' })
   onScopeDispose(() => { clearTimeout(historyTimer); clearTimeout(saveTimer) })
@@ -118,11 +113,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
     if (!def) throw new Error('Unknown component type')
-    const id = `ui_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+    const id = createNodeId()
     return {
       id, type, name: name ?? def.label, props: { ...def.defaultProps }, classes: [...def.defaultClasses], slots: {},
       children: def.defaultTextChild
-        ? [{ id: `${id}_text`, type: 'TEXT', name: def.label, props: {}, classes: [], children: [], slots: {} }]
+        ? [{ id: `${id}_text`, type: TEXT_NODE_TYPE, name: def.label, props: {}, classes: [], children: [], slots: {} }]
         : (def.defaultChildren ?? []).map(type => createNode(type)),
     }
   }
@@ -141,7 +136,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const savePrefab = (nodeId: string, name: string) => {
     const node = findNodeById(nodeId)
     if (!node || !name.trim()) return
-    prefabs.value = [...prefabs.value, { prefabId: `prefab_${Date.now()}_${Math.random().toString(36).slice(2)}`, name: name.trim(), node: JSON.parse(JSON.stringify(node)) }]
+    prefabs.value = [...prefabs.value, { prefabId: createNodeId('prefab'), name: name.trim(), node: cloneNode(node) }]
     notice.value = `Saved ${name.trim()} to My components.`
   }
   const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) => {
@@ -149,14 +144,14 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (!prefab) return false
     let parent = findNodeById(parentId)
     if (!slotName) while (parent && !canContain(parent)) parent = findParentAndIndex(parent.id)?.parent ?? null
-    return append(parent?.id ?? 'root-canvas', regenIds(JSON.parse(JSON.stringify(prefab.node))), slotName)
+    return append(parent?.id ?? ROOT_NODE_ID, cloneNodeWithNewIds(prefab.node), slotName)
   }
   const duplicateNode = (id: string) => {
     const loc = findParentAndIndex(id)
     if (!loc) return
     commit()
     const list = listAt(loc)
-    const clone = regenIds(JSON.parse(JSON.stringify(list[loc.index])))
+    const clone = cloneNodeWithNewIds(list[loc.index])
     list.splice(loc.index + 1, 0, clone)
     selectNode(clone.id)
     commit()
@@ -190,7 +185,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const unwrapReason = (id: string): string => {
     const node = findNodeById(id)
-    if (!node || id === 'root-canvas' || !getComponentDef(node.type)?.isWrapContainer) return 'Choose a container to unwrap.'
+    if (!node || id === ROOT_NODE_ID || !getComponentDef(node.type)?.isWrapContainer) return 'Choose a container to unwrap.'
     if (Object.values(node.slots).some(nodes => nodes.length)) return 'Move content out of named slots before unwrapping this container.'
     if (!node.children.length) return 'This container has no children to unwrap.'
     return ''
@@ -273,11 +268,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       row.children = [1, 2].map(n => {
         const col = createNode('VCol', `Column ${n}`)
         col.props = { cols: 12, md: 6 }
-        col.children = [regenIds(JSON.parse(JSON.stringify(card)))]
+        col.children = [cloneNodeWithNewIds(card)]
         return col
       })
-      append('root-canvas', row)
-    } else append('root-canvas', card)
+      append(ROOT_NODE_ID, row)
+    } else append(ROOT_NODE_ID, card)
   }
 
   return {

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { getComponentDef, type PropField } from '../../../entities/ui-node/model/componentDefinitions'
+import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
 import { readSpacing, writeSpacing, readFlex, writeFlex } from '../../../entities/ui-node/model/layoutControls'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { Icons } from '../../../../../shared/icons'
@@ -15,7 +16,7 @@ const selectedNode = computed(() => {
   return store.findNodeById(selectedNodeId.value)
 })
 
-const isRoot = computed(() => selectedNode.value?.id === 'root-canvas')
+const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
 
 const activeTab = ref('content')
 const fieldTab = (field: PropField, title: string) => {
@@ -27,7 +28,7 @@ const fieldTab = (field: PropField, title: string) => {
 const activeSections = computed(() => (selectedNode.value ? getComponentDef(selectedNode.value.type)?.propertySections ?? [] : [])
   .map(section => ({ ...section, fields: section.fields.filter(field => field.kind !== 'custom-classes' && fieldTab(field, section.title ?? '') === activeTab.value) }))
   .filter(section => section.fields.length))
-const textChild = computed(() => selectedNode.value?.children.find(node => node.type === 'TEXT'))
+const textChild = computed(() => selectedNode.value?.children.find(node => node.type === TEXT_NODE_TYPE))
 const breadcrumb = computed(() => selectedNode.value ? store.pathTo(selectedNode.value.id) : [])
 const saveDialog = ref(false)
 const prefabName = ref('')
@@ -42,7 +43,7 @@ const moveTargets = computed(() => {
     const names = [...path, node.name]
     if (store.canContain(node)) result.push({ title: names.join(' / '), value: JSON.stringify([node.id, null]) })
     for (const slot of getComponentDef(node.type)?.slots ?? []) {
-      if (node.id !== 'root-canvas' && slot.name !== 'default') result.push({ title: `${names.join(' / ')} / ${slot.label}`, value: JSON.stringify([node.id, slot.name]) })
+      if (node.id !== ROOT_NODE_ID && slot.name !== 'default') result.push({ title: `${names.join(' / ')} / ${slot.label}`, value: JSON.stringify([node.id, slot.name]) })
     }
     for (const child of [...node.children, ...Object.values(node.slots).flat()]) visit(child, names)
   }
@@ -72,7 +73,7 @@ watch(selectedNodeId, () => {
   activeSpacingType.value = 'm'
   const node = selectedNode.value
   const sections = node ? getComponentDef(node.type)?.propertySections ?? [] : []
-  if (node?.children.some(child => child.type === 'TEXT') || sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'content'))) activeTab.value = 'content'
+  if (node?.children.some(child => child.type === TEXT_NODE_TYPE) || sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'content'))) activeTab.value = 'content'
   else if (sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'layout'))) activeTab.value = 'layout'
   else activeTab.value = 'appearance'
 }, { immediate: true })
@@ -259,7 +260,7 @@ const addCustomClass = () => {
         </div>
       </div>
       <nav aria-label="Element path" class="element-path"><button v-for="node in breadcrumb" :key="node.id" @click="store.selectNode(node.id)">{{ node.name }}</button></nav>
-      <VTextField v-if="selectedNode.type !== 'TEXT'" v-model="selectedNode.name" label="Element name" variant="outlined" density="compact" hide-details class="my-3" @blur="store.commit()" />
+      <VTextField v-if="selectedNode.type !== TEXT_NODE_TYPE" v-model="selectedNode.name" label="Element name" variant="outlined" density="compact" hide-details class="my-3" @blur="store.commit()" />
       <VBtn v-if="!isRoot" variant="text" size="small" prepend-icon="mdi-folder-move-outline" class="mb-2" @click="moveTarget = ''; moveDialog = true">Move to…</VBtn>
       <VTabs v-model="activeTab" density="compact" class="property-tabs"><VTab value="content">Content</VTab><VTab value="layout">Layout</VTab><VTab value="appearance">Style</VTab><VTab value="advanced">Advanced</VTab></VTabs>
 

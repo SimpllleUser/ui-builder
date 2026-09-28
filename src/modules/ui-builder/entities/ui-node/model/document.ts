@@ -1,20 +1,26 @@
 import { getComponentDef } from './componentDefinitions'
+import {
+  DOCUMENT_VERSION,
+  MAX_DOCUMENT_DEPTH,
+  MAX_DOCUMENT_NODES,
+  ROOT_NODE_ID,
+} from './constants'
 import type { UiNode } from './types'
 
 export const DOCUMENT_KEY = 'ui-builder:document:v1'
 export const emptyDocument = (): UiNode => ({
-  id: 'root-canvas', type: 'VCard', name: 'Untitled page',
+  id: ROOT_NODE_ID, type: 'VCard', name: 'Untitled page',
   props: { variant: 'flat', color: 'transparent' },
   classes: ['w-100', 'pa-4'], children: [], slots: {},
 })
 
 export function parseDocument(text: string): UiNode {
   const document = JSON.parse(text)
-  if (document.version !== 1) throw new Error('Unsupported document version.')
+  if (document.version !== DOCUMENT_VERSION) throw new Error('Unsupported document version.')
   const ids = new Set<string>()
   let count = 0
   const validate = (node: any, depth = 0): void => {
-    if (++count > 5000 || depth > 60) throw new Error('Document is too large or deeply nested.')
+    if (++count > MAX_DOCUMENT_NODES || depth > MAX_DOCUMENT_DEPTH) throw new Error('Document is too large or deeply nested.')
     if (!node || typeof node.id !== 'string' || ids.has(node.id) ||
       !getComponentDef(node.type) || typeof node.name !== 'string' ||
       !Array.isArray(node.classes) || !node.classes.every((c: unknown) => typeof c === 'string') ||
@@ -36,8 +42,8 @@ export function parseDocument(text: string): UiNode {
     node.children.forEach((child: unknown) => validate(child, depth + 1))
   }
   validate(document.root)
-  if (document.root.id !== 'root-canvas' || document.root.type !== 'VCard') throw new Error('Invalid document root.')
+  if (document.root.id !== ROOT_NODE_ID || document.root.type !== 'VCard') throw new Error('Invalid document root.')
   return document.root
 }
 
-export const serializeDocument = (root: UiNode) => JSON.stringify({ version: 1, root }, null, 2)
+export const serializeDocument = (root: UiNode) => JSON.stringify({ version: DOCUMENT_VERSION, root }, null, 2)
