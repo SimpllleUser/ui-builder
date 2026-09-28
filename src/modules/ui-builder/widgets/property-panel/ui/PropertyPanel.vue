@@ -121,7 +121,7 @@ const updateTextChild = (value: string) => {
 const allIcons = Object.entries(Icons).map(([name, value]) => ({ name, value }))
 
 const fieldKey = (field: PropField) =>
-  field.kind + ('prop' in field ? (field as any).prop : '')
+  field.kind + ('prop' in field ? field.prop : '')
 
 </script>
 
