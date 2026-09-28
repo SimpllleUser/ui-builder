@@ -4,11 +4,11 @@ import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { getComponentDef, type PropField } from '../../../entities/ui-node/model/componentDefinitions'
 import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
-import { readFlex, writeFlex } from '../../../entities/ui-node/model/layoutControls'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { Icons } from '../../../../../shared/icons'
 import { useClassEditor } from '../model/useClassEditor'
 import { useSpacingEditor } from '../model/useSpacingEditor'
+import { useStyleEditor } from '../model/useStyleEditor'
 
 const store = useUiTreeStore()
 const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
@@ -27,6 +27,10 @@ const { activeSpacingType, spacingSides, spacingSizes, commonSpacing, updateComm
   id => store.findNodeById(id),
   (id, classes) => store.updateNodeClasses(id, classes),
   () => store.commit(),
+)
+const { flexOptions, fontWeights, getFlexValue, setFlexValue, getJustifyValue, setJustifyValue, getFontWeight, setFontWeight, getTextAlign, setTextAlign } = useStyleEditor(
+  selectedNode,
+  (id, classes) => store.updateNodeClasses(id, classes),
 )
 
 const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
@@ -99,59 +103,6 @@ const updateTextChild = (value: string) => {
 }
 
 const allIcons = Object.entries(Icons).map(([name, value]) => ({ name, value }))
-
-const flexOptions = [
-  { title: 'Block',       value: 'd-block' },
-  { title: 'Flex Row',    value: 'd-flex flex-row' },
-  { title: 'Flex Column', value: 'd-flex flex-column' },
-]
-
-const getFlexValue = () => readFlex(selectedNode.value?.classes ?? [])
-const setFlexValue = (value: string) => {
-  if (selectedNode.value) store.updateNodeClasses(selectedNode.value.id, writeFlex(selectedNode.value.classes, value))
-}
-
-const getJustifyValue = () =>
-  selectedNode.value?.classes.find((c: string) => c.startsWith('justify-')) ?? null
-
-const setJustifyValue = (val: string) => {
-  if (!selectedNode.value) return
-  store.updateNodeClasses(selectedNode.value.id, [
-    ...selectedNode.value.classes.filter((c: string) => !c.startsWith('justify-')),
-    val,
-  ])
-}
-
-const fontWeights = [
-  { title: 'Thin',    value: 'font-weight-thin' },
-  { title: 'Regular', value: 'font-weight-regular' },
-  { title: 'Bold',    value: 'font-weight-bold' },
-  { title: 'Black',   value: 'font-weight-black' },
-]
-
-const getFontWeight = () =>
-  selectedNode.value?.classes.find((c: string) => c.startsWith('font-weight-')) ?? null
-
-const setFontWeight = (val: string) => {
-  if (!selectedNode.value) return
-  store.updateNodeClasses(selectedNode.value.id, [
-    ...selectedNode.value.classes.filter((c: string) => !c.startsWith('font-weight-')),
-    ...(val ? [val] : []),
-  ])
-}
-
-const getTextAlign = () =>
-  selectedNode.value?.classes.find((c: string) =>
-    ['text-left', 'text-center', 'text-right'].includes(c)
-  ) ?? null
-
-const setTextAlign = (val: string | null) => {
-  if (!selectedNode.value) return
-  store.updateNodeClasses(selectedNode.value.id, [
-    ...selectedNode.value.classes.filter((c: string) => !['text-left', 'text-center', 'text-right'].includes(c)),
-    ...(val ? [val] : []),
-  ])
-}
 
 const fieldKey = (field: PropField) =>
   field.kind + ('prop' in field ? (field as any).prop : '')
