@@ -95,6 +95,21 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     return node ?? rootNode.value
   })
   const selectNode = (id: string | null) => { selectedNodeIds.value = id && findNodeById(id) ? [id] : [] }
+  const renameNode = (id: string, name: string) => {
+    const node = findNodeById(id)
+    const trimmedName = name.trim()
+    if (!node || !trimmedName) return false
+    commit()
+    node.name = trimmedName
+    commit()
+    return true
+  }
+  const updateSlotChildren = (id: string, slotName: string, children: UiNode[]) => {
+    const node = findNodeById(id)
+    if (!node || !getComponentDef(node.type)?.slots.some(slot => slot.name === slotName)) return false
+    node.slots[slotName] = children
+    return true
+  }
   const mutationContext: ContainerMutationContext & PrefabMutationContext & TemplateContext = {
     findNodeById,
     findParentAndIndex,
@@ -166,7 +181,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     findNodeById, findParentAndIndex, pathTo, createNode, canContain, insertionTarget,
     addComponent, addTemplate, duplicateNode, deleteNode, savePrefab, insertPrefab,
     deletePrefab: (id: string) => deletePrefabMutation(mutationContext, id),
-    selectNode,
+    selectNode, renameNode, updateSlotChildren,
     toggleMultiSelect: (id: string) => {
       if (!findNodeById(id)) return
       selectedNodeIds.value = selectedNodeIds.value.includes(id) ? selectedNodeIds.value.filter(i => i !== id) : [...selectedNodeIds.value, id]

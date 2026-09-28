@@ -29,7 +29,7 @@ watch(() => store.selectedNodeIds, async ids => {
   if (ids[0] === props.node.id) { await nextTick(); row.value?.scrollIntoView({ block: 'nearest' }) }
 })
 const rename = async () => { draftName.value = props.node.name; renaming.value = true; await nextTick(); renameInput.value?.focus(); renameInput.value?.select() }
-const finishRename = () => { if (draftName.value.trim()) props.node.name = draftName.value.trim(); store.commit(); renaming.value = false }
+const finishRename = () => { store.renameNode(props.node.id, draftName.value); renaming.value = false }
 const keydown = (e: KeyboardEvent) => {
   if (e.target !== e.currentTarget) return
   const rows = [...(row.value?.closest('[role="tree"]')?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])]
@@ -90,7 +90,7 @@ const keydown = (e: KeyboardEvent) => {
             <VList density="compact"><VListItem v-for="component in PALETTE_COMPONENTS" :key="component.type" :title="component.label" @click="store.appendToSlot(node.id, slot.name, store.createNode(component.type))" /></VList>
           </VMenu>
         </div>
-        <draggable :model-value="node.slots[slot.name] ?? []" @update:model-value="(nodes: UiNode[]) => node.slots[slot.name] = nodes" item-key="id" group="ui-nodes" :move="canMove" :data-parent-id="node.id" :data-slot-name="slot.name" class="tree-children" :class="{ 'tree-children--empty': !node.slots[slot.name]?.length }" :force-fallback="true" :fallback-on-body="true" handle=".drag-handle" :animation="150" ghost-class="tree-ghost" @start="store.commit()" @end="store.commit()">
+        <draggable :model-value="node.slots[slot.name] ?? []" @update:model-value="(nodes: UiNode[]) => store.updateSlotChildren(node.id, slot.name, nodes)" item-key="id" group="ui-nodes" :move="canMove" :data-parent-id="node.id" :data-slot-name="slot.name" class="tree-children" :class="{ 'tree-children--empty': !node.slots[slot.name]?.length }" :force-fallback="true" :fallback-on-body="true" handle=".drag-handle" :animation="150" ghost-class="tree-ghost" @start="store.commit()" @end="store.commit()">
           <template #item="{ element }"><SidebarTreeNode :node="element" :depth="depth + 2" /></template>
         </draggable>
       </div>
