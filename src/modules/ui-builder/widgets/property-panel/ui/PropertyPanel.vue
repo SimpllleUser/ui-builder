@@ -11,6 +11,7 @@ import { useSpacingEditor } from '../model/useSpacingEditor'
 import { useStyleEditor } from '../model/useStyleEditor'
 import AdvancedProperties from './AdvancedProperties.vue'
 import MoveNodeDialog from './MoveNodeDialog.vue'
+import SavePrefabDialog from './SavePrefabDialog.vue'
 
 const store = useUiTreeStore()
 const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
@@ -381,12 +382,12 @@ const fieldKey = (field: PropField) =>
       <VIcon :icon="Icons.CursorClick" size="x-large" class="mb-4 opacity-20" />
       <div class="text-body-2">Select an element to edit properties</div>
     </div>
-    <VDialog v-model="saveDialog" max-width="420">
-      <VCard title="Save component">
-        <VCardText><VTextField v-model="prefabName" label="Component name" autofocus variant="outlined" hide-details @keydown.enter="savePrefab" /></VCardText>
-        <VCardActions><VSpacer /><VBtn @click="saveDialog = false">Cancel</VBtn><VBtn color="primary" :disabled="!prefabName.trim()" @click="savePrefab">Save component</VBtn></VCardActions>
-      </VCard>
-    </VDialog>
+    <SavePrefabDialog
+      v-model="saveDialog"
+      :name="prefabName"
+      @update:name="prefabName = $event"
+      @save="savePrefab"
+    />
     <MoveNodeDialog
       v-model="moveDialog"
       :target="moveTarget"
