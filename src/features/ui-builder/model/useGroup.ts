@@ -31,7 +31,7 @@ function findNode(list: PaletteItem[], id: number): PaletteItem | null {
 }
 
 export function useGroup(canvas: Ref<PaletteItem[]>) {
-  const { selectedIds, selectedId, selectOne } = useSelection();
+  const { selectedIds, selectedId, selectOne, clear } = useSelection();
 
   const canGroup = (): boolean => {
     if (selectedIds.value.length < 2) return false;
@@ -82,7 +82,9 @@ export function useGroup(canvas: Ref<PaletteItem[]>) {
     const children = node.children ?? [];
     parent.splice(index, 1, ...children);
     // вибираємо останню дитину або скидаємо вибір
-    selectOne(children[children.length - 1]?.id ?? (null as any));
+    const lastChildId = children[children.length - 1]?.id;
+    if (lastChildId === undefined) clear();
+    else selectOne(lastChildId);
   };
 
   const ungroupDiv = () => {
