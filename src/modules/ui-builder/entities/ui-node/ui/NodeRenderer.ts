@@ -1,10 +1,11 @@
 // src/modules/ui-builder/entities/ui-node/ui/NodeRenderer.ts
-import { defineComponent, h, ref, type PropType, resolveDynamicComponent } from 'vue'
+import { defineComponent, h, ref, type Component, type PropType, resolveDynamicComponent, type VNode } from 'vue'
 import * as Components from 'vuetify/components'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../model/store'
 import { getComponentDef } from '../model/componentDefinitions'
 import { TEXT_NODE_TYPE } from '../model/constants'
+import type { UiNode } from '../model/types'
 
 /** Currently highlighted drop target on the canvas. Exported so MainCanvas can clear it. */
 export const canvasDragTargetId = ref<string | null>(null)
@@ -12,7 +13,7 @@ export const canvasDragTargetId = ref<string | null>(null)
 const NodeRenderer = defineComponent({
   name: 'NodeRenderer',
   props: {
-    node: { type: Object as PropType<any>, required: true }
+    node: { type: Object as PropType<UiNode>, required: true }
   },
   setup(props) {
     const store = useUiTreeStore()
@@ -35,32 +36,33 @@ const NodeRenderer = defineComponent({
         }, node.name)
       }
 
-      const VComponent = (Components as any)[node.type] || node.type
+      const VComponent = resolveDynamicComponent(
+        node.type in Components ? Components[node.type as keyof typeof Components] : node.type,
+      ) as Component | string
       const isSelected = selectedNodeIds.value.includes(node.id)
       const isLeaf = getComponentDef(node.type)?.isLeaf ?? false
 
-      const slots: Record<string, () => any> = {}
+      const slots: Record<string, () => VNode[]> = {}
 
       if (!isLeaf) {
         slots.default = () =>
-          (node.children || []).map((child: any) =>
-            h(resolveDynamicComponent('NodeRenderer') as any, { key: child.id, node: child })
+          node.children.map(child =>
+            h(NodeRenderer, { key: child.id, node: child })
           )
       }
 
       if (node.slots) {
         Object.entries(node.slots).forEach(([slotName, slotChildren]) => {
-          const sChildren = slotChildren as any[]
-          if (sChildren.length > 0) {
+          if (slotChildren.length > 0) {
             slots[slotName] = () =>
-              sChildren.map((child: any) =>
-                h(resolveDynamicComponent('NodeRenderer') as any, { key: child.id, node: child })
+              slotChildren.map(child =>
+                h(NodeRenderer, { key: child.id, node: child })
               )
           }
         })
       }
 
-      const extraProps: Record<string, any> = {}
+      const extraProps: Record<string, unknown> = {}
       if (node.type === 'VImg' && !node.props.src) {
         extraProps.src =
           'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="100%" height="100%" fill="%23e0e0e0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%23999">No image</text></svg>'
