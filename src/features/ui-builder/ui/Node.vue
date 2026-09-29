@@ -3,7 +3,10 @@ import { Icons } from '../../../shared/icons'
 import { defineComponent, h } from 'vue';
 import { VueDraggableNext as Draggable } from 'vue-draggable-next';
 import { VRow, VCol, VBtn, VExpansionPanels, VExpansionPanel } from 'vuetify/components';
-import type { PaletteItem } from '../types';
+import type { NodePropValue, PaletteItem } from '../types';
+
+const textProp = (value: NodePropValue | undefined): string | number | undefined =>
+  typeof value === 'string' || typeof value === 'number' ? value : undefined;
 
 export default defineComponent({
   name: 'Node',
@@ -246,7 +249,7 @@ export default defineComponent({
         },
         {
           title: () => [
-            h('span', { class: 'flex-grow-1 font-weight-medium' }, n.props?.title ?? 'Panel'),
+            h('span', { class: 'flex-grow-1 font-weight-medium' }, textProp(n.props?.title) ?? 'Panel'),
             h('span', { class: 'text-caption text-medium-emphasis me-1' }, 'VExpansionPanel'),
             h(VBtn as any, {
               icon: Icons.Delete,
@@ -297,7 +300,7 @@ export default defineComponent({
         onClick: handleClick,
         style: { position: 'relative' }
       },
-      [this.actions(n), h(Comp, n.props, { default: () => n.props?.text })]
+      [this.actions(n), h(Comp, n.props, { default: () => textProp(n.props?.text) })]
     );
   }
 });

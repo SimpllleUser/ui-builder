@@ -12,14 +12,16 @@
 - прибрано частину небезпечних `any` і некоректних приведень типів;
 - виправлено скидання вибору після розгрупування;
 - після кожного кроку поточний набір із 12 тестів проходить успішно, production build збирається.
+- типізовано legacy-модель: `CompCtor` узгоджено з Vue `VNodeTypes`, props переведено на JSON-сумісні значення, snapshot-копіювання зроблено типізованим;
+- для legacy canvas додано явний тип стану, щоб типи Vue-компонентів не витікали в inferred return type.
 
 ## Залишилось зробити
 
 ### 1. Типізувати legacy-модель
 
-- замінити `Record<string, any>` у `src/features/ui-builder/model/snapshot.ts`;
-- замінити `CompCtor = any` і пов'язані типи в `src/features/ui-builder/types.ts`;
-- узгодити legacy-типи з моделлю `UiNode`, не змішуючи їх без адаптера.
+- виконано: замінено `Record<string, any>` у `src/features/ui-builder/model/snapshot.ts`;
+- виконано: замінено `CompCtor = any` і пов'язані типи в `src/features/ui-builder/types.ts`;
+- виконано: legacy-типи залишено окремими від `UiNode`; перетворення snapshot використовує власну типізовану межу.
 
 ### 2. Розібрати `Node.vue`
 
@@ -57,4 +59,3 @@
 - перевірити назви, довжину функцій і дублювання;
 - додати або налаштувати lint/format перевірку, якщо її ще немає;
 - виконати фінальний build і повний regression review.
-

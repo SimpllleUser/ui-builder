@@ -1,11 +1,24 @@
-export type CompCtor = any;
+import type { VNodeTypes } from 'vue';
+
+export type CompCtor = VNodeTypes;
 export type CompName = 'VBtn' | 'VChip' | 'VAlert' | 'VRow' | 'VCol' | 'Div' | 'VExpansionPanels' | 'VExpansionPanel';
+
+export type NodePropValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | NodePropValue[]
+  | { [key: string]: NodePropValue };
+
+export type NodeProps = Record<string, NodePropValue>;
 
 export interface PaletteItem {
   id: number;
   type: CompCtor;
   name: CompName;
-  props: Record<string, any>;
+  props: NodeProps;
   children?: PaletteItem[];
 }
 
