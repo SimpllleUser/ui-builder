@@ -2,13 +2,15 @@ import { test, before, after, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
-let server, useStore, parseDocument, serializeDocument, readSpacing, writeSpacing, readFlex, writeFlex, store
+let server, useStore, parseDocument, serializeDocument, readSpacing, writeSpacing, readFlex, writeFlex, groupNodes, ungroupNode, clonePaletteItem, store
 const storage = new Map()
 before(async () => {
   server = await createServer({ configFile: false, server: { middlewareMode: true, watch: null, ws: false }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom' })
   ;({ useUiTreeStore: useStore } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/store.ts'))
   ;({ parseDocument, serializeDocument } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/document.ts'))
   ;({ readSpacing, writeSpacing, readFlex, writeFlex } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/layoutControls.ts'))
+  ;({ groupNodes, ungroupNode } = await server.ssrLoadModule('/src/features/ui-builder/model/treeOperations.ts'))
+  ;({ clonePaletteItem } = await server.ssrLoadModule('/src/features/ui-builder/model/useClone.ts'))
   global.window = { localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } }
 })
 beforeEach(() => { storage.clear(); setActivePinia(createPinia()); store = useStore() })
@@ -117,4 +119,27 @@ test('flex controls round-trip direction without removing grow and wrapping', ()
 test('all starter templates survive validated export and import', () => {
   for (const kind of ['card', 'form', 'columns']) store.addTemplate(kind)
   assert.equal(parseDocument(store.exportDocument()).children.length, 3)
+})
+
+test('legacy tree operations group siblings, preserve order, and ungroup cleanly', () => {
+  const nodes = [
+    { id: 1, name: 'VBtn', props: {}, children: [] },
+    { id: 2, name: 'VChip', props: {}, children: [] },
+    { id: 3, name: 'VAlert', props: {}, children: [] }
+  ]
+  const wrapper = groupNodes(nodes, [3, 1], children => ({ id: 10, name: 'Div', props: {}, children }))
+  assert.equal(wrapper.id, 10)
+  assert.deepEqual(nodes.map(node => node.id), [10, 2])
+  assert.deepEqual(wrapper.children.map(node => node.id), [1, 3])
+  assert.deepEqual(ungroupNode(nodes, 10).map(node => node.id), [1, 3])
+  assert.deepEqual(nodes.map(node => node.id), [1, 3, 2])
+})
+
+test('legacy clone copies props without copying child references', () => {
+  const original = { id: 1, name: 'Div', type: 'div', props: { class: 'box', nested: { active: true } }, children: [{ id: 2, name: 'VBtn', type: 'button', props: {} }] }
+  const clone = clonePaletteItem(original)
+  assert.notEqual(clone.id, original.id)
+  assert.deepEqual(clone.props, original.props)
+  assert.notEqual(clone.props, original.props)
+  assert.deepEqual(clone.children, [])
 })
