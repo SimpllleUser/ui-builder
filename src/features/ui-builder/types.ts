@@ -1,6 +1,6 @@
-import type { VNodeTypes } from 'vue';
+import type { Component } from 'vue';
 
-export type CompCtor = VNodeTypes;
+export type CompCtor = Component | string;
 export type CompName = 'VBtn' | 'VChip' | 'VAlert' | 'VRow' | 'VCol' | 'Div' | 'VExpansionPanels' | 'VExpansionPanel';
 
 export type NodePropValue =
