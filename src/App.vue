@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, defineAsyncComponent } from 'vue'
-import BuilderApp from './BuilderApp.vue'
 import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
+const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
 const LegacyBuilder = defineAsyncComponent(() => import('./features/ui-builder/ui/UiBuilder.vue'))
 const view = ref<'current' | 'legacy'>('current')
 const store = useUiTreeStore()

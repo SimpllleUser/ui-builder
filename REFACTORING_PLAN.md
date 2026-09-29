@@ -19,6 +19,7 @@
 - додано тести для group/ungroup і clone; поточний набір містить 14 успішних тестів.
 - посилено UI-layer coverage: додано перевірки пошкоджених документів, slot/empty-container boundaries, property updates і dialog input guards; поточний набір містить 17 успішних тестів.
 - перевірено entry points та всі production/dev dependencies; прибрано дубльоване підключення Vuetify/MDI styles із `src/vuetify.ts`.
+- production bundle досліджено й редактор розділено code splitting: initial JS зменшено приблизно з 939 kB до 327 kB; `BuilderApp` і Classic editor завантажуються окремими chunks.
 
 ## Залишилось зробити
 
@@ -55,9 +56,9 @@
 
 ### 6. Оптимізувати production bundle
 
-- дослідити великі CSS/JS chunks;
-- перевірити можливість code splitting для editor-модулів;
-- окремо оцінити Vuetify та icon-font assets, не змінюючи поведінку без вимірювання.
+- виконано: досліджено великі CSS/JS chunks і зафіксовано їхні розміри у build output;
+- виконано: `BuilderApp` переведено на lazy chunk; початковий JS зменшився приблизно на 65% (939 kB → 327 kB);
+- залишено окремим follow-up: Vuetify CSS та icon-font assets залишаються великими й потребують окремого вимірювання перед зміною підключення.
 
 ### 7. Фінальний clean-code review
 
