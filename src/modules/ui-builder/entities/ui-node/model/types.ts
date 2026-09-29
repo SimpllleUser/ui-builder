@@ -17,3 +17,10 @@ export interface Prefab {
   name: string
   node: UiNode
 }
+
+export interface HistoryCheckpoint {
+  checkpointId: string
+  name: string
+  createdAt: number
+  snapshot: string
+}

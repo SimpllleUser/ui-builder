@@ -148,6 +148,19 @@ test('history restores a selected version without losing newer history', () => {
   assert.notEqual(store.exportDocument(), formVersion)
   assert.equal(store.canRedo, true)
 })
+test('checkpoints create and restore a named document snapshot', () => {
+  store.addComponent('VForm', 'root-canvas')
+  assert.equal(store.createCheckpoint('Contact form draft'), true)
+  const checkpoint = store.checkpoints[0]
+  store.addComponent('VSlider', 'root-canvas')
+  assert.equal(store.rootNode.children.length, 2)
+
+  assert.equal(store.restoreCheckpoint(checkpoint.checkpointId), true)
+  assert.equal(store.rootNode.children.length, 1)
+  assert.equal(store.rootNode.children[0].type, 'VForm')
+  store.deleteCheckpoint(checkpoint.checkpointId)
+  assert.equal(store.checkpoints.length, 0)
+})
 
 test('legacy tree operations group siblings, preserve order, and ungroup cleanly', () => {
   const nodes = [

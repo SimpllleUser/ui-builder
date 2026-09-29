@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch, onScopeDispose } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { getComponentDef } from './componentDefinitions'
-import { HISTORY_COMMIT_DELAY_MS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
+import { HISTORY_COMMIT_DELAY_MS, MAX_CHECKPOINTS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
 import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from './document'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
@@ -11,7 +11,7 @@ import { appendNode, canReorder as canReorderNode, deleteNode as deleteNodeMutat
 import { areNodesSiblings as areNodesSiblingsMutation, getUnwrapReason, unwrapNode as unwrapNodeMutation, wrapNodes as wrapNodesMutation, type ContainerMutationContext } from './containerMutations'
 import { deletePrefab as deletePrefabMutation, insertPrefab as insertPrefabMutation, savePrefab as savePrefabMutation, type PrefabMutationContext } from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateKind } from './templateFactory'
-import type { UiNode, Prefab } from './types'
+import type { HistoryCheckpoint, UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
@@ -31,6 +31,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const selectedNodeId = computed(() => selectedNodeIds.value[0] ?? null)
   const isPreviewMode = ref(false)
   const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
+  const checkpoints = useStorage<HistoryCheckpoint[]>('ui-builder:history-checkpoints', [])
   let historyTimer: ReturnType<typeof setTimeout> | undefined
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -72,6 +73,36 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const restoreHistoryVersion = (index: number) => {
     clearTimeout(historyTimer)
     history.restore(index)
+  }
+  const createCheckpoint = (name: string) => {
+    const trimmedName = name.trim()
+    if (!trimmedName) return false
+    commit()
+    checkpoints.value = [
+      {
+        checkpointId: createNodeId('checkpoint'),
+        name: trimmedName,
+        createdAt: Date.now(),
+        snapshot: JSON.stringify(rootNode.value),
+      },
+      ...checkpoints.value,
+    ].slice(0, MAX_CHECKPOINTS)
+    return true
+  }
+  const restoreCheckpoint = (checkpointId: string) => {
+    const checkpoint = checkpoints.value.find(item => item.checkpointId === checkpointId)
+    if (!checkpoint) return false
+    clearTimeout(historyTimer)
+    try {
+      history.restoreSnapshot(checkpoint.snapshot)
+      return true
+    } catch {
+      notice.value = 'This checkpoint is invalid and could not be restored.'
+      return false
+    }
+  }
+  const deleteCheckpoint = (checkpointId: string) => {
+    checkpoints.value = checkpoints.value.filter(item => item.checkpointId !== checkpointId)
   }
 
   watch(rootNode, () => {
@@ -206,7 +237,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
 
   return {
     rootNode, selectedNodeIds, selectedNodeId, isPreviewMode, prefabs, notice, saveState,
-    canUndo, canRedo, historyVersions, historyPending: history.pending, undo, redo, restoreHistoryVersion, commit, saveDocument, importDocument,
+    canUndo, canRedo, historyVersions, historyPending: history.pending, checkpoints, undo, redo, restoreHistoryVersion,
+    createCheckpoint, restoreCheckpoint, deleteCheckpoint, commit, saveDocument, importDocument,
     exportDocument: () => serializeDocument(rootNode.value),
     findNodeById, findParentAndIndex, pathTo, createNode, canContain, insertionTarget,
     addComponent, addTemplate, duplicateNode, deleteNode, savePrefab, insertPrefab,

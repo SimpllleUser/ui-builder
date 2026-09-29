@@ -5,4 +5,5 @@ export const DOCUMENT_VERSION = 1
 export const MAX_DOCUMENT_NODES = 5_000
 export const MAX_DOCUMENT_DEPTH = 60
 export const MAX_HISTORY_ENTRIES = 50
+export const MAX_CHECKPOINTS = 30
 export const HISTORY_COMMIT_DELAY_MS = 600

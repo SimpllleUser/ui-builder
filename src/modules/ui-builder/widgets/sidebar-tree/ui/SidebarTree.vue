@@ -8,7 +8,7 @@ import SidebarTreeNode from './SidebarTreeNode.vue'
 import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
 
 const store = useUiTreeStore()
-const { rootNode, selectedNodeIds, prefabs, historyVersions, historyPending } = storeToRefs(store)
+const { rootNode, selectedNodeIds, prefabs, historyVersions, historyPending, checkpoints } = storeToRefs(store)
 
 type SidebarView = 'components' | 'layers' | 'prefabs' | 'history'
 const activityViews: Array<{ id: SidebarView; icon: string; label: string }> = [
@@ -19,6 +19,9 @@ const activityViews: Array<{ id: SidebarView; icon: string; label: string }> = [
 ]
 const activeView = ref<SidebarView>('layers')
 const deletingPrefab = ref<string | null>(null)
+const checkpointDialog = ref(false)
+const checkpointName = ref('')
+const checkpointDateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })
 const activeTreeId = ref(rootNode.value.id)
 
 provide('ui-builder-active-tree-id', activeTreeId)
@@ -44,6 +47,15 @@ const onInsertPrefab = (prefabId: string) => {
 }
 const viewTitle = computed(() => activityViews.find(view => view.id === activeView.value)?.label ?? 'Layers')
 const selectView = (view: SidebarView) => { activeView.value = view }
+const openCheckpointDialog = () => {
+  checkpointName.value = `Checkpoint ${checkpoints.value.length + 1}`
+  checkpointDialog.value = true
+}
+const saveCheckpoint = () => {
+  if (!store.createCheckpoint(checkpointName.value)) return
+  checkpointDialog.value = false
+}
+const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.format(createdAt)
 </script>
 
 <template>
@@ -93,6 +105,20 @@ const selectView = (view: SidebarView) => { activeView.value = view }
 
           <div v-else class="sidebar-view__scroll history-list" aria-label="Document history">
             <p class="history-help">Select a version to restore it. <span v-if="historyPending">Unsaved changes will be saved first.</span><span v-else>Older versions remain available until the history limit is reached.</span></p>
+            <VBtn block size="small" color="primary" variant="tonal" prepend-icon="mdi-bookmark-plus-outline" class="history-save" @click="openCheckpointDialog">Save checkpoint</VBtn>
+
+            <div v-if="checkpoints.length" class="history-section">
+              <h3 class="history-section__title">Checkpoints</h3>
+              <div v-for="checkpoint in checkpoints" :key="checkpoint.checkpointId" class="checkpoint-item">
+                <button class="checkpoint-restore" @click="store.restoreCheckpoint(checkpoint.checkpointId)">
+                  <VIcon icon="mdi-bookmark-outline" size="16" aria-hidden="true" />
+                  <span><strong>{{ checkpoint.name }}</strong><small>{{ formatCheckpointDate(checkpoint.createdAt) }}</small></span>
+                </button>
+                <VBtn icon="mdi-delete-outline" variant="text" size="x-small" color="error" :aria-label="`Delete ${checkpoint.name}`" @click="store.deleteCheckpoint(checkpoint.checkpointId)" />
+              </div>
+            </div>
+
+            <h3 class="history-section__title">Versions</h3>
             <button
               v-for="version in [...historyVersions].reverse()"
               :key="version.index"
@@ -145,6 +171,18 @@ const selectView = (view: SidebarView) => { activeView.value = view }
       <VDialog :model-value="!!deletingPrefab" max-width="400" @update:model-value="deletingPrefab = null">
         <VCard title="Delete saved component?" text="Existing copies on your page will remain. This removes the component from your library.">
           <VCardActions><VSpacer /><VBtn @click="deletingPrefab = null">Cancel</VBtn><VBtn color="error" @click="store.deletePrefab(deletingPrefab!); deletingPrefab = null">Delete</VBtn></VCardActions>
+        </VCard>
+      </VDialog>
+      <VDialog v-model="checkpointDialog" max-width="400">
+        <VCard title="Save checkpoint">
+          <VCardText>
+            <VTextField v-model="checkpointName" label="Checkpoint name" autofocus hide-details @keyup.enter="saveCheckpoint" />
+          </VCardText>
+          <VCardActions>
+            <VSpacer />
+            <VBtn @click="checkpointDialog = false">Cancel</VBtn>
+            <VBtn color="primary" :disabled="!checkpointName.trim()" @click="saveCheckpoint">Save</VBtn>
+          </VCardActions>
         </VCard>
       </VDialog>
 
@@ -246,6 +284,66 @@ const selectView = (view: SidebarView) => { activeView.value = view }
   color: rgb(var(--v-theme-on-surface));
   font-size: 12px;
   opacity: .7;
+}
+
+.history-save {
+  margin-bottom: 14px;
+}
+
+.history-section + .history-section {
+  margin-top: 16px;
+}
+
+.history-section__title {
+  margin: 0 4px 6px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .65;
+}
+
+.checkpoint-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.checkpoint-item:hover,
+.checkpoint-item:focus-within {
+  background: rgba(var(--v-theme-on-surface), .06);
+}
+
+.checkpoint-restore {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: rgb(var(--v-theme-on-surface));
+  text-align: left;
+}
+
+.checkpoint-restore span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.checkpoint-restore strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkpoint-restore small {
+  font-size: 10px;
+  opacity: .6;
 }
 
 .history-item {

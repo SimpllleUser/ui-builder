@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 
 export function createHistory(
   serialize: () => string,
-  restoreSnapshot: (snapshot: string) => void,
+  applySnapshot: (snapshot: string) => void,
   maxEntries: number,
 ) {
   const entries = ref<string[]>([serialize()])
@@ -30,8 +30,11 @@ export function createHistory(
 
   const restoreCurrent = () => {
     isRestoring.value = true
-    restoreSnapshot(entries.value[currentIndex.value])
-    isRestoring.value = false
+    try {
+      applySnapshot(entries.value[currentIndex.value])
+    } finally {
+      isRestoring.value = false
+    }
   }
 
   const undo = () => {
@@ -59,5 +62,16 @@ export function createHistory(
     restoreCurrent()
   }
 
-  return { isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore }
+  const restoreSnapshot = (snapshot: string) => {
+    commit()
+    isRestoring.value = true
+    try {
+      applySnapshot(snapshot)
+    } finally {
+      isRestoring.value = false
+    }
+    commit()
+  }
+
+  return { isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore, restoreSnapshot }
 }
