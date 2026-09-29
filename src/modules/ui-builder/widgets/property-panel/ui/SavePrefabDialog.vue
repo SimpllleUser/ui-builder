@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { canSavePrefabName } from '../model/propertyPanelUtils'
+
 defineProps<{
   modelValue: boolean
   name: string
@@ -36,7 +38,7 @@ const updateName = (value: unknown) => {
       <VCardActions>
         <VSpacer />
         <VBtn @click="emit('update:modelValue', false)">Cancel</VBtn>
-        <VBtn color="primary" :disabled="!name.trim()" @click="emit('save')">Save component</VBtn>
+        <VBtn color="primary" :disabled="!canSavePrefabName(name)" @click="emit('save')">Save component</VBtn>
       </VCardActions>
     </VCard>
   </VDialog>

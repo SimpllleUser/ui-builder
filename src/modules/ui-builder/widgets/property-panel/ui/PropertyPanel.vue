@@ -9,6 +9,7 @@ import { Icons } from '../../../../../shared/icons'
 import { useClassEditor } from '../model/useClassEditor'
 import { useSpacingEditor } from '../model/useSpacingEditor'
 import { useStyleEditor } from '../model/useStyleEditor'
+import { canSavePrefabName, parseMoveDestination } from '../model/propertyPanelUtils'
 import AdvancedProperties from './AdvancedProperties.vue'
 import MoveNodeDialog from './MoveNodeDialog.vue'
 import SavePrefabDialog from './SavePrefabDialog.vue'
@@ -53,7 +54,7 @@ const breadcrumb = computed(() => selectedNode.value ? store.pathTo(selectedNode
 const saveDialog = ref(false)
 const prefabName = ref('')
 const onSavePrefab = () => { prefabName.value = selectedNode.value?.name ?? ''; saveDialog.value = true }
-const savePrefab = () => { if (selectedNode.value && prefabName.value.trim()) { store.savePrefab(selectedNode.value.id, prefabName.value); saveDialog.value = false } }
+const savePrefab = () => { if (selectedNode.value && canSavePrefabName(prefabName.value)) { store.savePrefab(selectedNode.value.id, prefabName.value); saveDialog.value = false } }
 const moveDialog = ref(false)
 const moveTarget = ref('')
 const moveTargets = computed(() => {
@@ -71,17 +72,6 @@ const moveTargets = computed(() => {
   return result
 })
 
-type MoveDestination = { parentId: string; slot: string | null }
-const parseMoveDestination = (value: string): MoveDestination | null => {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    if (!Array.isArray(parsed) || typeof parsed[0] !== 'string') return null
-    if (parsed[1] !== null && typeof parsed[1] !== 'string') return null
-    return { parentId: parsed[0], slot: parsed[1] }
-  } catch {
-    return null
-  }
-}
 const moveSelected = () => {
   if (!selectedNodeId.value || !moveTarget.value) return
   const destination = parseMoveDestination(moveTarget.value)
