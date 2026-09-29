@@ -19,6 +19,12 @@ export interface PropertySection {
   fields: PropField[]
 }
 
+export interface DefaultChildDefinition {
+  type: string
+  name?: string
+  props?: Record<string, unknown>
+}
+
 export interface ComponentDef {
   type: string
   label: string
@@ -29,10 +35,29 @@ export interface ComponentDef {
   defaultProps: Record<string, unknown>
   defaultClasses: string[]
   defaultTextChild?: boolean
-  defaultChildren?: string[]
+  defaultChildren?: Array<string | DefaultChildDefinition>
   showInPalette: boolean
   propertySections: PropertySection[]
 }
+
+export const COMPONENT_CATEGORY_ORDER = [
+  'Layout', 'Content', 'Actions', 'Forms', 'Navigation', 'Lists & data', 'Feedback', 'Media', 'Utility', 'Other',
+] as const
+export type ComponentCategory = typeof COMPONENT_CATEGORY_ORDER[number]
+
+const CATEGORY_BY_TYPE: Record<string, ComponentCategory> = {
+  div: 'Layout', VRow: 'Layout', VCol: 'Layout', VContainer: 'Layout', VSheet: 'Layout', VSpacer: 'Layout', VBtnGroup: 'Layout',
+  VCard: 'Content', VCardTitle: 'Content', VCardText: 'Content', VToolbar: 'Content',
+  VBtn: 'Actions',
+  VForm: 'Forms', VTextField: 'Forms', VTextarea: 'Forms', VAutocomplete: 'Forms', VFileInput: 'Forms', VCheckbox: 'Forms', VSwitch: 'Forms', VSelect: 'Forms', VSlider: 'Forms', VRadioGroup: 'Forms',
+  VTabs: 'Navigation', VExpansionPanels: 'Navigation',
+  VAlert: 'Feedback', VChip: 'Feedback', VAvatar: 'Feedback', VBadge: 'Feedback', VProgressCircular: 'Feedback', VProgressLinear: 'Feedback',
+  VIcon: 'Media', VImg: 'Media',
+  VList: 'Lists & data', VListItem: 'Lists & data',
+  VDivider: 'Utility',
+}
+
+export const getComponentCategory = (type: string): ComponentCategory => CATEGORY_BY_TYPE[type] ?? 'Other'
 
 function def(config: Omit<ComponentDef, 'propertySections'>) {
   const sections: PropertySection[] = []
@@ -206,6 +231,276 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
           { prop: 'prependInnerIcon', label: 'Prepend Inner' },
           { prop: 'appendInnerIcon',  label: 'Append Inner' },
         ]},
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VForm: def({
+    type: 'VForm',
+    label: 'Form',
+    treeIcon: 'mdi-form-select',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Fields' }],
+    defaultProps: { disabled: false },
+    defaultClasses: [],
+    defaultChildren: [
+      { type: 'VTextField', name: 'Name', props: { label: 'Name' } },
+      { type: 'VTextField', name: 'Email', props: { label: 'Email', type: 'email' } },
+      { type: 'VBtn', name: 'Submit', props: { color: 'primary' } },
+    ],
+    showInPalette: true,
+  })
+    .section('Form', [
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VTextarea: def({
+    type: 'VTextarea',
+    label: 'Textarea',
+    treeIcon: 'mdi-text-box-multiple-outline',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Message', rows: 3, variant: 'outlined' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Field label' },
+      { kind: 'text', prop: 'placeholder', label: 'Placeholder' },
+      { kind: 'select', prop: 'variant', label: 'Variant', options: ['underlined', 'outlined', 'filled', 'solo', 'plain'] },
+      { kind: 'slider', prop: 'rows', label: 'Rows', min: 1, max: 10, step: 1 },
+      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VCheckbox: def({
+    type: 'VCheckbox',
+    label: 'Checkbox',
+    treeIcon: 'mdi-checkbox-marked-outline',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Accept terms', modelValue: false, color: 'primary' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Checkbox label' },
+      { kind: 'switch', prop: 'modelValue', label: 'Checked' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VSwitch: def({
+    type: 'VSwitch',
+    label: 'Switch',
+    treeIcon: 'mdi-toggle-switch-outline',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Enabled', modelValue: true, color: 'primary' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Switch label' },
+      { kind: 'switch', prop: 'modelValue', label: 'On' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'inset', label: 'Inset' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VSelect: def({
+    type: 'VSelect',
+    label: 'Select',
+    treeIcon: 'mdi-form-select',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Choose an option', items: ['Option 1', 'Option 2'], variant: 'outlined' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Select label' },
+      { kind: 'select', prop: 'variant', label: 'Variant', options: ['underlined', 'outlined', 'filled', 'solo', 'plain'] },
+      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
+      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VAutocomplete: def({
+    type: 'VAutocomplete',
+    label: 'Autocomplete',
+    treeIcon: 'mdi-text-search',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Search', items: ['Option 1', 'Option 2', 'Option 3'], variant: 'outlined' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Search label' },
+      { kind: 'select', prop: 'variant', label: 'Variant', options: ['underlined', 'outlined', 'filled', 'solo', 'plain'] },
+      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
+      { kind: 'switch', prop: 'chips', label: 'Show chips' },
+      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VFileInput: def({
+    type: 'VFileInput',
+    label: 'File Input',
+    treeIcon: 'mdi-file-upload-outline',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Upload file', variant: 'outlined', showSize: true },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Upload label' },
+      { kind: 'text', prop: 'accept', label: 'Accepted types', placeholder: 'image/*,.pdf' },
+      { kind: 'select', prop: 'variant', label: 'Variant', options: ['underlined', 'outlined', 'filled', 'solo', 'plain'] },
+      { kind: 'switch', prop: 'showSize', label: 'Show file size' },
+      { kind: 'switch', prop: 'multiple', label: 'Multiple files' },
+      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VSlider: def({
+    type: 'VSlider',
+    label: 'Slider',
+    treeIcon: 'mdi-tune-vertical-variant',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { modelValue: 50, min: 0, max: 100, step: 1, thumbLabel: true, color: 'primary' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Slider', [
+      { kind: 'slider', prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
+      { kind: 'slider', prop: 'min', label: 'Minimum', min: 0, max: 100, step: 1 },
+      { kind: 'slider', prop: 'max', label: 'Maximum', min: 1, max: 200, step: 1 },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'thumbLabel', label: 'Show value' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VRadioGroup: def({
+    type: 'VRadioGroup',
+    label: 'Radio Group',
+    treeIcon: 'mdi-radiobox-marked',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Options' }],
+    defaultProps: { modelValue: 'option-1', label: 'Choose one', color: 'primary' },
+    defaultClasses: [],
+    defaultChildren: [
+      { type: 'VRadio', name: 'Option 1', props: { value: 'option-1' } },
+      { type: 'VRadio', name: 'Option 2', props: { value: 'option-2' } },
+    ],
+    showInPalette: true,
+  })
+    .section('Group', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Choose one' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'inline', label: 'Inline options' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VRadio: def({
+    type: 'VRadio',
+    label: 'Radio',
+    treeIcon: 'mdi-radiobox-blank',
+    slots: [{ name: 'default', label: 'Label' }],
+    defaultProps: { value: 'option' },
+    defaultClasses: [],
+    defaultTextChild: true,
+    showInPalette: false,
+  })
+    .section('Option', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Option' },
+      { kind: 'text', prop: 'value', label: 'Value', placeholder: 'option' },
+    ])
+    .classes()
+    .build(),
+
+  VContainer: def({
+    type: 'VContainer',
+    label: 'Container',
+    treeIcon: 'mdi-view-dashboard-outline',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Default' }],
+    defaultProps: { fluid: false },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Layout', [
+      { kind: 'switch', prop: 'fluid', label: 'Fluid width' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VSheet: def({
+    type: 'VSheet',
+    label: 'Surface',
+    treeIcon: 'mdi-square-rounded-outline',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Default' }],
+    defaultProps: { rounded: 'lg', elevation: 1 },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Appearance', [
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'select', prop: 'rounded', label: 'Rounded', options: ['0', 'sm', 'md', 'lg', 'xl', 'pill'] },
+      { kind: 'slider', prop: 'elevation', label: 'Elevation', min: 0, max: 24, step: 1 },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VToolbar: def({
+    type: 'VToolbar',
+    label: 'Toolbar',
+    treeIcon: 'mdi-dock-top',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Default' }, { name: 'title', label: 'Title' }, { name: 'prepend', label: 'Prepend' }, { name: 'append', label: 'Append' }],
+    defaultProps: { title: 'Toolbar', color: 'surface', density: 'default' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Toolbar', [
+      { kind: 'text', prop: 'title', label: 'Title', placeholder: 'Toolbar title' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'select', prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
+      { kind: 'switch', prop: 'flat', label: 'Flat' },
     ])
     .spacing()
     .classes()
@@ -479,6 +774,106 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
       { kind: 'slider', prop: 'width',         label: 'Width', min: 1, max: 20, step: 1 },
     ])
     .spacing()
+    .classes()
+    .build(),
+
+  VProgressLinear: def({
+    type: 'VProgressLinear',
+    label: 'Progress Linear',
+    treeIcon: 'mdi-progress-upload',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { indeterminate: true, color: 'primary', height: 6 },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Progress', [
+      { kind: 'switch', prop: 'indeterminate', label: 'Indeterminate' },
+      { kind: 'slider', prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'slider', prop: 'height', label: 'Height', min: 1, max: 24, step: 1 },
+      { kind: 'switch', prop: 'rounded', label: 'Rounded' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VBadge: def({
+    type: 'VBadge',
+    label: 'Badge',
+    treeIcon: 'mdi-numeric-1-box-outline',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Content' }, { name: 'badge', label: 'Badge' }],
+    defaultProps: { content: 'New', color: 'error', inline: false },
+    defaultClasses: [],
+    defaultTextChild: true,
+    showInPalette: true,
+  })
+    .section('Badge', [
+      { kind: 'text', prop: 'content', label: 'Content', placeholder: 'New' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'dot', label: 'Dot' },
+      { kind: 'switch', prop: 'inline', label: 'Inline' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VBtnGroup: def({
+    type: 'VBtnGroup',
+    label: 'Button Group',
+    treeIcon: 'mdi-view-sequential-outline',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Buttons' }],
+    defaultProps: { divided: false, variant: 'outlined' },
+    defaultClasses: [],
+    defaultChildren: ['VBtn', 'VBtn'],
+    showInPalette: true,
+  })
+    .section('Appearance', [
+      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: 'switch', prop: 'divided', label: 'Divided' },
+      { kind: 'select', prop: 'direction', label: 'Direction', options: ['horizontal', 'vertical'] },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VTabs: def({
+    type: 'VTabs',
+    label: 'Tabs',
+    treeIcon: 'mdi-tab',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Tabs' }],
+    defaultProps: { color: 'primary', grow: false },
+    defaultClasses: [],
+    defaultChildren: ['VTab', 'VTab'],
+    showInPalette: true,
+  })
+    .section('Tabs', [
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'grow', label: 'Grow tabs' },
+      { kind: 'switch', prop: 'centered', label: 'Centered' },
+      { kind: 'switch', prop: 'fixedTabs', label: 'Fixed tabs' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VTab: def({
+    type: 'VTab',
+    label: 'Tab',
+    treeIcon: 'mdi-tab-unselected',
+    slots: [{ name: 'default', label: 'Label' }],
+    defaultProps: { value: 'tab' },
+    defaultClasses: [],
+    defaultTextChild: true,
+    showInPalette: false,
+  })
+    .section('Tab', [
+      { kind: 'text', prop: 'value', label: 'Value' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+    ])
     .classes()
     .build(),
 

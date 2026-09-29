@@ -156,7 +156,15 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       id, type, name: name ?? def.label, props: { ...def.defaultProps }, classes: [...def.defaultClasses], slots: {},
       children: def.defaultTextChild
         ? [{ id: `${id}_text`, type: TEXT_NODE_TYPE, name: def.label, props: {}, classes: [], children: [], slots: {} }]
-        : (def.defaultChildren ?? []).map(type => createNode(type)),
+        : (def.defaultChildren ?? []).map(child => {
+          if (typeof child === 'string') return createNode(child)
+          const childNode = createNode(child.type, child.name)
+          Object.assign(childNode.props, child.props)
+          if (child.name && childNode.children[0]?.type === TEXT_NODE_TYPE) {
+            childNode.children[0].name = child.name
+          }
+          return childNode
+        }),
     }
   }
   const append = (parentId: string, node: UiNode, slotName: string | null = null) =>

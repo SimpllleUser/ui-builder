@@ -121,6 +121,21 @@ test('all starter templates survive validated export and import', () => {
   for (const kind of ['card', 'form', 'columns']) store.addTemplate(kind)
   assert.equal(parseDocument(store.exportDocument()).children.length, 3)
 })
+test('composite palette components create useful named children', () => {
+  const form = store.createNode('VForm')
+  assert.deepEqual(form.children.map(child => child.props.label ?? child.children[0]?.name), ['Name', 'Email', 'Submit'])
+  assert.equal(form.children[1].props.type, 'email')
+
+  const radioGroup = store.createNode('VRadioGroup')
+  assert.deepEqual(radioGroup.children.map(child => child.props.value), ['option-1', 'option-2'])
+  assert.deepEqual(radioGroup.children.map(child => child.children[0]?.name), ['Option 1', 'Option 2'])
+})
+test('form can be inserted into the canvas as a composite component', () => {
+  store.addComponent('VForm')
+  const form = store.rootNode.children.at(-1)
+  assert.equal(form.type, 'VForm')
+  assert.deepEqual(form.children.map(child => child.type), ['VTextField', 'VTextField', 'VBtn'])
+})
 
 test('legacy tree operations group siblings, preserve order, and ungroup cleanly', () => {
   const nodes = [
