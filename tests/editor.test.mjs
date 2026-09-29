@@ -2,13 +2,16 @@ import { test, before, after, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
-let server, useStore, parseDocument, serializeDocument, readSpacing, writeSpacing, readFlex, writeFlex, store
+let server, useStore, parseDocument, serializeDocument, readSpacing, writeSpacing, readFlex, writeFlex, groupNodes, ungroupNode, clonePaletteItem, parseMoveDestination, canSavePrefabName, store
 const storage = new Map()
 before(async () => {
   server = await createServer({ configFile: false, server: { middlewareMode: true, watch: null, ws: false }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom' })
   ;({ useUiTreeStore: useStore } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/store.ts'))
   ;({ parseDocument, serializeDocument } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/document.ts'))
   ;({ readSpacing, writeSpacing, readFlex, writeFlex } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/layoutControls.ts'))
+  ;({ groupNodes, ungroupNode } = await server.ssrLoadModule('/src/features/ui-builder/model/treeOperations.ts'))
+  ;({ clonePaletteItem } = await server.ssrLoadModule('/src/features/ui-builder/model/useClone.ts'))
+  ;({ parseMoveDestination, canSavePrefabName } = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/propertyPanelUtils.ts'))
   global.window = { localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } }
 })
 beforeEach(() => { storage.clear(); setActivePinia(createPinia()); store = useStore() })
@@ -117,4 +120,67 @@ test('flex controls round-trip direction without removing grow and wrapping', ()
 test('all starter templates survive validated export and import', () => {
   for (const kind of ['card', 'form', 'columns']) store.addTemplate(kind)
   assert.equal(parseDocument(store.exportDocument()).children.length, 3)
+})
+
+test('legacy tree operations group siblings, preserve order, and ungroup cleanly', () => {
+  const nodes = [
+    { id: 1, name: 'VBtn', props: {}, children: [] },
+    { id: 2, name: 'VChip', props: {}, children: [] },
+    { id: 3, name: 'VAlert', props: {}, children: [] }
+  ]
+  const wrapper = groupNodes(nodes, [3, 1], children => ({ id: 10, name: 'Div', props: {}, children }))
+  assert.equal(wrapper.id, 10)
+  assert.deepEqual(nodes.map(node => node.id), [10, 2])
+  assert.deepEqual(wrapper.children.map(node => node.id), [1, 3])
+  assert.deepEqual(ungroupNode(nodes, 10).map(node => node.id), [1, 3])
+  assert.deepEqual(nodes.map(node => node.id), [1, 3, 2])
+})
+
+test('legacy clone copies props without copying child references', () => {
+  const original = { id: 1, name: 'Div', type: 'div', props: { class: 'box', nested: { active: true } }, children: [{ id: 2, name: 'VBtn', type: 'button', props: {} }] }
+  const clone = clonePaletteItem(original)
+  assert.notEqual(clone.id, original.id)
+  assert.deepEqual(clone.props, original.props)
+  assert.notEqual(clone.props, original.props)
+  assert.deepEqual(clone.children, [])
+})
+
+test('document validation rejects damaged nodes and invalid slot structure', () => {
+  store.addComponent('VIcon')
+  const valid = JSON.parse(store.exportDocument())
+
+  const leafChildren = structuredClone(valid)
+  leafChildren.root.children[0].children = [{ id: 'nested', type: 'TEXT', name: 'Text', props: {}, classes: [], children: [], slots: {} }]
+  assert.throws(() => parseDocument(JSON.stringify(leafChildren)), /unsupported children/)
+
+  const invalidSlot = structuredClone(valid)
+  invalidSlot.root.slots = { missing: [] }
+  assert.throws(() => parseDocument(JSON.stringify(invalidSlot)), /Invalid component slot/)
+
+  const duplicateId = structuredClone(valid)
+  duplicateId.root.children[0].id = duplicateId.root.id
+  assert.throws(() => parseDocument(JSON.stringify(duplicateId)), /Invalid component data/)
+})
+
+test('move target and save dialog helpers reject malformed or empty values', () => {
+  assert.deepEqual(parseMoveDestination('["root-canvas",null]'), { parentId: 'root-canvas', slot: null })
+  assert.deepEqual(parseMoveDestination('["card","title"]'), { parentId: 'card', slot: 'title' })
+  for (const value of ['', '{broken', '[]', '[1,null]', '["root",3]']) assert.equal(parseMoveDestination(value), null)
+  assert.equal(canSavePrefabName('   '), false)
+  assert.equal(canSavePrefabName(' Action '), true)
+})
+
+test('property updates and empty-container boundaries are safe', () => {
+  store.addComponent('VRow')
+  const row = store.selectedNodeId
+  assert.equal(store.canContain(store.findNodeById(row)), true)
+  assert.equal(store.appendToSlot(row, 'title', store.createNode('TEXT', 'Wrong slot')), false)
+  assert.equal(store.findNodeById(row).children.length, 0)
+
+  store.updateNodeProp(row, 'density', 'comfortable')
+  store.updateNodeClasses(row, ['d-flex', 'pa-2'])
+  store.updateNodeName(row, 'Layout row')
+  assert.equal(store.findNodeById(row).props.density, 'comfortable')
+  assert.deepEqual(store.findNodeById(row).classes, ['d-flex', 'pa-2'])
+  assert.equal(store.findNodeById(row).name, 'Layout row')
 })

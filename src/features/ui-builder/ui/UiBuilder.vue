@@ -15,7 +15,7 @@ const { canvas } = useCanvas();
 const { findById } = useTree();
 const { schema } = useSchema();
 const { undo, redo, canUndo, canRedo, commit } = useHistory(canvas);
-const { selectedId, selectedIds } = useSelection();
+const { selectedId, selectedIds, clear } = useSelection();
 const { canGroup, groupIntoDiv, canUngroup, ungroupDiv } = useGroup(canvas);
 
 const selectedComp = computed(() => findById(canvas.value, selectedId.value));
@@ -34,7 +34,7 @@ const onKey = (e: KeyboardEvent) => {
 };
 
 const closeDrawer = () => {
-  selectedId.value = null;
+  clear();
 };
 
 let t: number | undefined;

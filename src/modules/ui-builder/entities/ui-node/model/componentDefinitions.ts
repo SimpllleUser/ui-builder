@@ -26,7 +26,7 @@ export interface ComponentDef {
   isLeaf?: boolean
   isWrapContainer?: boolean
   slots: { name: string; label: string }[]
-  defaultProps: Record<string, any>
+  defaultProps: Record<string, unknown>
   defaultClasses: string[]
   defaultTextChild?: boolean
   defaultChildren?: string[]

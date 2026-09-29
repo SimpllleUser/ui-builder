@@ -4,6 +4,7 @@ import draggable from 'vuedraggable'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { getComponentDef, getComponentSlots, PALETTE_COMPONENTS } from '../../../entities/ui-node/model/componentDefinitions'
+import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
 const props = defineProps<{ node: UiNode; depth?: number }>()
 const store = useUiTreeStore()
 const expanded = ref(true)
@@ -13,7 +14,7 @@ const draftName = ref('')
 const row = ref<HTMLElement>()
 const renameInput = ref<HTMLInputElement>()
 const selected = computed(() => store.selectedNodeIds.includes(props.node.id))
-const slots = computed(() => getComponentSlots(props.node.type).filter(s => s.name !== 'default' && (props.node.id !== 'root-canvas' || props.node.slots[s.name]?.length)))
+const slots = computed(() => getComponentSlots(props.node.type).filter(s => s.name !== 'default' && (props.node.id !== ROOT_NODE_ID || props.node.slots[s.name]?.length)))
 const visibleSlots = computed(() => slots.value.filter(s => showEmptySlots.value || props.node.slots[s.name]?.length))
 const canMove = (event: { draggedContext: { element: UiNode }; to: HTMLElement }) => {
   const parent = store.findNodeById(event.to.dataset.parentId ?? '')
@@ -28,7 +29,7 @@ watch(() => store.selectedNodeIds, async ids => {
   if (ids[0] === props.node.id) { await nextTick(); row.value?.scrollIntoView({ block: 'nearest' }) }
 })
 const rename = async () => { draftName.value = props.node.name; renaming.value = true; await nextTick(); renameInput.value?.focus(); renameInput.value?.select() }
-const finishRename = () => { if (draftName.value.trim()) props.node.name = draftName.value.trim(); store.commit(); renaming.value = false }
+const finishRename = () => { store.renameNode(props.node.id, draftName.value); renaming.value = false }
 const keydown = (e: KeyboardEvent) => {
   if (e.target !== e.currentTarget) return
   const rows = [...(row.value?.closest('[role="tree"]')?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])]
@@ -51,11 +52,11 @@ const keydown = (e: KeyboardEvent) => {
 
 <template>
   <div class="tree-node">
-    <div ref="row" role="treeitem" :data-tree-id="node.id" :aria-label="node.name" :aria-selected="selected" :aria-level="depth + 1" :aria-expanded="hasContent ? expanded : undefined" :tabindex="store.selectedNodeId === node.id || (!store.selectedNodeId && node.id === 'root-canvas') ? 0 : -1" class="node-row" :class="{ 'node-row--selected': selected }" :style="{ paddingLeft: `${depth * 12 + 4}px` }" @click.stop="select" @keydown="keydown" @dblclick.stop="rename">
-      <span v-if="node.id !== 'root-canvas'" class="drag-handle" title="Drag to reorder or move"><VIcon icon="mdi-drag-vertical" size="16" /></span>
+    <div ref="row" role="treeitem" :data-tree-id="node.id" :aria-label="node.name" :aria-selected="selected" :aria-level="depth + 1" :aria-expanded="hasContent ? expanded : undefined" :tabindex="store.selectedNodeId === node.id || (!store.selectedNodeId && node.id === ROOT_NODE_ID) ? 0 : -1" class="node-row" :class="{ 'node-row--selected': selected }" :style="{ paddingLeft: `${depth * 12 + 4}px` }" @click.stop="select" @keydown="keydown" @dblclick.stop="rename">
+      <span v-if="node.id !== ROOT_NODE_ID" class="drag-handle" title="Drag to reorder or move"><VIcon icon="mdi-drag-vertical" size="16" /></span>
       <button v-if="hasContent" class="tree-btn" :aria-label="`${expanded ? 'Collapse' : 'Expand'} ${node.name}`" @click.stop="expanded = !expanded"><VIcon :icon="expanded ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" /></button>
       <span v-else class="expand-placeholder" />
-      <VIcon :icon="node.id === 'root-canvas' ? 'mdi-view-dashboard-outline' : getComponentDef(node.type)?.treeIcon" size="16" />
+      <VIcon :icon="node.id === ROOT_NODE_ID ? 'mdi-view-dashboard-outline' : getComponentDef(node.type)?.treeIcon" size="16" />
       <input v-if="renaming" ref="renameInput" v-model="draftName" class="rename-input" aria-label="Element name" @click.stop @keydown.enter.stop.prevent="finishRename" @keydown.esc.stop="draftName = node.name; renaming = false" @blur="finishRename" />
       <span v-else class="node-label" :title="node.name">{{ node.name }}</span>
       <span class="node-actions" @click.stop @dblclick.stop>
@@ -67,7 +68,7 @@ const keydown = (e: KeyboardEvent) => {
           <template #activator="{ props: menuProps }"><button v-bind="menuProps" class="tree-btn" :aria-label="`Actions for ${node.name}`"><VIcon icon="mdi-dots-horizontal" size="18" /></button></template>
           <VList density="compact">
             <VListItem title="Rename" prepend-icon="mdi-pencil" @click="rename" />
-            <template v-if="node.id !== 'root-canvas'">
+            <template v-if="node.id !== ROOT_NODE_ID">
               <VListItem title="Move up" :disabled="!store.canReorder(node.id, -1)" prepend-icon="mdi-arrow-up" @click="store.reorderNode(node.id, -1)" />
               <VListItem title="Move down" :disabled="!store.canReorder(node.id, 1)" prepend-icon="mdi-arrow-down" @click="store.reorderNode(node.id, 1)" />
               <VListItem title="Duplicate" prepend-icon="mdi-content-copy" @click="store.duplicateNode(node.id)" />
@@ -89,7 +90,7 @@ const keydown = (e: KeyboardEvent) => {
             <VList density="compact"><VListItem v-for="component in PALETTE_COMPONENTS" :key="component.type" :title="component.label" @click="store.appendToSlot(node.id, slot.name, store.createNode(component.type))" /></VList>
           </VMenu>
         </div>
-        <draggable :model-value="node.slots[slot.name] ?? []" @update:model-value="(nodes: UiNode[]) => node.slots[slot.name] = nodes" item-key="id" group="ui-nodes" :move="canMove" :data-parent-id="node.id" :data-slot-name="slot.name" class="tree-children" :class="{ 'tree-children--empty': !node.slots[slot.name]?.length }" :force-fallback="true" :fallback-on-body="true" handle=".drag-handle" :animation="150" ghost-class="tree-ghost" @start="store.commit()" @end="store.commit()">
+        <draggable :model-value="node.slots[slot.name] ?? []" @update:model-value="(nodes: UiNode[]) => store.updateSlotChildren(node.id, slot.name, nodes)" item-key="id" group="ui-nodes" :move="canMove" :data-parent-id="node.id" :data-slot-name="slot.name" class="tree-children" :class="{ 'tree-children--empty': !node.slots[slot.name]?.length }" :force-fallback="true" :fallback-on-body="true" handle=".drag-handle" :animation="150" ghost-class="tree-ghost" @start="store.commit()" @end="store.commit()">
           <template #item="{ element }"><SidebarTreeNode :node="element" :depth="depth + 2" /></template>
         </draggable>
       </div>

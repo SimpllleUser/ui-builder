@@ -1,11 +1,17 @@
 import { ref } from 'vue';
+import type { Ref } from 'vue';
 import type { PaletteItem } from '../types';
 
-const state = {
+type CanvasState = {
+  canvas: Ref<PaletteItem[]>;
+  selectedId: Ref<number | null>;
+};
+
+const state: CanvasState = {
   canvas: ref<PaletteItem[]>([]),
   selectedId: ref<number | null>(null)
 };
 
-export function useCanvas() {
+export function useCanvas(): CanvasState {
   return state;
 }

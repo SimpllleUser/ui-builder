@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { WRAP_CONTAINER_TYPES as WRAP_ALLOWED_TYPES, getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
+import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
 import SidebarTreeNode from './SidebarTreeNode.vue'
 import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
 
@@ -19,7 +20,7 @@ const canWrap = computed(() =>
 const canUnwrap = computed(() => {
   if (selectedNodeIds.value.length !== 1) return false
   const id = selectedNodeIds.value[0]
-  if (id === 'root-canvas') return false
+  if (id === ROOT_NODE_ID) return false
   const node = store.findNodeById(id)
   return !!node && (node.children?.length > 0) && !!getComponentDef(node.type)?.isWrapContainer
 })

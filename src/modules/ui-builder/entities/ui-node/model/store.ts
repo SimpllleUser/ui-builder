@@ -2,15 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch, onScopeDispose } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { getComponentDef } from './componentDefinitions'
+import { HISTORY_COMMIT_DELAY_MS, MAX_HISTORY_ENTRIES, ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
 import { DOCUMENT_KEY, emptyDocument, parseDocument, serializeDocument } from './document'
+import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
+import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
+import { createHistory } from './history'
+import { appendNode, canReorder as canReorderNode, deleteNode as deleteNodeMutation, duplicateNode as duplicateNodeMutation, moveNode as moveNodeMutation, reorderNode as reorderNodeMutation } from './nodeMutations'
+import { areNodesSiblings as areNodesSiblingsMutation, getUnwrapReason, unwrapNode as unwrapNodeMutation, wrapNodes as wrapNodesMutation, type ContainerMutationContext } from './containerMutations'
+import { deletePrefab as deletePrefabMutation, insertPrefab as insertPrefabMutation, savePrefab as savePrefabMutation, type PrefabMutationContext } from './prefabMutations'
+import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateKind } from './templateFactory'
 import type { UiNode, Prefab } from './types'
-
-const regenIds = (node: UiNode): UiNode => ({
-  ...node,
-  id: `ui_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`,
-  children: node.children.map(regenIds),
-  slots: Object.fromEntries(Object.entries(node.slots).map(([key, nodes]) => [key, nodes.map(regenIds)])),
-})
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
@@ -30,11 +31,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const selectedNodeId = computed(() => selectedNodeIds.value[0] ?? null)
   const isPreviewMode = ref(false)
   const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
-  const history = ref<string[]>([JSON.stringify(initial)])
-  const historyIndex = ref(0)
   let historyTimer: ReturnType<typeof setTimeout> | undefined
   let saveTimer: ReturnType<typeof setTimeout> | undefined
-  let restoring = false
 
   const saveDocument = () => {
     clearTimeout(saveTimer)
@@ -47,62 +45,44 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       notice.value = 'Could not save in this browser. Export your page to keep a backup.'
     }
   }
+  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null =>
+    findNodeByIdInTree(id, node)
+
+  const history = createHistory(
+    () => JSON.stringify(rootNode.value),
+    snapshot => {
+      rootNode.value = JSON.parse(snapshot)
+      selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
+    },
+    MAX_HISTORY_ENTRIES,
+  )
+  const { canUndo, canRedo, commit: commitHistory } = history
   const commit = () => {
     clearTimeout(historyTimer)
-    if (restoring) return
-    const snapshot = JSON.stringify(rootNode.value)
-    if (history.value[historyIndex.value] === snapshot) return
-    history.value = history.value.slice(0, historyIndex.value + 1)
-    history.value.push(snapshot)
-    if (history.value.length > 50) history.value.shift()
-    historyIndex.value = history.value.length - 1
+    if (!history.isRestoring.value) commitHistory()
   }
+  const undo = () => {
+    clearTimeout(historyTimer)
+    history.undo()
+  }
+  const redo = () => {
+    clearTimeout(historyTimer)
+    history.redo()
+  }
+
   watch(rootNode, () => {
     saveState.value = 'saving'
     clearTimeout(saveTimer)
     saveTimer = setTimeout(saveDocument, 250)
-    if (!restoring) {
+    if (!history.isRestoring.value) {
       clearTimeout(historyTimer)
-      historyTimer = setTimeout(commit, 600)
+      historyTimer = setTimeout(commit, HISTORY_COMMIT_DELAY_MS)
     }
   }, { deep: true, flush: 'sync' })
   onScopeDispose(() => { clearTimeout(historyTimer); clearTimeout(saveTimer) })
 
-  const pending = computed(() => JSON.stringify(rootNode.value) !== history.value[historyIndex.value])
-  const canUndo = computed(() => pending.value || historyIndex.value > 0)
-  const canRedo = computed(() => !pending.value && historyIndex.value < history.value.length - 1)
-  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => {
-    if (node.id === id) return node
-    for (const child of [...node.children, ...Object.values(node.slots).flat()]) {
-      const found = findNodeById(id, child)
-      if (found) return found
-    }
-    return null
-  }
-  const restore = () => {
-    restoring = true
-    rootNode.value = JSON.parse(history.value[historyIndex.value])
-    selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
-    restoring = false
-  }
-  const undo = () => { commit(); if (historyIndex.value > 0) { historyIndex.value--; restore() } }
-  const redo = () => { if (canRedo.value) { historyIndex.value++; restore() } }
-
-  type Location = { parent: UiNode; index: number; slotName: string | null }
-  const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): Location | null => {
-    const index = parent.children.findIndex(c => c.id === id)
-    if (index !== -1) return { parent, index, slotName: null }
-    for (const [slotName, nodes] of Object.entries(parent.slots)) {
-      const index = nodes.findIndex(c => c.id === id)
-      if (index !== -1) return { parent, index, slotName }
-    }
-    for (const child of [...parent.children, ...Object.values(parent.slots).flat()]) {
-      const found = findParentAndIndex(id, child)
-      if (found) return found
-    }
-    return null
-  }
-  const listAt = (loc: Location) => loc.slotName ? loc.parent.slots[loc.slotName] : loc.parent.children
+  const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): NodeLocation | null =>
+    findParentAndIndexInTree(id, parent)
   const canContain = (node: UiNode, slotName: string | null = null) => {
     const def = getComponentDef(node.type)
     return !!def && (slotName
@@ -115,130 +95,92 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     return node ?? rootNode.value
   })
   const selectNode = (id: string | null) => { selectedNodeIds.value = id && findNodeById(id) ? [id] : [] }
+  const renameNode = (id: string, name: string) => {
+    const node = findNodeById(id)
+    const trimmedName = name.trim()
+    if (!node || !trimmedName) return false
+    commit()
+    node.name = trimmedName
+    commit()
+    return true
+  }
+  const updateSlotChildren = (id: string, slotName: string, children: UiNode[]) => {
+    const node = findNodeById(id)
+    if (!node || !getComponentDef(node.type)?.slots.some(slot => slot.name === slotName)) return false
+    node.slots[slotName] = children
+    return true
+  }
+  const updateNodeClasses = (id: string, classes: string[]) => {
+    const node = findNodeById(id)
+    if (!node) return false
+    node.classes = classes
+    return true
+  }
+  const updateNodeName = (id: string, name: string) => {
+    const node = findNodeById(id)
+    if (!node) return false
+    node.name = name
+    return true
+  }
+  const updateNodeProp = (id: string, prop: string, value: unknown) => {
+    const node = findNodeById(id)
+    if (!node) return false
+    node.props[prop] = value
+    return true
+  }
+  const mutationContext: ContainerMutationContext & PrefabMutationContext & TemplateContext = {
+    findNodeById,
+    findParentAndIndex,
+    getNodeList,
+    canContain,
+    cloneNodeWithNewIds,
+    commit,
+    selectNode,
+    setNotice: message => { notice.value = message },
+    clearDeletedSelection: () => {
+      selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
+    },
+    createNode: (type, name) => createNode(type, name),
+    getComponentDef,
+    setSelectedNodeIds: ids => { selectedNodeIds.value = ids },
+    getPrefabs: () => prefabs.value,
+    setPrefabs: value => { prefabs.value = value },
+    getInsertionTargetId: () => insertionTarget.value.id,
+    appendNode: (parentId, node, slotName) => appendNode(mutationContext, parentId, node, slotName),
+  }
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
     if (!def) throw new Error('Unknown component type')
-    const id = `ui_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+    const id = createNodeId()
     return {
       id, type, name: name ?? def.label, props: { ...def.defaultProps }, classes: [...def.defaultClasses], slots: {},
       children: def.defaultTextChild
-        ? [{ id: `${id}_text`, type: 'TEXT', name: def.label, props: {}, classes: [], children: [], slots: {} }]
+        ? [{ id: `${id}_text`, type: TEXT_NODE_TYPE, name: def.label, props: {}, classes: [], children: [], slots: {} }]
         : (def.defaultChildren ?? []).map(type => createNode(type)),
     }
   }
-  const append = (parentId: string, node: UiNode, slotName: string | null = null) => {
-    const parent = findNodeById(parentId)
-    if (!parent || !canContain(parent, slotName)) { notice.value = 'Choose a container that accepts this content.'; return false }
-    commit()
-    if (slotName) (parent.slots[slotName] ??= []).push(node)
-    else parent.children.push(node)
-    selectNode(node.id)
-    commit()
-    notice.value = `Added ${node.name} to ${parent.name}${slotName ? ` / ${slotName}` : ''}.`
-    return true
-  }
+  const append = (parentId: string, node: UiNode, slotName: string | null = null) =>
+    appendNode(mutationContext, parentId, node, slotName)
   const addComponent = (type: string, parentId = insertionTarget.value.id) => append(parentId, createNode(type))
-  const savePrefab = (nodeId: string, name: string) => {
-    const node = findNodeById(nodeId)
-    if (!node || !name.trim()) return
-    prefabs.value = [...prefabs.value, { prefabId: `prefab_${Date.now()}_${Math.random().toString(36).slice(2)}`, name: name.trim(), node: JSON.parse(JSON.stringify(node)) }]
-    notice.value = `Saved ${name.trim()} to My components.`
-  }
-  const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) => {
-    const prefab = prefabs.value.find(p => p.prefabId === prefabId)
-    if (!prefab) return false
-    let parent = findNodeById(parentId)
-    if (!slotName) while (parent && !canContain(parent)) parent = findParentAndIndex(parent.id)?.parent ?? null
-    return append(parent?.id ?? 'root-canvas', regenIds(JSON.parse(JSON.stringify(prefab.node))), slotName)
-  }
-  const duplicateNode = (id: string) => {
-    const loc = findParentAndIndex(id)
-    if (!loc) return
-    commit()
-    const list = listAt(loc)
-    const clone = regenIds(JSON.parse(JSON.stringify(list[loc.index])))
-    list.splice(loc.index + 1, 0, clone)
-    selectNode(clone.id)
-    commit()
-    return clone.id
-  }
-  const deleteNode = (id: string) => {
-    const loc = findParentAndIndex(id)
-    if (!loc) return false
-    commit()
-    listAt(loc).splice(loc.index, 1)
-    selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
-    commit()
-    notice.value = 'Element deleted. Use Undo to restore it.'
-    return true
-  }
-  const areNodesSiblings = (ids: string[]) => {
-    const locs = ids.map(id => findParentAndIndex(id))
-    return locs.length > 0 && locs.every(l => l && l.parent.id === locs[0]?.parent.id && l.slotName === locs[0]?.slotName)
-  }
-  const wrapNodes = (ids: string[], type: string) => {
-    if (!areNodesSiblings(ids) || !getComponentDef(type)?.isWrapContainer) return
-    commit()
-    const locs = ids.map(id => findParentAndIndex(id)!).sort((a, b) => a.index - b.index)
-    const list = listAt(locs[0])
-    const wrapper = createNode(type)
-    wrapper.children = locs.map(l => list[l.index])
-    for (const loc of [...locs].reverse()) list.splice(loc.index, 1)
-    list.splice(locs[0].index, 0, wrapper)
-    selectNode(wrapper.id)
-    commit()
-  }
-  const unwrapReason = (id: string): string => {
-    const node = findNodeById(id)
-    if (!node || id === 'root-canvas' || !getComponentDef(node.type)?.isWrapContainer) return 'Choose a container to unwrap.'
-    if (Object.values(node.slots).some(nodes => nodes.length)) return 'Move content out of named slots before unwrapping this container.'
-    if (!node.children.length) return 'This container has no children to unwrap.'
-    return ''
-  }
-  const unwrapNode = (id: string) => {
-    const reason = unwrapReason(id)
-    if (reason) { notice.value = reason; return false }
-    const loc = findParentAndIndex(id)!
-    commit()
-    const list = listAt(loc)
-    const children = list[loc.index].children
-    list.splice(loc.index, 1, ...children)
-    selectedNodeIds.value = children.map(n => n.id)
-    commit()
-    return true
-  }
+  const savePrefab = (nodeId: string, name: string) => savePrefabMutation(mutationContext, nodeId, name)
+  const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) =>
+    insertPrefabMutation(mutationContext, prefabId, parentId, slotName)
+  const duplicateNode = (id: string) => duplicateNodeMutation(mutationContext, id)
+  const deleteNode = (id: string) => deleteNodeMutation(mutationContext, id)
+  const areNodesSiblings = (ids: string[]) => areNodesSiblingsMutation(mutationContext, ids)
+  const wrapNodes = (ids: string[], type: string) => wrapNodesMutation(mutationContext, ids, type)
+  const unwrapReason = (id: string) => getUnwrapReason(mutationContext, id)
+  const unwrapNode = (id: string) => unwrapNodeMutation(mutationContext, id)
   const pathTo = (id: string): UiNode[] => {
     const node = findNodeById(id)
     if (!node) return []
     const parent = findParentAndIndex(id)?.parent
     return [...(parent ? pathTo(parent.id) : []), node]
   }
-  const moveNode = (id: string, parentId: string, slotName: string | null = null) => {
-    const node = findNodeById(id)
-    const loc = findParentAndIndex(id)
-    const parent = findNodeById(parentId)
-    if (!node || !loc || !parent || !canContain(parent, slotName) || findNodeById(parentId, node)) return false
-    commit()
-    listAt(loc).splice(loc.index, 1)
-    if (slotName) (parent.slots[slotName] ??= []).push(node)
-    else parent.children.push(node)
-    commit()
-    selectNode(id)
-    notice.value = `Moved ${node.name} to ${parent.name}.`
-    return true
-  }
-  const canReorder = (id: string, direction: number) => {
-    const loc = findParentAndIndex(id)
-    return !!loc && loc.index + direction >= 0 && loc.index + direction < listAt(loc).length
-  }
-  const reorderNode = (id: string, direction: number) => {
-    if (!canReorder(id, direction)) return
-    commit()
-    const loc = findParentAndIndex(id)!
-    const list = listAt(loc)
-    list.splice(loc.index + direction, 0, list.splice(loc.index, 1)[0])
-    commit()
-  }
+  const moveNode = (id: string, parentId: string, slotName: string | null = null) =>
+    moveNodeMutation(mutationContext, id, parentId, slotName)
+  const canReorder = (id: string, direction: number) => canReorderNode(mutationContext, id, direction)
+  const reorderNode = (id: string, direction: number) => reorderNodeMutation(mutationContext, id, direction)
   const importDocument = (text: string) => {
     const document = parseDocument(text)
     commit()
@@ -248,37 +190,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     saveDocument()
     notice.value = 'Page imported. Use Undo to return to the previous page.'
   }
-  const addTemplate = (kind: 'card' | 'form' | 'columns') => {
-    const card = createNode('VCard', kind === 'form' ? 'Contact form' : 'Welcome card')
-    card.classes = ['pa-6', 'rounded-lg']
-    const title = createNode('VCardTitle')
-    title.classes.push('text-wrap')
-    title.children[0].name = kind === 'form' ? 'Get in touch' : 'Your next idea starts here'
-    const text = createNode('VCardText')
-    text.children[0].name = 'Select an element to edit its content and appearance.'
-    const button = createNode('VBtn')
-    button.props = { color: 'primary', variant: 'flat' }
-    button.children[0].name = kind === 'form' ? 'Send message' : 'Get started'
-    card.children = [title, text]
-    if (kind === 'form') {
-      for (const label of ['Name', 'Email', 'Message']) {
-        const input = createNode('VTextField')
-        input.props = { label, variant: 'outlined', type: label === 'Email' ? 'email' : 'text' }
-        card.children.push(input)
-      }
-    }
-    card.children.push(button)
-    if (kind === 'columns') {
-      const row = createNode('VRow', 'Two columns')
-      row.children = [1, 2].map(n => {
-        const col = createNode('VCol', `Column ${n}`)
-        col.props = { cols: 12, md: 6 }
-        col.children = [regenIds(JSON.parse(JSON.stringify(card)))]
-        return col
-      })
-      append('root-canvas', row)
-    } else append('root-canvas', card)
-  }
+  const addTemplate = (kind: TemplateKind) => addTemplateMutation(mutationContext, kind)
 
   return {
     rootNode, selectedNodeIds, selectedNodeId, isPreviewMode, prefabs, notice, saveState,
@@ -286,8 +198,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     exportDocument: () => serializeDocument(rootNode.value),
     findNodeById, findParentAndIndex, pathTo, createNode, canContain, insertionTarget,
     addComponent, addTemplate, duplicateNode, deleteNode, savePrefab, insertPrefab,
-    deletePrefab: (id: string) => { prefabs.value = prefabs.value.filter(p => p.prefabId !== id); notice.value = 'Saved component deleted.' },
-    selectNode,
+    deletePrefab: (id: string) => deletePrefabMutation(mutationContext, id),
+    selectNode, renameNode, updateSlotChildren, updateNodeClasses, updateNodeName, updateNodeProp,
     toggleMultiSelect: (id: string) => {
       if (!findNodeById(id)) return
       selectedNodeIds.value = selectedNodeIds.value.includes(id) ? selectedNodeIds.value.filter(i => i !== id) : [...selectedNodeIds.value, id]

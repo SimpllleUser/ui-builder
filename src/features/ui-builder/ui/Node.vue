@@ -1,306 +1,252 @@
 <script lang="ts">
-import { Icons } from '../../../shared/icons'
-import { defineComponent, h } from 'vue';
+import { Icons } from '../../../shared/icons';
+import { defineComponent, h, type Component, type PropType, type VNode } from 'vue';
 import { VueDraggableNext as Draggable } from 'vue-draggable-next';
 import { VRow, VCol, VBtn, VExpansionPanels, VExpansionPanel } from 'vuetify/components';
-import type { PaletteItem } from '../types';
+import type { NodePropValue, PaletteItem } from '../types';
 
-export default defineComponent({
+type ClickNodePayload = { id: number; meta: boolean };
+const textProp = (value: NodePropValue | undefined): string | number | undefined =>
+  typeof value === 'string' || typeof value === 'number' ? value : undefined;
+
+const nodeProps = {
+  node: { type: Object as PropType<PaletteItem>, required: true },
+  selectedIds: { type: Array as PropType<number[]>, required: true }
+};
+
+const draggableGroup = { name: 'vuetify', pull: true, put: true };
+const DraggableComponent: Component = Draggable;
+const VRowComponent: Component = VRow;
+const VExpansionPanelsComponent: Component = VExpansionPanels;
+const VExpansionPanelComponent: Component = VExpansionPanel;
+
+const LegacyNode = defineComponent({
   name: 'Node',
-  props: {
-    node: { type: Object as () => PaletteItem, required: true },
-    selectedIds: { type: Array as () => number[], required: true }
+  props: nodeProps,
+  emits: {
+    'click-node': (_payload: ClickNodePayload) => true,
+    remove: (_id: number) => true,
+    changed: () => true,
+    ungroup: (_id: number) => true
   },
-  emits: ['click-node', 'remove', 'changed', 'ungroup'],
-  setup(_, { emit }) {
+  setup(props, { emit }) {
     const clickNode = (id: number, meta: boolean) => emit('click-node', { id, meta });
-    const remove = (id: number, e?: Event) => {
-      if (e) e.stopPropagation();
+    const remove = (id: number, event?: Event) => {
+      event?.stopPropagation();
       emit('remove', id);
     };
-    const ungroup = (id: number, e?: Event) => {
-      if (e) e.stopPropagation();
+    const ungroup = (id: number, event?: Event) => {
+      event?.stopPropagation();
       emit('ungroup', id);
     };
     const changed = () => emit('changed');
-    const actions = (n: PaletteItem) =>
+
+    const actions = (node: PaletteItem): VNode =>
       h('div', { class: 'node-actions' }, [
-        n.name === 'Div'
-          ? h(VBtn as any, {
+        node.name === 'Div'
+          ? h(VBtn, {
               icon: Icons.Ungroup,
               size: 'x-small',
               variant: 'text',
               density: 'comfortable',
-              onClick: (e: Event) => ungroup(n.id, e)
+              onClick: (event: Event) => ungroup(node.id, event)
             })
           : null,
-        h(VBtn as any, {
+        h(VBtn, {
           icon: Icons.Delete,
           size: 'x-small',
           variant: 'text',
           density: 'comfortable',
-          onClick: (e: Event) => remove(n.id, e)
+          onClick: (event: Event) => remove(node.id, event)
         })
       ]);
-    return { clickNode, actions, changed };
-  },
-  render() {
-    const n = this.$props.node as PaletteItem;
-    const isSelected = this.$props.selectedIds.includes(n.id);
 
-    const handleClick = (e: Event) => {
-      const me = e as MouseEvent;
-      this.clickNode(n.id, !!(me.metaKey || me.ctrlKey));
-      e.stopPropagation();
-    };
+    const renderChild = (child: PaletteItem): VNode =>
+        h(LegacyNode, {
+        node: child,
+        selectedIds: props.selectedIds ?? [],
+        onClickNode: (payload: ClickNodePayload) => emit('click-node', payload),
+        onRemove: (id: number) => emit('remove', id),
+        onChanged: () => emit('changed'),
+        onUngroup: (id: number) => emit('ungroup', id),
+        key: child.id
+      });
 
-    if (n.name === 'VRow') {
-      if (!n.children) n.children = [];
-      return h(
-        Draggable as any,
+    const renderChildren = (children: PaletteItem[], empty: VNode | VNode[]): VNode[] =>
+      children.length ? children.map(renderChild) : (Array.isArray(empty) ? empty : [empty]);
+
+    const renderDropZone = (
+      owner: PaletteItem,
+      tag: string,
+      className: string | string[],
+      empty: VNode | VNode[]
+    ): VNode =>
+      h(
+        DraggableComponent,
         {
-          modelValue: n.children,
-          'onUpdate:modelValue': (v: PaletteItem[]) => {
-            n.children = v;
-            this.changed();
+          modelValue: owner.children ?? [],
+          'onUpdate:modelValue': (value: PaletteItem[]) => {
+            owner.children = value;
+            changed();
           },
           itemKey: 'id',
-          group: { name: 'vuetify', pull: true, put: true },
-          tag: VRow,
-          class: ['row-decor', 'bg-blue-lighten-4', 'pa-3', 'rounded-lg', isSelected ? 'selected' : ''],
-          onClick: handleClick
+          group: draggableGroup,
+          tag,
+          class: className
+        },
+        { default: () => renderChildren(owner.children ?? [], empty) }
+      );
+
+    const handleClick = (event: Event, node: PaletteItem) => {
+      const mouseEvent = event as MouseEvent;
+      clickNode(node.id, !!(mouseEvent.metaKey || mouseEvent.ctrlKey));
+      event.stopPropagation();
+    };
+
+    const renderRow = (node: PaletteItem, selected: boolean): VNode => {
+      const children = node.children ?? (node.children = []);
+      return h(
+        DraggableComponent,
+        {
+          modelValue: children,
+          'onUpdate:modelValue': (value: PaletteItem[]) => {
+            node.children = value;
+            changed();
+          },
+          itemKey: 'id',
+          group: draggableGroup,
+          tag: VRowComponent,
+          class: ['row-decor', 'bg-blue-lighten-4', 'pa-3', 'rounded-lg', selected ? 'selected' : ''],
+          onClick: (event: Event) => handleClick(event, node)
         },
         {
           default: () => [
             h('div', { class: 'box-label position-absolute text-caption' }, 'VRow'),
-            this.actions(n),
-            ...(n.children!.length
-              ? n.children!.map(child =>
-                  h((this as any).$options, {
-                    node: child,
-                    selectedIds: this.$props.selectedIds,
-                    onClickNode: (p: any) => this.$emit('click-node', p),
-                    onRemove: (id: number) => this.$emit('remove', id),
-                    onChanged: () => this.$emit('changed'),
-                    onUngroup: (id: number) => this.$emit('ungroup', id),
-                    key: child.id
-                  })
-                )
-              : [
-                  h(
-                    VCol as any,
-                    { cols: 12, class: 'text-grey-darken-1 text-caption py-6', key: 'placeholder' },
-                    'Перетягніть сюди компонент'
-                  )
-                ])
+            actions(node),
+            ...renderChildren(children, h(VCol, { cols: 12, class: 'text-grey-darken-1 text-caption py-6' }, () => 'Перетягніть сюди компонент'))
           ]
         }
       );
-    }
+    };
 
-    if (n.name === 'VCol') {
-      if (!n.children) n.children = [];
-      const colsValue = Number(n.props?.cols) || 12;
-      const widthPercent = (colsValue / 12) * 100;
+    const renderColumn = (node: PaletteItem, selected: boolean): VNode => {
+      const children = node.children ?? (node.children = []);
+      const cols = Number(node.props.cols) || 12;
+      const widthPercent = (cols / 12) * 100;
       return h(
-        VCol as any,
+        VCol,
         {
-          ...n.props,
-          class: ['col-decor', 'bg-green-lighten-4', 'pa-3', 'rounded-lg', isSelected ? 'selected' : ''],
-          style: {
-            flex: `0 0 ${widthPercent}%`,
-            maxWidth: `${widthPercent}%`
-          },
-          onClick: handleClick
+          ...node.props,
+          class: ['col-decor', 'bg-green-lighten-4', 'pa-3', 'rounded-lg', selected ? 'selected' : ''],
+          style: { flex: `0 0 ${widthPercent}%`, maxWidth: `${widthPercent}%` },
+          onClick: (event: Event) => handleClick(event, node)
         },
         {
           default: () => [
-            h('div', { class: 'box-label position-absolute text-caption' }, `VCol (cols: ${n.props?.cols ?? ''})`),
-            this.actions(n),
-            h(
-              Draggable as any,
-              {
-                modelValue: n.children,
-                'onUpdate:modelValue': (v: PaletteItem[]) => {
-                  n.children = v;
-                  this.changed();
-                },
-                itemKey: 'id',
-                group: { name: 'vuetify', pull: true, put: true },
-                tag: 'div',
-                class: ['inner-list', 'bg-green-lighten-5', 'pa-3', 'rounded-lg']
-              },
-              {
-                default: () =>
-                  n.children!.length
-                    ? n.children!.map(child =>
-                        h((this as any).$options, {
-                          node: child,
-                          selectedIds: this.$props.selectedIds,
-                          onClickNode: (p: any) => this.$emit('click-node', p),
-                          onRemove: (id: number) => this.$emit('remove', id),
-                          onChanged: () => this.$emit('changed'),
-                          onUngroup: (id: number) => this.$emit('ungroup', id),
-                          key: child.id
-                        })
-                      )
-                    : [h('div', { class: 'inner-placeholder text-caption' }, 'Put here')]
-              }
-            )
+            h('div', { class: 'box-label position-absolute text-caption' }, `VCol (cols: ${node.props.cols ?? ''})`),
+            actions(node),
+            renderDropZone(node, 'div', ['inner-list', 'bg-green-lighten-5', 'pa-3', 'rounded-lg'], h('div', { class: 'inner-placeholder text-caption' }, 'Put here'))
           ]
         }
       );
-    }
+    };
 
-    if (n.name === 'Div') {
-      if (!n.children) n.children = [];
+    const renderDiv = (node: PaletteItem, selected: boolean): VNode => {
+      const children = node.children ?? (node.children = []);
       return h(
         'div',
         {
-          class: ['group-decor', 'bg-grey-lighten-4', 'pa-3', 'rounded-lg', isSelected ? 'selected' : ''],
-          onClick: handleClick
+          class: ['group-decor', 'bg-grey-lighten-4', 'pa-3', 'rounded-lg', selected ? 'selected' : ''],
+          onClick: (event: Event) => handleClick(event, node)
         },
         [
           h('div', { class: 'box-label position-absolute text-caption' }, 'DIV'),
-          this.actions(n),
-          h(
-            Draggable as any,
-            {
-              modelValue: n.children,
-              'onUpdate:modelValue': (v: PaletteItem[]) => {
-                n.children = v;
-                this.changed();
-              },
-              itemKey: 'id',
-              group: { name: 'vuetify', pull: true, put: true },
-              tag: 'div',
-              class: ['inner-list', 'bg-grey-lighten-5', 'pa-3', 'rounded-lg']
-            },
-            {
-              default: () =>
-                n.children!.length
-                  ? n.children!.map(child =>
-                      h((this as any).$options, {
-                        node: child,
-                        selectedIds: this.$props.selectedIds,
-                        onClickNode: (p: any) => this.$emit('click-node', p),
-                        onRemove: (id: number) => this.$emit('remove', id),
-                        onChanged: () => this.$emit('changed'),
-                        onUngroup: (id: number) => this.$emit('ungroup', id),
-                        key: child.id
-                      })
-                    )
-                  : [h('div', { class: 'inner-placeholder text-caption' }, 'Put here')]
-            }
-          )
+          actions(node),
+          renderDropZone(node, 'div', ['inner-list', 'bg-grey-lighten-5', 'pa-3', 'rounded-lg'], h('div', { class: 'inner-placeholder text-caption' }, 'Put here'))
         ]
       );
-    }
+    };
 
-    if (n.name === 'VExpansionPanels') {
-      if (!n.children) n.children = [];
+    const renderExpansionPanels = (node: PaletteItem, selected: boolean): VNode => {
+      const children = node.children ?? (node.children = []);
       return h(
-        Draggable as any,
+        DraggableComponent,
         {
-          modelValue: n.children,
-          'onUpdate:modelValue': (v: PaletteItem[]) => { n.children = v; this.changed(); },
+          modelValue: children,
+          'onUpdate:modelValue': (value: PaletteItem[]) => {
+            node.children = value;
+            changed();
+          },
           itemKey: 'id',
-          group: { name: 'vuetify', pull: true, put: true },
-          tag: VExpansionPanels,
-          ...n.props,
-          class: ['panels-decor', 'bg-deep-purple-lighten-4', 'pa-3', 'rounded-lg', isSelected ? 'selected' : ''],
-          onClick: handleClick
+          group: draggableGroup,
+          tag: VExpansionPanelsComponent,
+          ...node.props,
+          class: ['panels-decor', 'bg-deep-purple-lighten-4', 'pa-3', 'rounded-lg', selected ? 'selected' : ''],
+          onClick: (event: Event) => handleClick(event, node)
         },
         {
           default: () => [
             h('div', { class: 'box-label position-absolute text-caption' }, 'VExpansionPanels'),
-            this.actions(n),
-            ...(n.children!.length
-              ? n.children!.map(child =>
-                  h((this as any).$options, {
-                    node: child,
-                    selectedIds: this.$props.selectedIds,
-                    onClickNode: (p: any) => this.$emit('click-node', p),
-                    onRemove: (id: number) => this.$emit('remove', id),
-                    onChanged: () => this.$emit('changed'),
-                    onUngroup: (id: number) => this.$emit('ungroup', id),
-                    key: child.id
-                  })
-                )
-              : [h('div', { class: 'text-grey-darken-1 text-caption py-6 text-center w-100' }, 'Перетягніть панелі сюди')]
-            )
+            actions(node),
+            ...renderChildren(children, h('div', { class: 'text-grey-darken-1 text-caption py-6 text-center w-100' }, 'Перетягніть панелі сюди'))
           ]
         }
       );
-    }
+    };
 
-    if (n.name === 'VExpansionPanel') {
-      if (!n.children) n.children = [];
+    const renderExpansionPanel = (node: PaletteItem, selected: boolean): VNode => {
+      const children = node.children ?? (node.children = []);
       return h(
-        VExpansionPanel as any,
+        VExpansionPanelComponent,
         {
-          value: n.props?.value,
-          eager: n.props?.eager,
-          class: ['expansion-panel-decor', isSelected ? 'selected' : ''],
-          onClick: handleClick
+          value: node.props.value,
+          eager: node.props.eager,
+          class: ['expansion-panel-decor', selected ? 'selected' : ''],
+          onClick: (event: Event) => handleClick(event, node)
         },
         {
           title: () => [
-            h('span', { class: 'flex-grow-1 font-weight-medium' }, n.props?.title ?? 'Panel'),
+            h('span', { class: 'flex-grow-1 font-weight-medium' }, textProp(node.props.title) ?? 'Panel'),
             h('span', { class: 'text-caption text-medium-emphasis me-1' }, 'VExpansionPanel'),
-            h(VBtn as any, {
+            h(VBtn, {
               icon: Icons.Delete,
               size: 'x-small',
               variant: 'text',
               density: 'comfortable',
-              onClick: (e: Event) => { e.stopPropagation(); this.$emit('remove', n.id); }
+              onClick: (event: Event) => remove(node.id, event)
             })
           ],
           default: () => [
-            h(
-              Draggable as any,
-              {
-                modelValue: n.children,
-                'onUpdate:modelValue': (v: PaletteItem[]) => { n.children = v; this.changed(); },
-                itemKey: 'id',
-                group: { name: 'vuetify', pull: true, put: true },
-                tag: 'div',
-                class: ['inner-list', 'bg-deep-purple-lighten-5', 'pa-2', 'rounded-lg']
-              },
-              {
-                default: () =>
-                  n.children!.length
-                    ? n.children!.map(child =>
-                        h((this as any).$options, {
-                          node: child,
-                          selectedIds: this.$props.selectedIds,
-                          onClickNode: (p: any) => this.$emit('click-node', p),
-                          onRemove: (id: number) => this.$emit('remove', id),
-                          onChanged: () => this.$emit('changed'),
-                          onUngroup: (id: number) => this.$emit('ungroup', id),
-                          key: child.id
-                        })
-                      )
-                    : [h('div', { class: 'inner-placeholder text-caption' }, 'Put here')]
-              }
-            )
+            renderDropZone(node, 'div', ['inner-list', 'bg-deep-purple-lighten-5', 'pa-2', 'rounded-lg'], h('div', { class: 'inner-placeholder text-caption' }, 'Put here'))
           ]
         }
       );
-    }
+    };
 
-    const Comp = n.type as any;
-    return h(
-      'div',
-      {
-        class: ['leaf', isSelected ? 'selected' : ''],
-        onClick: handleClick,
-        style: { position: 'relative' }
-      },
-      [this.actions(n), h(Comp, n.props, { default: () => n.props?.text })]
-    );
+    return () => {
+      const node = props.node!;
+      const selected = (props.selectedIds ?? []).includes(node.id);
+
+      if (node.name === 'VRow') return renderRow(node, selected);
+      if (node.name === 'VCol') return renderColumn(node, selected);
+      if (node.name === 'Div') return renderDiv(node, selected);
+      if (node.name === 'VExpansionPanels') return renderExpansionPanels(node, selected);
+      if (node.name === 'VExpansionPanel') return renderExpansionPanel(node, selected);
+
+      return h(
+        'div',
+        {
+          class: ['leaf', selected ? 'selected' : ''],
+          onClick: (event: Event) => handleClick(event, node),
+          style: { position: 'relative' }
+        },
+        [actions(node), h(node.type, node.props, { default: () => textProp(node.props.text) })]
+      );
+    };
   }
 });
+
+export default LegacyNode;
 </script>
 
 <style scoped>
