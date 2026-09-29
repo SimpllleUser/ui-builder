@@ -8,10 +8,20 @@ import SidebarTreeNode from './SidebarTreeNode.vue'
 import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
 
 const store = useUiTreeStore()
-const { rootNode, selectedNodeIds, prefabs } = storeToRefs(store)
+const { rootNode, selectedNodeIds, prefabs, historyVersions, historyPending, checkpoints } = storeToRefs(store)
 
-const activeView = ref<'components' | 'layers' | 'prefabs'>('layers')
+type SidebarView = 'components' | 'layers' | 'prefabs' | 'history'
+const activityViews: Array<{ id: SidebarView; icon: string; label: string }> = [
+  { id: 'components', icon: 'mdi-shape-outline', label: 'Components' },
+  { id: 'layers', icon: 'mdi-file-tree-outline', label: 'Layers' },
+  { id: 'prefabs', icon: 'mdi-puzzle-outline', label: 'My components' },
+  { id: 'history', icon: 'mdi-history', label: 'History' },
+]
+const activeView = ref<SidebarView>('layers')
 const deletingPrefab = ref<string | null>(null)
+const checkpointDialog = ref(false)
+const checkpointName = ref('')
+const checkpointDateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })
 const activeTreeId = ref(rootNode.value.id)
 
 provide('ui-builder-active-tree-id', activeTreeId)
@@ -35,6 +45,17 @@ const canUnwrap = computed(() => {
 const onInsertPrefab = (prefabId: string) => {
   store.insertPrefab(prefabId)
 }
+const viewTitle = computed(() => activityViews.find(view => view.id === activeView.value)?.label ?? 'Layers')
+const selectView = (view: SidebarView) => { activeView.value = view }
+const openCheckpointDialog = () => {
+  checkpointName.value = `Checkpoint ${checkpoints.value.length + 1}`
+  checkpointDialog.value = true
+}
+const saveCheckpoint = () => {
+  if (!store.createCheckpoint(checkpointName.value)) return
+  checkpointDialog.value = false
+}
+const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.format(createdAt)
 </script>
 
 <template>
@@ -43,19 +64,15 @@ const onInsertPrefab = (prefabId: string) => {
 
       <div class="sidebar-layout">
         <nav class="activity-bar" aria-label="Builder views">
-          <button v-for="view in [
-            { id: 'components', icon: 'mdi-shape-outline', label: 'Components' },
-            { id: 'layers', icon: 'mdi-file-tree-outline', label: 'Layers' },
-            { id: 'prefabs', icon: 'mdi-puzzle-outline', label: 'My components' },
-          ]" :key="view.id" class="activity-button" :class="{ 'activity-button--active': activeView === view.id }" :aria-pressed="activeView === view.id" :title="view.label" @click="activeView = view.id as typeof activeView">
+          <button v-for="view in activityViews" :key="view.id" class="activity-button" :class="{ 'activity-button--active': activeView === view.id }" :aria-pressed="activeView === view.id" :title="view.label" @click="selectView(view.id)">
             <VIcon :icon="view.icon" size="21" aria-hidden="true" />
             <span class="sr-only">{{ view.label }}</span>
           </button>
         </nav>
 
-        <section class="sidebar-view" :aria-label="activeView === 'components' ? 'Components' : activeView === 'layers' ? 'Layers' : 'My components'">
+        <section class="sidebar-view" :aria-label="viewTitle">
           <div class="explorer-heading">
-            <span>{{ activeView === 'components' ? 'Components' : activeView === 'layers' ? 'Layers' : 'My components' }}</span>
+            <span>{{ viewTitle }}</span>
             <span class="explorer-heading__hint">UI BUILDER</span>
           </div>
 
@@ -68,7 +85,7 @@ const onInsertPrefab = (prefabId: string) => {
             </div>
           </div>
 
-          <div v-else class="sidebar-view__scroll pa-2">
+          <div v-else-if="activeView === 'prefabs'" class="sidebar-view__scroll pa-2">
             <div v-if="prefabs.length === 0" class="text-center pa-8">
               <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
               <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
@@ -84,6 +101,36 @@ const onInsertPrefab = (prefabId: string) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div v-else class="sidebar-view__scroll history-list" aria-label="Document history">
+            <p class="history-help">Select a version to restore it. <span v-if="historyPending">Unsaved changes will be saved first.</span><span v-else>Older versions remain available until the history limit is reached.</span></p>
+            <VBtn block size="small" color="primary" variant="tonal" prepend-icon="mdi-bookmark-plus-outline" class="history-save" @click="openCheckpointDialog">Save checkpoint</VBtn>
+
+            <div v-if="checkpoints.length" class="history-section">
+              <h3 class="history-section__title">Checkpoints</h3>
+              <div v-for="checkpoint in checkpoints" :key="checkpoint.checkpointId" class="checkpoint-item">
+                <button class="checkpoint-restore" @click="store.restoreCheckpoint(checkpoint.checkpointId)">
+                  <VIcon icon="mdi-bookmark-outline" size="16" aria-hidden="true" />
+                  <span><strong>{{ checkpoint.name }}</strong><small>{{ formatCheckpointDate(checkpoint.createdAt) }}</small></span>
+                </button>
+                <VBtn icon="mdi-delete-outline" variant="text" size="x-small" color="error" :aria-label="`Delete ${checkpoint.name}`" @click="store.deleteCheckpoint(checkpoint.checkpointId)" />
+              </div>
+            </div>
+
+            <h3 class="history-section__title">Versions</h3>
+            <button
+              v-for="version in [...historyVersions].reverse()"
+              :key="version.index"
+              class="history-item"
+              :class="{ 'history-item--current': version.isCurrent }"
+              :aria-current="version.isCurrent ? 'true' : undefined"
+              @click="store.restoreHistoryVersion(version.index)"
+            >
+              <VIcon :icon="version.isCurrent ? 'mdi-record-circle' : 'mdi-history'" size="16" aria-hidden="true" />
+              <span>{{ version.label }}</span>
+              <span v-if="version.isCurrent" class="history-current">Current</span>
+            </button>
           </div>
         </section>
       </div>
@@ -124,6 +171,18 @@ const onInsertPrefab = (prefabId: string) => {
       <VDialog :model-value="!!deletingPrefab" max-width="400" @update:model-value="deletingPrefab = null">
         <VCard title="Delete saved component?" text="Existing copies on your page will remain. This removes the component from your library.">
           <VCardActions><VSpacer /><VBtn @click="deletingPrefab = null">Cancel</VBtn><VBtn color="error" @click="store.deletePrefab(deletingPrefab!); deletingPrefab = null">Delete</VBtn></VCardActions>
+        </VCard>
+      </VDialog>
+      <VDialog v-model="checkpointDialog" max-width="400">
+        <VCard title="Save checkpoint">
+          <VCardText>
+            <VTextField v-model="checkpointName" label="Checkpoint name" autofocus hide-details @keyup.enter="saveCheckpoint" />
+          </VCardText>
+          <VCardActions>
+            <VSpacer />
+            <VBtn @click="checkpointDialog = false">Cancel</VBtn>
+            <VBtn color="primary" :disabled="!checkpointName.trim()" @click="saveCheckpoint">Save</VBtn>
+          </VCardActions>
         </VCard>
       </VDialog>
 
@@ -214,6 +273,102 @@ const onInsertPrefab = (prefabId: string) => {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.history-list {
+  padding: 8px;
+}
+
+.history-help {
+  margin: 4px 4px 10px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 12px;
+  opacity: .7;
+}
+
+.history-save {
+  margin-bottom: 14px;
+}
+
+.history-section + .history-section {
+  margin-top: 16px;
+}
+
+.history-section__title {
+  margin: 0 4px 6px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .65;
+}
+
+.checkpoint-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.checkpoint-item:hover,
+.checkpoint-item:focus-within {
+  background: rgba(var(--v-theme-on-surface), .06);
+}
+
+.checkpoint-restore {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: rgb(var(--v-theme-on-surface));
+  text-align: left;
+}
+
+.checkpoint-restore span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.checkpoint-restore strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkpoint-restore small {
+  font-size: 10px;
+  opacity: .6;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 13px;
+  text-align: left;
+}
+
+.history-item:hover,
+.history-item:focus-visible,
+.history-item--current {
+  background: rgba(var(--v-theme-primary), .1);
+}
+
+.history-current {
+  margin-left: auto;
+  color: rgb(var(--v-theme-primary));
+  font-size: 11px;
 }
 
 .explorer-heading {

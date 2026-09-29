@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 
 export function createHistory(
   serialize: () => string,
-  restoreSnapshot: (snapshot: string) => void,
+  applySnapshot: (snapshot: string) => void,
   maxEntries: number,
 ) {
   const entries = ref<string[]>([serialize()])
@@ -12,6 +12,11 @@ export function createHistory(
   const pending = computed(() => serialize() !== entries.value[currentIndex.value])
   const canUndo = computed(() => pending.value || currentIndex.value > 0)
   const canRedo = computed(() => !pending.value && currentIndex.value < entries.value.length - 1)
+  const versions = computed(() => entries.value.map((_, index) => ({
+    index,
+    label: index === 0 ? 'Initial version' : `Version ${index + 1}`,
+    isCurrent: index === currentIndex.value,
+  })))
 
   const commit = () => {
     const snapshot = serialize()
@@ -25,8 +30,11 @@ export function createHistory(
 
   const restoreCurrent = () => {
     isRestoring.value = true
-    restoreSnapshot(entries.value[currentIndex.value])
-    isRestoring.value = false
+    try {
+      applySnapshot(entries.value[currentIndex.value])
+    } finally {
+      isRestoring.value = false
+    }
   }
 
   const undo = () => {
@@ -44,5 +52,26 @@ export function createHistory(
     }
   }
 
-  return { isRestoring, pending, canUndo, canRedo, commit, undo, redo }
+  const restore = (index: number) => {
+    if (index < 0 || index >= entries.value.length) return
+    const wasCurrent = index === currentIndex.value
+    const hadPendingChanges = pending.value
+    commit()
+    if (wasCurrent && hadPendingChanges) return
+    currentIndex.value = index
+    restoreCurrent()
+  }
+
+  const restoreSnapshot = (snapshot: string) => {
+    commit()
+    isRestoring.value = true
+    try {
+      applySnapshot(snapshot)
+    } finally {
+      isRestoring.value = false
+    }
+    commit()
+  }
+
+  return { isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore, restoreSnapshot }
 }
