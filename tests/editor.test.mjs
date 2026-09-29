@@ -136,6 +136,18 @@ test('form can be inserted into the canvas as a composite component', () => {
   assert.equal(form.type, 'VForm')
   assert.deepEqual(form.children.map(child => child.type), ['VTextField', 'VTextField', 'VBtn'])
 })
+test('history restores a selected version without losing newer history', () => {
+  store.addComponent('VForm')
+  const formVersion = store.exportDocument()
+  store.addComponent('VSlider', 'root-canvas')
+  assert.equal(store.rootNode.children.length, 2)
+
+  const initialVersion = store.historyVersions.find(version => version.index === 0)
+  store.restoreHistoryVersion(initialVersion.index)
+  assert.equal(store.rootNode.children.length, 0)
+  assert.notEqual(store.exportDocument(), formVersion)
+  assert.equal(store.canRedo, true)
+})
 
 test('legacy tree operations group siblings, preserve order, and ungroup cleanly', () => {
   const nodes = [

@@ -12,6 +12,11 @@ export function createHistory(
   const pending = computed(() => serialize() !== entries.value[currentIndex.value])
   const canUndo = computed(() => pending.value || currentIndex.value > 0)
   const canRedo = computed(() => !pending.value && currentIndex.value < entries.value.length - 1)
+  const versions = computed(() => entries.value.map((_, index) => ({
+    index,
+    label: index === 0 ? 'Initial version' : `Version ${index + 1}`,
+    isCurrent: index === currentIndex.value,
+  })))
 
   const commit = () => {
     const snapshot = serialize()
@@ -44,5 +49,15 @@ export function createHistory(
     }
   }
 
-  return { isRestoring, pending, canUndo, canRedo, commit, undo, redo }
+  const restore = (index: number) => {
+    if (index < 0 || index >= entries.value.length) return
+    const wasCurrent = index === currentIndex.value
+    const hadPendingChanges = pending.value
+    commit()
+    if (wasCurrent && hadPendingChanges) return
+    currentIndex.value = index
+    restoreCurrent()
+  }
+
+  return { isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore }
 }

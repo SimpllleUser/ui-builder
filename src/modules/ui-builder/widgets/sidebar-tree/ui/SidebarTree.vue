@@ -8,9 +8,16 @@ import SidebarTreeNode from './SidebarTreeNode.vue'
 import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
 
 const store = useUiTreeStore()
-const { rootNode, selectedNodeIds, prefabs } = storeToRefs(store)
+const { rootNode, selectedNodeIds, prefabs, historyVersions, historyPending } = storeToRefs(store)
 
-const activeView = ref<'components' | 'layers' | 'prefabs'>('layers')
+type SidebarView = 'components' | 'layers' | 'prefabs' | 'history'
+const activityViews: Array<{ id: SidebarView; icon: string; label: string }> = [
+  { id: 'components', icon: 'mdi-shape-outline', label: 'Components' },
+  { id: 'layers', icon: 'mdi-file-tree-outline', label: 'Layers' },
+  { id: 'prefabs', icon: 'mdi-puzzle-outline', label: 'My components' },
+  { id: 'history', icon: 'mdi-history', label: 'History' },
+]
+const activeView = ref<SidebarView>('layers')
 const deletingPrefab = ref<string | null>(null)
 const activeTreeId = ref(rootNode.value.id)
 
@@ -35,6 +42,8 @@ const canUnwrap = computed(() => {
 const onInsertPrefab = (prefabId: string) => {
   store.insertPrefab(prefabId)
 }
+const viewTitle = computed(() => activityViews.find(view => view.id === activeView.value)?.label ?? 'Layers')
+const selectView = (view: SidebarView) => { activeView.value = view }
 </script>
 
 <template>
@@ -43,19 +52,15 @@ const onInsertPrefab = (prefabId: string) => {
 
       <div class="sidebar-layout">
         <nav class="activity-bar" aria-label="Builder views">
-          <button v-for="view in [
-            { id: 'components', icon: 'mdi-shape-outline', label: 'Components' },
-            { id: 'layers', icon: 'mdi-file-tree-outline', label: 'Layers' },
-            { id: 'prefabs', icon: 'mdi-puzzle-outline', label: 'My components' },
-          ]" :key="view.id" class="activity-button" :class="{ 'activity-button--active': activeView === view.id }" :aria-pressed="activeView === view.id" :title="view.label" @click="activeView = view.id as typeof activeView">
+          <button v-for="view in activityViews" :key="view.id" class="activity-button" :class="{ 'activity-button--active': activeView === view.id }" :aria-pressed="activeView === view.id" :title="view.label" @click="selectView(view.id)">
             <VIcon :icon="view.icon" size="21" aria-hidden="true" />
             <span class="sr-only">{{ view.label }}</span>
           </button>
         </nav>
 
-        <section class="sidebar-view" :aria-label="activeView === 'components' ? 'Components' : activeView === 'layers' ? 'Layers' : 'My components'">
+        <section class="sidebar-view" :aria-label="viewTitle">
           <div class="explorer-heading">
-            <span>{{ activeView === 'components' ? 'Components' : activeView === 'layers' ? 'Layers' : 'My components' }}</span>
+            <span>{{ viewTitle }}</span>
             <span class="explorer-heading__hint">UI BUILDER</span>
           </div>
 
@@ -68,7 +73,7 @@ const onInsertPrefab = (prefabId: string) => {
             </div>
           </div>
 
-          <div v-else class="sidebar-view__scroll pa-2">
+          <div v-else-if="activeView === 'prefabs'" class="sidebar-view__scroll pa-2">
             <div v-if="prefabs.length === 0" class="text-center pa-8">
               <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
               <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
@@ -84,6 +89,22 @@ const onInsertPrefab = (prefabId: string) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div v-else class="sidebar-view__scroll history-list" aria-label="Document history">
+            <p class="history-help">Select a version to restore it. <span v-if="historyPending">Unsaved changes will be saved first.</span><span v-else>Older versions remain available until the history limit is reached.</span></p>
+            <button
+              v-for="version in [...historyVersions].reverse()"
+              :key="version.index"
+              class="history-item"
+              :class="{ 'history-item--current': version.isCurrent }"
+              :aria-current="version.isCurrent ? 'true' : undefined"
+              @click="store.restoreHistoryVersion(version.index)"
+            >
+              <VIcon :icon="version.isCurrent ? 'mdi-record-circle' : 'mdi-history'" size="16" aria-hidden="true" />
+              <span>{{ version.label }}</span>
+              <span v-if="version.isCurrent" class="history-current">Current</span>
+            </button>
           </div>
         </section>
       </div>
@@ -214,6 +235,42 @@ const onInsertPrefab = (prefabId: string) => {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.history-list {
+  padding: 8px;
+}
+
+.history-help {
+  margin: 4px 4px 10px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 12px;
+  opacity: .7;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 13px;
+  text-align: left;
+}
+
+.history-item:hover,
+.history-item:focus-visible,
+.history-item--current {
+  background: rgba(var(--v-theme-primary), .1);
+}
+
+.history-current {
+  margin-left: auto;
+  color: rgb(var(--v-theme-primary));
+  font-size: 11px;
 }
 
 .explorer-heading {

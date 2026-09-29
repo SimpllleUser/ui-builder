@@ -56,7 +56,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     },
     MAX_HISTORY_ENTRIES,
   )
-  const { canUndo, canRedo, commit: commitHistory } = history
+  const { canUndo, canRedo, versions: historyVersions, commit: commitHistory } = history
   const commit = () => {
     clearTimeout(historyTimer)
     if (!history.isRestoring.value) commitHistory()
@@ -68,6 +68,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const redo = () => {
     clearTimeout(historyTimer)
     history.redo()
+  }
+  const restoreHistoryVersion = (index: number) => {
+    clearTimeout(historyTimer)
+    history.restore(index)
   }
 
   watch(rootNode, () => {
@@ -202,7 +206,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
 
   return {
     rootNode, selectedNodeIds, selectedNodeId, isPreviewMode, prefabs, notice, saveState,
-    canUndo, canRedo, undo, redo, commit, saveDocument, importDocument,
+    canUndo, canRedo, historyVersions, historyPending: history.pending, undo, redo, restoreHistoryVersion, commit, saveDocument, importDocument,
     exportDocument: () => serializeDocument(rootNode.value),
     findNodeById, findParentAndIndex, pathTo, createNode, canContain, insertionTarget,
     addComponent, addTemplate, duplicateNode, deleteNode, savePrefab, insertPrefab,
