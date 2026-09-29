@@ -18,6 +18,7 @@
 - tree-операції legacy feature винесено в чистий модуль, clone зроблено напряму тестованим, DnD-конфігурацію стабілізовано як типізовані константи;
 - додано тести для group/ungroup і clone; поточний набір містить 14 успішних тестів.
 - посилено UI-layer coverage: додано перевірки пошкоджених документів, slot/empty-container boundaries, property updates і dialog input guards; поточний набір містить 17 успішних тестів.
+- перевірено entry points та всі production/dev dependencies; прибрано дубльоване підключення Vuetify/MDI styles із `src/vuetify.ts`.
 
 ## Залишилось зробити
 
@@ -48,9 +49,9 @@
 
 ### 5. Перевірити зайві файли та залежності
 
-- повторно пройтись по imports і entry points;
-- видаляти лише файли, для яких підтверджено відсутність runtime/test references;
-- перевірити невикористані npm-залежності.
+- виконано: повторно перевірено imports і entry points;
+- виконано: потенційно публічний `src/features/ui-builder/index.ts` збережено, оскільки відсутність внутрішніх references не доводить відсутність зовнішніх consumers;
+- виконано: усі залежності з `package.json` мають підтверджені runtime/dev/test imports; дублікати стилів прибрано.
 
 ### 6. Оптимізувати production bundle
 
