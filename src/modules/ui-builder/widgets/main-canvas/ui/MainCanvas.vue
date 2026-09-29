@@ -103,6 +103,6 @@ const leaveCanvas = (event: DragEvent) => {
 .v-card.ui-builder-element { min-height: 80px; }
 .v-row.ui-builder-element { min-height: 80px; }
 .v-col.ui-builder-element { min-height: 60px; }
-.ui-builder-element[data-node-id="root-canvas"] { min-height: 160px; background: rgb(var(--v-theme-background)) !important; }
+.ui-builder-element[data-node-id="root-canvas"] { min-height: 1600px; background: rgb(var(--v-theme-background)) !important; }
 @media (max-width: 600px) { .main-canvas-wrapper, .preview-workspace { padding: 12px; } }
 </style>

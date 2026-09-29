@@ -19,6 +19,12 @@ export interface PropertySection {
   fields: PropField[]
 }
 
+export interface DefaultChildDefinition {
+  type: string
+  name?: string
+  props?: Record<string, unknown>
+}
+
 export interface ComponentDef {
   type: string
   label: string
@@ -29,7 +35,7 @@ export interface ComponentDef {
   defaultProps: Record<string, unknown>
   defaultClasses: string[]
   defaultTextChild?: boolean
-  defaultChildren?: string[]
+  defaultChildren?: Array<string | DefaultChildDefinition>
   showInPalette: boolean
   propertySections: PropertySection[]
 }
@@ -43,7 +49,7 @@ const CATEGORY_BY_TYPE: Record<string, ComponentCategory> = {
   div: 'Layout', VRow: 'Layout', VCol: 'Layout', VContainer: 'Layout', VSheet: 'Layout', VSpacer: 'Layout', VBtnGroup: 'Layout',
   VCard: 'Content', VCardTitle: 'Content', VCardText: 'Content', VToolbar: 'Content',
   VBtn: 'Actions',
-  VTextField: 'Forms', VTextarea: 'Forms', VCheckbox: 'Forms', VSwitch: 'Forms', VSelect: 'Forms',
+  VForm: 'Forms', VTextField: 'Forms', VTextarea: 'Forms', VAutocomplete: 'Forms', VFileInput: 'Forms', VCheckbox: 'Forms', VSwitch: 'Forms', VSelect: 'Forms', VSlider: 'Forms', VRadioGroup: 'Forms',
   VTabs: 'Navigation', VExpansionPanels: 'Navigation',
   VAlert: 'Feedback', VChip: 'Feedback', VAvatar: 'Feedback', VBadge: 'Feedback', VProgressCircular: 'Feedback', VProgressLinear: 'Feedback',
   VIcon: 'Media', VImg: 'Media',
@@ -230,6 +236,28 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     .classes()
     .build(),
 
+  VForm: def({
+    type: 'VForm',
+    label: 'Form',
+    treeIcon: 'mdi-form-select',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Fields' }],
+    defaultProps: { disabled: false },
+    defaultClasses: [],
+    defaultChildren: [
+      { type: 'VTextField', name: 'Name', props: { label: 'Name' } },
+      { type: 'VTextField', name: 'Email', props: { label: 'Email', type: 'email' } },
+      { type: 'VBtn', name: 'Submit', props: { color: 'primary' } },
+    ],
+    showInPalette: true,
+  })
+    .section('Form', [
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
   VTextarea: def({
     type: 'VTextarea',
     label: 'Textarea',
@@ -311,6 +339,114 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
       { kind: 'switch', prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
+    .classes()
+    .build(),
+
+  VAutocomplete: def({
+    type: 'VAutocomplete',
+    label: 'Autocomplete',
+    treeIcon: 'mdi-text-search',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Search', items: ['Option 1', 'Option 2', 'Option 3'], variant: 'outlined' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Search label' },
+      { kind: 'select', prop: 'variant', label: 'Variant', options: ['underlined', 'outlined', 'filled', 'solo', 'plain'] },
+      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
+      { kind: 'switch', prop: 'chips', label: 'Show chips' },
+      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VFileInput: def({
+    type: 'VFileInput',
+    label: 'File Input',
+    treeIcon: 'mdi-file-upload-outline',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { label: 'Upload file', variant: 'outlined', showSize: true },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Field', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Upload label' },
+      { kind: 'text', prop: 'accept', label: 'Accepted types', placeholder: 'image/*,.pdf' },
+      { kind: 'select', prop: 'variant', label: 'Variant', options: ['underlined', 'outlined', 'filled', 'solo', 'plain'] },
+      { kind: 'switch', prop: 'showSize', label: 'Show file size' },
+      { kind: 'switch', prop: 'multiple', label: 'Multiple files' },
+      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VSlider: def({
+    type: 'VSlider',
+    label: 'Slider',
+    treeIcon: 'mdi-tune-vertical-variant',
+    isLeaf: true,
+    slots: [],
+    defaultProps: { modelValue: 50, min: 0, max: 100, step: 1, thumbLabel: true, color: 'primary' },
+    defaultClasses: [],
+    showInPalette: true,
+  })
+    .section('Slider', [
+      { kind: 'slider', prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
+      { kind: 'slider', prop: 'min', label: 'Minimum', min: 0, max: 100, step: 1 },
+      { kind: 'slider', prop: 'max', label: 'Maximum', min: 1, max: 200, step: 1 },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'thumbLabel', label: 'Show value' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VRadioGroup: def({
+    type: 'VRadioGroup',
+    label: 'Radio Group',
+    treeIcon: 'mdi-radiobox-marked',
+    isWrapContainer: true,
+    slots: [{ name: 'default', label: 'Options' }],
+    defaultProps: { modelValue: 'option-1', label: 'Choose one', color: 'primary' },
+    defaultClasses: [],
+    defaultChildren: [
+      { type: 'VRadio', name: 'Option 1', props: { value: 'option-1' } },
+      { type: 'VRadio', name: 'Option 2', props: { value: 'option-2' } },
+    ],
+    showInPalette: true,
+  })
+    .section('Group', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Choose one' },
+      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: 'switch', prop: 'inline', label: 'Inline options' },
+      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+    ])
+    .spacing()
+    .classes()
+    .build(),
+
+  VRadio: def({
+    type: 'VRadio',
+    label: 'Radio',
+    treeIcon: 'mdi-radiobox-blank',
+    slots: [{ name: 'default', label: 'Label' }],
+    defaultProps: { value: 'option' },
+    defaultClasses: [],
+    defaultTextChild: true,
+    showInPalette: false,
+  })
+    .section('Option', [
+      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Option' },
+      { kind: 'text', prop: 'value', label: 'Value', placeholder: 'option' },
+    ])
     .classes()
     .build(),
 
