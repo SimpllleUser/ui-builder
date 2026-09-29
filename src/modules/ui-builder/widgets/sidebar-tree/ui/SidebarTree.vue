@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, provide, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { WRAP_CONTAINER_TYPES as WRAP_ALLOWED_TYPES, getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
@@ -10,8 +10,15 @@ import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue
 const store = useUiTreeStore()
 const { rootNode, selectedNodeIds, prefabs } = storeToRefs(store)
 
-const activeTab = ref<'tree' | 'prefabs'>('tree')
+const activeView = ref<'components' | 'layers' | 'prefabs'>('layers')
 const deletingPrefab = ref<string | null>(null)
+const activeTreeId = ref(rootNode.value.id)
+
+provide('ui-builder-active-tree-id', activeTreeId)
+provide('ui-builder-set-active-tree-id', (id: string) => { activeTreeId.value = id })
+watch(selectedNodeIds, ids => {
+  if (ids[0]) activeTreeId.value = ids[0]
+}, { immediate: true })
 
 const canWrap = computed(() =>
   selectedNodeIds.value.length >= 2 && store.areNodesSiblings(selectedNodeIds.value)
@@ -34,72 +41,55 @@ const onInsertPrefab = (prefabId: string) => {
   <div class="sidebar-drawer">
     <div class="d-flex flex-column h-100">
 
-      <ComponentsPalette />
+      <div class="sidebar-layout">
+        <nav class="activity-bar" aria-label="Builder views">
+          <button v-for="view in [
+            { id: 'components', icon: 'mdi-shape-outline', label: 'Components' },
+            { id: 'layers', icon: 'mdi-file-tree-outline', label: 'Layers' },
+            { id: 'prefabs', icon: 'mdi-puzzle-outline', label: 'My components' },
+          ]" :key="view.id" class="activity-button" :class="{ 'activity-button--active': activeView === view.id }" :aria-pressed="activeView === view.id" :title="view.label" @click="activeView = view.id as typeof activeView">
+            <VIcon :icon="view.icon" size="21" aria-hidden="true" />
+            <span class="sr-only">{{ view.label }}</span>
+          </button>
+        </nav>
 
-      <VTabs v-model="activeTab" density="compact" grow class="flex-shrink-0">
-        <VTab value="tree">Layers</VTab>
-        <VTab value="prefabs">My components</VTab>
-      </VTabs>
-
-      <VWindow v-model="activeTab" class="flex-grow-1 overflow-y-auto">
-
-        <VWindowItem value="tree" class="pa-2">
-          <p class="text-caption px-2 my-2">Shift-click to select several elements. Use arrow keys to navigate.</p>
-          <div role="tree" aria-label="Page layers" aria-multiselectable="true" class="pa-0">
-            <SidebarTreeNode :node="rootNode" :depth="0" />
+        <section class="sidebar-view" :aria-label="activeView === 'components' ? 'Components' : activeView === 'layers' ? 'Layers' : 'My components'">
+          <div class="explorer-heading">
+            <span>{{ activeView === 'components' ? 'Components' : activeView === 'layers' ? 'Layers' : 'My components' }}</span>
+            <span class="explorer-heading__hint">UI BUILDER</span>
           </div>
-        </VWindowItem>
 
-        <VWindowItem value="prefabs" class="pa-2">
-          <div class="text-h6 px-2 mb-4 mt-2">My components</div>
+          <ComponentsPalette v-if="activeView === 'components'" />
 
-          <div v-if="prefabs.length === 0" class="text-center pa-8">
-            <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
-            <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
-            <div class="text-caption text-medium-emphasis mt-1 opacity-70">
-              Select a node and click
-              <VIcon icon="mdi-content-save-outline" size="12" />
-              in the property panel
+          <div v-else-if="activeView === 'layers'" class="sidebar-view__scroll">
+            <p id="layers-help" class="text-caption px-2 my-2">Use ↑ ↓ to move, ← → to collapse or expand, Enter to select. Shift-click selects several elements.</p>
+            <div role="tree" aria-label="Page layers" aria-describedby="layers-help" aria-multiselectable="true" class="pa-2">
+              <SidebarTreeNode :node="rootNode" :depth="0" />
             </div>
           </div>
 
-          <div v-else class="prefabs-list">
-            <div
-              v-for="prefab in prefabs"
-              :key="prefab.prefabId"
-              class="prefab-row"
-            >
-              <VIcon
-                :icon="getComponentDef(prefab.node.type)?.treeIcon ?? 'mdi-puzzle-outline'"
-                size="15"
-                class="prefab-icon"
-              />
-              <span class="prefab-name">{{ prefab.name }}</span>
-              <div class="prefab-actions">
-                <VBtn
-                  icon="mdi-plus"
-                  :aria-label="`Insert ${prefab.name}`"
-                  variant="text"
-                  size="x-small"
-                  @click="onInsertPrefab(prefab.prefabId)"
-                />
-                <VBtn
-                  icon="mdi-trash-can-outline"
-                  :aria-label="`Delete saved component ${prefab.name}`"
-                  variant="text"
-                  size="x-small"
-                  color="error"
-                  @click="deletingPrefab = prefab.prefabId"
-                />
+          <div v-else class="sidebar-view__scroll pa-2">
+            <div v-if="prefabs.length === 0" class="text-center pa-8">
+              <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
+              <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
+              <div class="text-caption text-medium-emphasis mt-1 opacity-70">Select a node and click <VIcon icon="mdi-content-save-outline" size="12" /> in the property panel</div>
+            </div>
+            <div v-else class="prefabs-list">
+              <div v-for="prefab in prefabs" :key="prefab.prefabId" class="prefab-row">
+                <VIcon :icon="getComponentDef(prefab.node.type)?.treeIcon ?? 'mdi-puzzle-outline'" size="15" class="prefab-icon" />
+                <span class="prefab-name">{{ prefab.name }}</span>
+                <div class="prefab-actions">
+                  <VBtn icon="mdi-plus" :aria-label="`Insert ${prefab.name}`" variant="text" size="x-small" @click="onInsertPrefab(prefab.prefabId)" />
+                  <VBtn icon="mdi-trash-can-outline" :aria-label="`Delete saved component ${prefab.name}`" variant="text" size="x-small" color="error" @click="deletingPrefab = prefab.prefabId" />
+                </div>
               </div>
             </div>
           </div>
-        </VWindowItem>
-
-      </VWindow>
+        </section>
+      </div>
 
       <VSlideYReverseTransition>
-        <div v-if="(canWrap || canUnwrap) && activeTab === 'tree'" class="wrap-toolbar">
+        <div v-if="(canWrap || canUnwrap) && activeView === 'layers'" class="wrap-toolbar">
           <template v-if="canWrap">
             <span class="wrap-label">Wrap {{ selectedNodeIds.length }} items:</span>
             <div class="wrap-chips">
@@ -151,6 +141,108 @@ const onInsertPrefab = (prefabId: string) => {
   :deep(.v-slide-group) {
     flex-grow: 0 !important;
   }
+}
+
+.sidebar-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.activity-bar {
+  display: flex;
+  flex: 0 0 44px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-right: 1px solid rgba(var(--v-border-color), .15);
+  background: rgb(var(--v-theme-surface-light));
+}
+
+.activity-button {
+  position: relative;
+  display: grid;
+  width: 36px;
+  height: 40px;
+  place-items: center;
+  border-radius: 5px;
+  color: rgb(var(--v-theme-on-surface));
+  opacity: .65;
+}
+
+.activity-button:hover,
+.activity-button:focus-visible,
+.activity-button--active {
+  color: rgb(var(--v-theme-primary));
+  opacity: 1;
+  background: rgba(var(--v-theme-primary), .1);
+}
+
+.activity-button--active::before {
+  position: absolute;
+  left: -4px;
+  width: 2px;
+  height: 24px;
+  border-radius: 2px;
+  background: rgb(var(--v-theme-primary));
+  content: '';
+}
+
+.sidebar-view {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+.sidebar-view__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.explorer-heading {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.explorer-heading__hint {
+  margin-left: auto;
+  font-size: 9px;
+  opacity: .5;
+}
+
+.sidebar-section-heading--layers {
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.sidebar-tabs :deep(.v-tab) {
+  min-width: 0;
+  font-size: 11px;
+  text-transform: none;
 }
 
 .prefabs-list {

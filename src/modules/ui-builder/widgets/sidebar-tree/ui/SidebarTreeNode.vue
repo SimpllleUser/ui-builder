@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, inject, type Ref } from 'vue'
 import draggable from 'vuedraggable'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
@@ -13,7 +13,10 @@ const renaming = ref(false)
 const draftName = ref('')
 const row = ref<HTMLElement>()
 const renameInput = ref<HTMLInputElement>()
+const activeTreeId = inject<Ref<string>>('ui-builder-active-tree-id')!
+const setActiveTreeId = inject<(id: string) => void>('ui-builder-set-active-tree-id')!
 const selected = computed(() => store.selectedNodeIds.includes(props.node.id))
+const componentLabel = computed(() => props.node.id === ROOT_NODE_ID ? 'Page canvas' : getComponentDef(props.node.type)?.label ?? props.node.type)
 const slots = computed(() => getComponentSlots(props.node.type).filter(s => s.name !== 'default' && (props.node.id !== ROOT_NODE_ID || props.node.slots[s.name]?.length)))
 const visibleSlots = computed(() => slots.value.filter(s => showEmptySlots.value || props.node.slots[s.name]?.length))
 const canMove = (event: { draggedContext: { element: UiNode }; to: HTMLElement }) => {
@@ -23,7 +26,11 @@ const canMove = (event: { draggedContext: { element: UiNode }; to: HTMLElement }
 }
 const depth = computed(() => props.depth ?? 0)
 const hasContent = computed(() => store.canContain(props.node) || props.node.children.length > 0 || slots.value.length > 0)
-const select = (e: MouseEvent | KeyboardEvent) => e.shiftKey || e.metaKey || e.ctrlKey ? store.toggleMultiSelect(props.node.id) : store.selectNode(props.node.id)
+const select = (e: MouseEvent | KeyboardEvent) => {
+  setActiveTreeId(props.node.id)
+  e.shiftKey || e.metaKey || e.ctrlKey ? store.toggleMultiSelect(props.node.id) : store.selectNode(props.node.id)
+}
+const makeTabStop = () => setActiveTreeId(props.node.id)
 watch(() => store.selectedNodeIds, async ids => {
   if (ids.some(id => id !== props.node.id && store.findNodeById(id, props.node))) expanded.value = true
   if (ids[0] === props.node.id) { await nextTick(); row.value?.scrollIntoView({ block: 'nearest' }) }
@@ -52,7 +59,7 @@ const keydown = (e: KeyboardEvent) => {
 
 <template>
   <div class="tree-node">
-    <div ref="row" role="treeitem" :data-tree-id="node.id" :aria-label="node.name" :aria-selected="selected" :aria-level="depth + 1" :aria-expanded="hasContent ? expanded : undefined" :tabindex="store.selectedNodeId === node.id || (!store.selectedNodeId && node.id === ROOT_NODE_ID) ? 0 : -1" class="node-row" :class="{ 'node-row--selected': selected }" :style="{ paddingLeft: `${depth * 12 + 4}px` }" @click.stop="select" @keydown="keydown" @dblclick.stop="rename">
+    <div ref="row" role="treeitem" :id="`treeitem-${node.id}`" :data-tree-id="node.id" :aria-label="`${node.name}, ${componentLabel}`" :aria-selected="selected" :aria-level="depth + 1" :aria-expanded="hasContent ? expanded : undefined" :tabindex="activeTreeId === node.id ? 0 : -1" class="node-row" :class="{ 'node-row--selected': selected }" :style="{ paddingLeft: `${depth * 12 + 4}px` }" @focus="makeTabStop" @click.stop="select" @keydown="keydown" @dblclick.stop="rename">
       <span v-if="node.id !== ROOT_NODE_ID" class="drag-handle" title="Drag to reorder or move"><VIcon icon="mdi-drag-vertical" size="16" /></span>
       <button v-if="hasContent" class="tree-btn" :aria-label="`${expanded ? 'Collapse' : 'Expand'} ${node.name}`" @click.stop="expanded = !expanded"><VIcon :icon="expanded ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" /></button>
       <span v-else class="expand-placeholder" />
