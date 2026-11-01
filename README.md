@@ -31,6 +31,15 @@ Panel buttons hide/show the library and inspector. Drag their dividers to resize
 
 The previous **Classic** editor is available from the top-right menu. It has a separate document and does not save automatically.
 
+## MCP access
+
+`mcp/server.mjs` lets an MCP client (Claude Code, Claude Desktop, …) read and edit the page open in your browser. The page lives in the browser, so the server relays commands to the editor over a local bridge (`127.0.0.1:3002`, dev mode only).
+
+1. `npm run dev` and open http://localhost:3001 (the tab must stay open).
+2. Claude Code picks up `.mcp.json` automatically. For other clients, run `node mcp/server.mjs` over stdio.
+
+Tools: `get_document`, `get_node`, `list_components`, `add_component`, `update_node`, `delete_node`, `move_node`, `duplicate_node`, `add_template`, `select_node`, `undo`, `redo`, `export_document`, `import_document`. Every change goes through the editor's store, so it appears live and can be undone. Change the port with `UI_BUILDER_MCP_PORT` (and `VITE_MCP_BRIDGE_URL` for the editor); see `.env.mcp.example`.
+
 ## Checks
 
 ```sh

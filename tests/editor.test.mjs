@@ -224,3 +224,16 @@ test('property updates and empty-container boundaries are safe', () => {
   assert.deepEqual(store.findNodeById(row).classes, ['d-flex', 'pa-2'])
   assert.equal(store.findNodeById(row).name, 'Layout row')
 })
+
+test('MCP commands edit the page through the store', async () => {
+  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { id } = executeMcpCommand(store, 'add_component', { type: 'VBtn', text: 'Hi', props: { color: 'primary' } })
+  assert.equal(store.findNodeById(id).props.color, 'primary')
+  executeMcpCommand(store, 'update_node', { id, props: { color: null }, name: 'Go' })
+  assert.equal(store.findNodeById(id).name, 'Go')
+  assert.equal('color' in store.findNodeById(id).props, false)
+  assert.throws(() => executeMcpCommand(store, 'delete_node', { id: 'missing' }), /not found/)
+  executeMcpCommand(store, 'delete_node', { id })
+  assert.equal(store.findNodeById(id), null)
+  assert.ok(executeMcpCommand(store, 'get_document').root.id)
+})
