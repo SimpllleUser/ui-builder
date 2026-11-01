@@ -48,3 +48,25 @@ npm run build
 ```
 
 The tests cover history, document recovery/import, safe unwrapping, component insertion and movement, selection, layout controls, and starter templates. The production build includes TypeScript checking.
+
+[
+## TODO
+
+Gaps found while building a multi-page admin panel through MCP.
+
+### Critical
+- [ ] Multiple pages, routes and a shared layout (document is a single page today; exporter has no routes)
+- [ ] `VDataTable` and `VPagination` (tables are currently faked with `VRow`/`VCardText`)
+- [ ] `VNavigationDrawer`, `VAppBar`, `VApp`/`VMain` for a real app layout
+- [ ] Events and state: click, navigation, `v-model`, conditional rendering, `v-for` (filters and status buttons are static)
+
+### Nice to have
+- [ ] `VDialog`, `VMenu`, `VSnackbar`, `VTooltip`
+- [ ] `VDatePicker` and masked text fields for date filters
+- [ ] `VBreadcrumbs`, `VStepper`, `VTimeline` (order status history), `VBtnToggle`, `VSkeletonLoader`
+
+### MCP
+- [ ] Page tools: `add_page`, `list_pages`, `set_route`
+- [ ] Binding and event tools: `set_binding`, `set_event`
+- [ ] `update_node`: direct `style` and `attrs` support (verify that `props.style` and `props.class` are applied)
+- [ ] `VCol` and other layout components should accept `text`, or add a generic text child tool
