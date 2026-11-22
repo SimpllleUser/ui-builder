@@ -30,6 +30,15 @@ export const MCP_PAGE_COMMANDS: Record<string, McpCommand> = {
     ok(store.updatePage(page.id, { name: a.name, path: a.path }), store.notice || 'Could not update page')
     return { pages: pageSummary(store) }
   },
+  duplicate_page(store, a) {
+    const copy = store.duplicatePage(needPage(store, a.id).id)
+    ok(!!copy, 'Could not duplicate page')
+    return { id: copy!.id, path: copy!.path }
+  },
+  move_page(store, a) {
+    ok(store.movePage(needPage(store, a.id).id, a.direction === 'left' ? -1 : 1), 'Page cannot move further')
+    return { pages: pageSummary(store) }
+  },
   select_page(store, a) {
     const page = needPage(store, a.id)
     store.selectPage(page.id)

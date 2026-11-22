@@ -10,6 +10,8 @@ import { usePreviewRuntime } from './previewRuntime'
 import {
   addPage as addPageMutation,
   deletePage as deletePageMutation,
+  duplicatePage as duplicatePageMutation,
+  movePage as movePageMutation,
   editLayout as editLayoutMutation,
   removeLayout as removeLayoutMutation,
   removeStateVariable as removeStateVariableMutation,
@@ -51,6 +53,19 @@ import {
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateKind } from './templateFactory'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
+const ACTIVE_PAGE_KEY = 'ui-builder:active-page'
+
+/** Reopening the editor returns to the page that was being edited. */
+function restoreActivePageId(project: Project): string {
+  try {
+    const saved = typeof window === 'undefined' ? null : window.localStorage.getItem(ACTIVE_PAGE_KEY)
+    if (saved && project.pages.some(page => page.id === saved)) return saved
+  } catch {
+    /* storage unavailable: start on the first page */
+  }
+  return project.pages[0].id
+}
+
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
   const saveState = ref<'saved' | 'saving' | 'error'>('saved')
@@ -65,8 +80,19 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     }
   }
   const project = ref<Project>(initial)
-  const activePageId = ref(initial.pages[0].id)
+  const activePageId = ref(restoreActivePageId(initial))
   const editingLayout = ref(false)
+  watch(
+    activePageId,
+    id => {
+      try {
+        window.localStorage.setItem(ACTIVE_PAGE_KEY, id)
+      } catch {
+        /* not remembered: the editor starts on the first page next time */
+      }
+    },
+    { flush: 'sync' },
+  )
   const activePage = computed(
     () => project.value.pages.find(page => page.id === activePageId.value) ?? project.value.pages[0],
   )
@@ -372,6 +398,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     addPage: (name: string, path?: string) => addPageMutation(projectContext, name, path),
     updatePage: (id: string, patch: { name?: string; path?: string }) => updatePageMutation(projectContext, id, patch),
     deletePage: (id: string) => deletePageMutation(projectContext, id),
+    duplicatePage: (id: string) => duplicatePageMutation(projectContext, id),
+    movePage: (id: string, direction: -1 | 1) => movePageMutation(projectContext, id, direction),
     editLayout: (on: boolean) => editLayoutMutation(projectContext, on),
     removeLayout: () => removeLayoutMutation(projectContext),
     setStateVariable: (name: string, value: unknown) => setStateVariableMutation(projectContext, name, value),

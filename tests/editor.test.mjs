@@ -575,3 +575,34 @@ test('a click can store a whole table row and conditions can read its fields', (
   const text = runtime.bindAction({ type: 'set', key: 'name', value: '{{item.customer}}' }, { item: row })
   assert.equal(text.value, 'Ivan')
 })
+
+test('pages can be duplicated with fresh ids, reordered, and the last page is remembered', () => {
+  store.addComponent('VBtn')
+  store.addComponent('VCard', 'root-canvas')
+  const home = store.activePage
+  const copy = store.duplicatePage(home.id)
+  assert.equal(copy.name, 'Home copy')
+  assert.deepEqual(
+    store.pages.map(page => page.id),
+    [home.id, copy.id],
+    'copy sits right after the original',
+  )
+  assert.equal(store.activePage.id, copy.id)
+  assert.equal(store.rootNode.id, 'root-canvas')
+  assert.equal(store.rootNode.children.length, 2)
+  assert.notEqual(store.rootNode.children[0].id, home.root.children[0].id, 'elements get new ids')
+  assert.equal(new Set(store.pages.map(page => page.path)).size, 2, 'copy gets its own route')
+  assert.equal(store.movePage(copy.id, -1), true)
+  assert.deepEqual(
+    store.pages.map(page => page.id),
+    [copy.id, home.id],
+  )
+  assert.equal(store.movePage(copy.id, -1), false, 'cannot move past the first tab')
+  store.selectPage(home.id)
+  store.saveDocument()
+  const next = useStore(createPinia())
+  assert.equal(next.activePage.id, home.id, 'reopening returns to the last page')
+  next.$dispose()
+  store.deletePage(copy.id)
+  assert.match(store.notice, /Use Undo/)
+})

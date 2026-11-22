@@ -142,6 +142,11 @@ tool('set_route', 'Rename a page or change its route.', {
   path: z.string().optional(),
 })
 tool('select_page', 'Switch the editor to a page; later add_component calls edit that page.', { id: pageRef })
+tool('duplicate_page', 'Duplicate a page (all its elements) and switch the editor to the copy.', { id: pageRef })
+tool('move_page', 'Move a page one place left or right in the tab order.', {
+  id: pageRef,
+  direction: z.enum(['left', 'right']),
+})
 tool('delete_page', 'Delete a page (the last page cannot be deleted).', { id: pageRef })
 tool(
   'edit_layout',

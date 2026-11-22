@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMediaQuery, useStorage } from '@vueuse/core'
 import MainCanvas from './modules/ui-builder/widgets/main-canvas/ui/MainCanvas.vue'
 import SidebarTree from './modules/ui-builder/widgets/sidebar-tree/ui/SidebarTree.vue'
+import PageTabs from './modules/ui-builder/widgets/pages-panel/ui/PageTabs.vue'
 import PagesPanel from './modules/ui-builder/widgets/pages-panel/ui/PagesPanel.vue'
 import PropertyPanel from './modules/ui-builder/widgets/property-panel/ui/PropertyPanel.vue'
 import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
@@ -105,6 +106,14 @@ const onKey = (e: KeyboardEvent) => {
       e.target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'))
   )
     return
+  if (e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
+    // Alt+[ and Alt+] switch to the previous and next page.
+    const index = store.pages.findIndex(page => page.id === store.activePage.id)
+    const next = store.pages[index + (e.code === 'BracketLeft' ? -1 : 1)]
+    if (next) store.selectPage(next.id)
+    e.preventDefault()
+    return
+  }
   const mod = e.ctrlKey || e.metaKey
   const key = e.key.toLowerCase()
   if (mod && key === 'z' && !e.shiftKey) {
@@ -174,6 +183,7 @@ onBeforeUnmount(() => {
         @change="importPage"
       />
     </div>
+    <PageTabs v-if="!store.isPreviewMode" />
     <div class="builder-layout" :class="{ 'builder-layout--narrow': narrow }">
       <button
         v-if="narrow && !store.isPreviewMode && (leftOpen || rightOpen)"

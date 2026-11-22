@@ -15,6 +15,7 @@ const canvas = ref<HTMLElement>()
 const empty = computed(
   () => !rootNode.value.children.length && !Object.values(rootNode.value.slots).some(nodes => nodes.length),
 )
+const pageItems = computed(() => store.pages.map(page => ({ title: page.name, subtitle: page.path, value: page.id })))
 const devices = [
   { title: 'Desktop · 1280', value: 1280 },
   { title: 'Tablet · 768', value: 768 },
@@ -63,9 +64,7 @@ const leaveCanvas = (event: DragEvent) => {
         <VSelect
           v-if="store.pages.length > 1"
           v-model="store.previewPageId"
-          :items="store.pages"
-          item-title="name"
-          item-value="id"
+          :items="pageItems"
           label="Page"
           variant="outlined"
           density="compact"

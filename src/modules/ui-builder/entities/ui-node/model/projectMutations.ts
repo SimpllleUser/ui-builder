@@ -1,6 +1,7 @@
 import { MAX_PAGES } from './constants'
 import { defaultLayout, emptyPage } from './document'
 import { isValidPagePath } from './documentValidator'
+import { cloneNodeWithNewIds } from './nodeUtils'
 import type { Page, Project, UiNode } from './types'
 
 const INVALID_PATH_MESSAGE = 'Use a path like /orders (letters, digits, - and _).'
@@ -94,9 +95,39 @@ export function updatePage(
   return true
 }
 
+/** A copy of a page with its own element ids, placed right after the original. */
+export function duplicatePage(context: ProjectMutationContext, id: string): Page | null {
+  const { project } = context
+  const index = project.pages.findIndex(page => page.id === id)
+  if (index < 0 || project.pages.length >= MAX_PAGES) return null
+
+  const source = project.pages[index]
+  const name = `${source.name} copy`
+  const copy: Page = {
+    ...emptyPage(name, uniquePath(project, `${source.path === '/' ? '/page' : source.path}-copy`)),
+    // The root keeps its fixed id; everything inside gets new ids.
+    root: { ...cloneNodeWithNewIds(source.root), id: source.root.id, name },
+  }
+  undoable(context, () => project.pages.splice(index + 1, 0, copy))
+  selectPage(context, copy.id)
+  return copy
+}
+
+/** Moves a page one place left (-1) or right (1) in the tab order. */
+export function movePage(context: ProjectMutationContext, id: string, direction: -1 | 1): boolean {
+  const { pages } = context.project
+  const from = pages.findIndex(page => page.id === id)
+  const to = from + direction
+  if (from < 0 || to < 0 || to >= pages.length) return false
+  undoable(context, () => pages.splice(to, 0, ...pages.splice(from, 1)))
+  return true
+}
+
 export function deletePage(context: ProjectMutationContext, id: string): boolean {
   const { project } = context
   if (project.pages.length < 2 || !project.pages.some(page => page.id === id)) return false
+  const name = project.pages.find(page => page.id === id)?.name
+  context.setNotice(`Deleted page “${name}”. Use Undo to bring it back.`)
   undoable(context, () => {
     project.pages = project.pages.filter(page => page.id !== id)
     if (context.getActivePageId() === id) context.setActivePageId(project.pages[0].id)

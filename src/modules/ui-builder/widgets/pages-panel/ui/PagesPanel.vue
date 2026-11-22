@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { parseLiteral } from '../../../entities/ui-node/model/runtime'
 
@@ -9,7 +9,6 @@ const newName = ref('')
 const newPath = ref('')
 const newKey = ref('')
 const newValue = ref('')
-const label = computed(() => (store.editingLayout ? 'Shared layout' : store.activePage.name))
 const formatValue = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value))
 
 const addPage = () => {
@@ -35,16 +34,8 @@ const toggleLayout = (on: boolean) => {
 </script>
 
 <template>
-  <VBtn
-    size="small"
-    variant="tonal"
-    prepend-icon="mdi-file-multiple-outline"
-    append-icon="mdi-menu-down"
-    class="pages-button"
-    aria-haspopup="dialog"
-    @click="open = true"
-  >
-    <span class="pages-button__label">{{ label }}</span>
+  <VBtn size="small" variant="tonal" prepend-icon="mdi-tune-variant" aria-haspopup="dialog" @click="open = true">
+    Pages &amp; state
   </VBtn>
   <VDialog v-model="open" max-width="640" scrollable>
     <VCard title="Pages & state">
@@ -179,12 +170,6 @@ const toggleLayout = (on: boolean) => {
 </template>
 
 <style scoped>
-.pages-button__label {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .state-key {
   min-width: 90px;
 }
