@@ -1,32 +1,32 @@
 <script setup lang="ts">
-import { VueDraggableNext as Draggable } from 'vue-draggable-next';
-import { useCanvas } from '../model/useCanvas';
-import { useDnDGroups } from '../model/useDnDGroups';
-import { useTree } from '../model/useTree';
-import { useHistory } from '../model/useHistory';
-import { useSelection } from '../model/useSelection';
-import { useGroup } from '../model/useGroup';
-import Node from './Node.vue';
+import { VueDraggableNext as Draggable } from 'vue-draggable-next'
+import { useCanvas } from '../model/useCanvas'
+import { useDnDGroups } from '../model/useDnDGroups'
+import { useTree } from '../model/useTree'
+import { useHistory } from '../model/useHistory'
+import { useSelection } from '../model/useSelection'
+import { useGroup } from '../model/useGroup'
+import Node from './Node.vue'
 
-const { canvas } = useCanvas();
-const { groupCanvas } = useDnDGroups();
-const { removeById } = useTree();
-const { commit } = useHistory(canvas);
-const { selectedIds, selectOne, toggle } = useSelection();
-const { ungroupDivById } = useGroup(canvas);
+const { canvas } = useCanvas()
+const { groupCanvas } = useDnDGroups()
+const { removeById } = useTree()
+const { commit } = useHistory(canvas)
+const { selectedIds, selectOne, toggle } = useSelection()
+const { ungroupDivById } = useGroup(canvas)
 
-const onDndChange = () => commit();
+const onDndChange = () => commit()
 const onRemove = (id: number) => {
-  removeById(canvas.value, id);
-  commit();
-};
+  removeById(canvas.value, id)
+  commit()
+}
 const onClickNode = ({ id, meta }: { id: number; meta: boolean }) => {
-  meta ? toggle(id) : selectOne(id);
-};
+  meta ? toggle(id) : selectOne(id)
+}
 const onUngroup = (id: number) => {
-  ungroupDivById(id);
-  commit();
-};
+  ungroupDivById(id)
+  commit()
+}
 </script>
 
 <template>
@@ -39,17 +39,8 @@ const onUngroup = (id: number) => {
     @add="onDndChange"
     @remove="onDndChange"
   >
-    <div
-      v-if="!canvas.length"
-      class="placeholder"
-    >
-      Перетягніть компонент із палітри →
-    </div>
-    <div
-      v-for="comp in canvas"
-      :key="comp.id"
-      class="canvas-item"
-    >
+    <div v-if="!canvas.length" class="placeholder">Перетягніть компонент із палітри →</div>
+    <div v-for="comp in canvas" :key="comp.id" class="canvas-item">
       <Node
         :node="comp"
         :selected-ids="selectedIds"

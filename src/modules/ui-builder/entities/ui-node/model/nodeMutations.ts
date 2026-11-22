@@ -1,4 +1,4 @@
-import type { UiNode } from './types'
+import type { UiNode, UiNodeEvents } from './types'
 import type { NodeLocation } from './treeUtils'
 
 export interface NodeMutationContext {
@@ -68,7 +68,8 @@ export function moveNode(
   const node = context.findNodeById(id)
   const location = context.findParentAndIndex(id)
   const parent = context.findNodeById(parentId)
-  if (!node || !location || !parent || !context.canContain(parent, slotName) || context.findNodeById(parentId, node)) return false
+  if (!node || !location || !parent || !context.canContain(parent, slotName) || context.findNodeById(parentId, node))
+    return false
 
   context.commit()
   context.getNodeList(location).splice(location.index, 1)
@@ -82,7 +83,9 @@ export function moveNode(
 
 export function canReorder(context: NodeMutationContext, id: string, direction: number): boolean {
   const location = context.findParentAndIndex(id)
-  return !!location && location.index + direction >= 0 && location.index + direction < context.getNodeList(location).length
+  return (
+    !!location && location.index + direction >= 0 && location.index + direction < context.getNodeList(location).length
+  )
 }
 
 export function reorderNode(context: NodeMutationContext, id: string, direction: number): void {
@@ -93,4 +96,31 @@ export function reorderNode(context: NodeMutationContext, id: string, direction:
   const list = context.getNodeList(location)
   list.splice(location.index + direction, 0, list.splice(location.index, 1)[0])
   context.commit()
+}
+
+export interface NodeLogicPatch {
+  model?: string
+  vIf?: string
+  vFor?: string
+  events?: UiNodeEvents
+}
+
+/** Sets bindings and events. An empty value, or `events` without a click action, removes that setting. */
+export function updateNodeLogic(context: NodeMutationContext, id: string, patch: NodeLogicPatch): boolean {
+  const node = context.findNodeById(id)
+  if (!node) return false
+
+  context.commit()
+  for (const key of ['model', 'vIf', 'vFor'] as const) {
+    if (!(key in patch)) continue
+    const value = patch[key]?.trim()
+    if (value) node[key] = value
+    else delete node[key]
+  }
+  if ('events' in patch) {
+    if (patch.events?.click) node.events = { click: patch.events.click }
+    else delete node.events
+  }
+  context.commit()
+  return true
 }

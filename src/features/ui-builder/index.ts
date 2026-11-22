@@ -1,1 +1,1 @@
-export { default as UiBuilder } from './ui/UiBuilder.vue';
+export { default as UiBuilder } from './ui/UiBuilder.vue'

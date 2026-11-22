@@ -35,9 +35,7 @@ export function findParentAndIndex(id: string, parent: UiNode): NodeLocation | n
 }
 
 export function getNodeList(location: NodeLocation): UiNode[] {
-  return location.slotName
-    ? location.parent.slots[location.slotName]
-    : location.parent.children
+  return location.slotName ? location.parent.slots[location.slotName] : location.parent.children
 }
 
 function getChildren(node: UiNode): UiNode[] {

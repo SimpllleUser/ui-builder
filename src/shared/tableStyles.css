@@ -1,0 +1,40 @@
+/* Looks for data tables that Vuetify has no prop for. Classes are set by the data table renderer. */
+.ui-table--striped tbody tr:nth-of-type(even) > td {
+  background: rgba(var(--v-theme-on-surface), 0.04);
+}
+.ui-table--bordered th,
+.ui-table--bordered td {
+  border-right: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.ui-table--bordered th:last-child,
+.ui-table--bordered td:last-child {
+  border-right: none;
+}
+.ui-table-header--primary thead th {
+  background: rgb(var(--v-theme-primary)) !important;
+  color: rgb(var(--v-theme-on-primary)) !important;
+}
+.ui-table-header--secondary thead th {
+  background: rgb(var(--v-theme-secondary)) !important;
+  color: rgb(var(--v-theme-on-secondary)) !important;
+}
+.ui-table-header--success thead th {
+  background: rgb(var(--v-theme-success)) !important;
+  color: rgb(var(--v-theme-on-success)) !important;
+}
+.ui-table-header--info thead th {
+  background: rgb(var(--v-theme-info)) !important;
+  color: rgb(var(--v-theme-on-info)) !important;
+}
+.ui-table-header--warning thead th {
+  background: rgb(var(--v-theme-warning)) !important;
+  color: rgb(var(--v-theme-on-warning)) !important;
+}
+.ui-table-header--error thead th {
+  background: rgb(var(--v-theme-error)) !important;
+  color: rgb(var(--v-theme-on-error)) !important;
+}
+.ui-table-header--surface thead th {
+  background: rgb(var(--v-theme-surface)) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+}

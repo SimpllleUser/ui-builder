@@ -18,11 +18,7 @@ const updateName = (value: unknown) => {
 </script>
 
 <template>
-  <VDialog
-    :model-value="modelValue"
-    max-width="420"
-    @update:model-value="emit('update:modelValue', $event)"
-  >
+  <VDialog :model-value="modelValue" max-width="420" @update:model-value="emit('update:modelValue', $event)">
     <VCard title="Save component">
       <VCardText>
         <VTextField

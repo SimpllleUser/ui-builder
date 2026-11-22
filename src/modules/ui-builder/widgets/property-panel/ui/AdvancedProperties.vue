@@ -29,7 +29,8 @@ const emit = defineEmits<{
         variant="tonal"
         class="ma-1"
         @click:close="emit('toggle-class', className)"
-      >{{ className }}</VChip>
+        >{{ className }}</VChip
+      >
     </div>
     <div v-else class="text-caption text-medium-emphasis mb-2">No classes applied</div>
 
@@ -59,7 +60,8 @@ const emit = defineEmits<{
             :color="node.classes.includes(className) ? 'primary' : 'default'"
             class="preset-chip"
             @click="emit('toggle-class', className)"
-          >{{ className }}</VChip>
+            >{{ className }}</VChip
+          >
         </div>
       </div>
       <div v-if="filteredGroups.length === 0" class="text-caption text-medium-emphasis text-center py-4">
@@ -70,10 +72,39 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.applied-chips { display: flex; flex-wrap: wrap; gap: 2px; }
-.preset-groups { max-height: 260px; overflow-y: auto; border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-radius: 8px; padding: 6px 8px; }
-.preset-group + .preset-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(var(--v-border-color), calc(var(--v-border-opacity) * 0.5)); }
-.preset-group__title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; margin-bottom: 4px; }
-.preset-group__chips { display: flex; flex-wrap: wrap; gap: 3px; }
-.preset-chip { cursor: pointer; font-size: 12px !important; transition: all 0.12s; }
+.applied-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.preset-groups {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.preset-group + .preset-group {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(var(--v-border-color), calc(var(--v-border-opacity) * 0.5));
+}
+.preset-group__title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+.preset-group__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.preset-chip {
+  cursor: pointer;
+  font-size: 12px !important;
+  transition: all 0.12s;
+}
 </style>

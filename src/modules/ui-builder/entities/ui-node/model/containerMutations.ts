@@ -10,8 +10,12 @@ export interface ContainerMutationContext extends NodeMutationContext {
 
 export function areNodesSiblings(context: ContainerMutationContext, ids: string[]): boolean {
   const locations = ids.map(id => context.findParentAndIndex(id))
-  return locations.length > 0 && locations.every(location =>
-    location && location.parent.id === locations[0]?.parent.id && location.slotName === locations[0]?.slotName,
+  return (
+    locations.length > 0 &&
+    locations.every(
+      location =>
+        location && location.parent.id === locations[0]?.parent.id && location.slotName === locations[0]?.slotName,
+    )
   )
 }
 

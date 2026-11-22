@@ -1,5 +1,4 @@
-
-import { createVuetify } from 'vuetify';
+import { createVuetify } from 'vuetify'
 
 export default createVuetify({
   theme: {
@@ -34,7 +33,7 @@ export default createVuetify({
           'primary-dim': '#EEF2FF',
           'secondary-dim': '#FCE7F3',
           'accent-dim': '#CFFAFE',
-        }
+        },
       },
       dark: {
         colors: {
@@ -65,8 +64,8 @@ export default createVuetify({
           'primary-dim': '#312E81',
           'secondary-dim': '#500724',
           'accent-dim': '#0C4A6E',
-        }
-      }
-    }
-  }
-});
+        },
+      },
+    },
+  },
+})

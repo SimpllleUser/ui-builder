@@ -1,10 +1,6 @@
 import { computed, ref } from 'vue'
 
-export function createHistory(
-  serialize: () => string,
-  applySnapshot: (snapshot: string) => void,
-  maxEntries: number,
-) {
+export function createHistory(serialize: () => string, applySnapshot: (snapshot: string) => void, maxEntries: number) {
   const entries = ref<string[]>([serialize()])
   const currentIndex = ref(0)
   const isRestoring = ref(false)
@@ -12,11 +8,13 @@ export function createHistory(
   const pending = computed(() => serialize() !== entries.value[currentIndex.value])
   const canUndo = computed(() => pending.value || currentIndex.value > 0)
   const canRedo = computed(() => !pending.value && currentIndex.value < entries.value.length - 1)
-  const versions = computed(() => entries.value.map((_, index) => ({
-    index,
-    label: index === 0 ? 'Initial version' : `Version ${index + 1}`,
-    isCurrent: index === currentIndex.value,
-  })))
+  const versions = computed(() =>
+    entries.value.map((_, index) => ({
+      index,
+      label: index === 0 ? 'Initial version' : `Version ${index + 1}`,
+      isCurrent: index === currentIndex.value,
+    })),
+  )
 
   const commit = () => {
     const snapshot = serialize()
