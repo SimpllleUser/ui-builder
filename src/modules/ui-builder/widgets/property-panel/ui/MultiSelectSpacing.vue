@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { SpacingType } from '../../../entities/ui-node/model/enums'
+import { SpacingType, useUiTreeStore } from '../../../entities/ui-node'
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
 import { useSpacingEditor } from '../model/useSpacingEditor'
 
 /** What can be edited while several elements are selected: their shared margin and padding. */

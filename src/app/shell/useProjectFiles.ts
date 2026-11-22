@@ -1,4 +1,4 @@
-import type { useUiTreeStore } from '../../entities/ui-node/model/store'
+import { type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 
 const MAX_IMPORT_BYTES = 5_000_000
 const EXPORT_FILE_NAME = 'ui-builder-project.json'

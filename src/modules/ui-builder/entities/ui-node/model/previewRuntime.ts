@@ -47,5 +47,5 @@ export function usePreviewRuntime({ project, activePage, isPreviewMode, setNotic
     if (on) start()
   })
 
-  return { state, pageId, page, root, navigate, dispatch, reset }
+  return { state, pageId, page, root, navigate, dispatch, reset, start }
 }

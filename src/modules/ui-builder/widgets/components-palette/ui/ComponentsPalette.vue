@@ -6,8 +6,8 @@ import {
   getComponentCategory,
   PALETTE_COMPONENTS,
   getComponentDef,
-} from '../../../entities/ui-node/model/componentDefinitions'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+  useUiTreeStore,
+} from '../../../entities/ui-node'
 import PaletteItem from './PaletteItem.vue'
 import { quickSections } from '../model/quickSections'
 const store = useUiTreeStore()

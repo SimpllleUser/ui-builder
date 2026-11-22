@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
+import { type ComponentDef } from '../../../entities/ui-node'
 
 const props = defineProps<{ component: ComponentDef; favorite: boolean; target: string }>()
 const emit = defineEmits<{ add: []; 'toggle-favorite': []; dragstart: [event: DragEvent] }>()

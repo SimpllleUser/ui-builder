@@ -2,11 +2,9 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { TEMPLATES } from '../../../entities/ui-node/model/templateFactory'
+import { useUiTreeStore, TEMPLATES, NodeRenderer, canvasDragTargetId } from '../../../entities/ui-node'
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
-import NodeRenderer, { canvasDragTargetId } from '../../../entities/ui-node/ui/NodeRenderer'
 const emit = defineEmits<{ 'open-components': [] }>()
 const store = useUiTreeStore()
 const { rootNode, canUndo, canRedo, isPreviewMode, selectedNodeIds } = storeToRefs(store)

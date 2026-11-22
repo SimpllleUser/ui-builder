@@ -1,13 +1,12 @@
-import { TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
-import { FieldKind } from '../../../entities/ui-node/model/enums'
-import type { PropField, PropertySection } from '../../../entities/ui-node/model/componentDefinitions'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { TEXT_NODE_TYPE, FieldKind, type PropField, type PropertySection, type UiNode } from '../../../entities/ui-node'
 
 export enum InspectorTab {
   Content = 'content',
   Layout = 'layout',
   Appearance = 'appearance',
   Advanced = 'advanced',
+  /** Figma-style controls; they write the element's own style rather than classes. */
+  Design = 'design',
 }
 
 const CONTENT_PROPS = ['title', 'subtitle', 'label', 'placeholder', 'hint', 'src', 'alt', 'image', 'value']

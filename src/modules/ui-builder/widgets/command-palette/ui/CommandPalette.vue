@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { buildCommands, type Command, type CommandHost } from '../../../model/commands'
-import { searchCommands } from '../../../model/commandSearch'
+import { useUiTreeStore } from '../../../entities/ui-node'
+import { buildCommands, type Command, type CommandHost } from '../model/commands'
+import { searchCommands } from '../model/commandSearch'
 
 /** One search box for everything: commands, components to add, pages, elements and settings of the selected element. */
 const props = defineProps<{ modelValue: boolean; host: CommandHost }>()

@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import { SaveState } from './modules/ui-builder/entities/ui-node/model/enums'
-import { PanelSide } from './modules/ui-builder/model/shell/panelSide'
+import { SaveState, useUiTreeStore, ROOT_NODE_ID } from '../modules/ui-builder/entities/ui-node'
+import { PanelSide } from './shell/panelSide'
 import { ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
-import MainCanvas from './modules/ui-builder/widgets/main-canvas/ui/MainCanvas.vue'
-import SidebarTree from './modules/ui-builder/widgets/sidebar-tree/ui/SidebarTree.vue'
-import OnboardingTour from './modules/ui-builder/widgets/onboarding/ui/OnboardingTour.vue'
-import { useFirstRunTour } from './modules/ui-builder/widgets/onboarding/model/useFirstRunTour'
-import CommandPalette from './modules/ui-builder/widgets/command-palette/ui/CommandPalette.vue'
-import type { CommandHost } from './modules/ui-builder/model/commands'
-import PageTabs from './modules/ui-builder/widgets/pages-panel/ui/PageTabs.vue'
-import PagesPanel from './modules/ui-builder/widgets/pages-panel/ui/PagesPanel.vue'
-import PropertyPanel from './modules/ui-builder/widgets/property-panel/ui/PropertyPanel.vue'
-import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
-import { ROOT_NODE_ID } from './modules/ui-builder/entities/ui-node/model/constants'
-import { useEditorPanels } from './modules/ui-builder/model/shell/useEditorPanels'
-import { useEditorShortcuts } from './modules/ui-builder/model/shell/useEditorShortcuts'
-import { platformModifierKey, useFocusMode } from './modules/ui-builder/model/shell/useFocusMode'
-import { useProjectFiles } from './modules/ui-builder/model/shell/useProjectFiles'
+import { ComponentsPalette } from '../modules/ui-builder/widgets/components-palette'
+import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
+import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
+import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/onboarding'
+import { CommandPalette, type CommandHost } from '../modules/ui-builder/widgets/command-palette'
+import { PageTabs, PagesPanel } from '../modules/ui-builder/widgets/pages-panel'
+import { PropertyPanel, useDesignTabPreference } from '../modules/ui-builder/widgets/property-panel'
+import { useEditorPanels } from './shell/useEditorPanels'
+import { useEditorShortcuts } from './shell/useEditorShortcuts'
+import { platformModifierKey, useFocusMode } from './shell/useFocusMode'
+import { useProjectFiles } from './shell/useProjectFiles'
 
 const store = useUiTreeStore()
 const narrow = useMediaQuery('(max-width: 1100px)')
 const modifierKey = platformModifierKey()
+const designTab = useDesignTabPreference()
 
 const panels = useEditorPanels(store, narrow)
 const { leftOpen, rightOpen, leftWidth, rightWidth, rightSlim, rightFull, rightPanelWidth, limits } = panels
@@ -49,7 +46,8 @@ const commandHost: CommandHost = {
   exportProject,
   startTour,
   toggleFocus,
-  togglePanel,
+  toggleLayersPanel: () => togglePanel(PanelSide.Left),
+  toggleProperties: () => togglePanel(PanelSide.Right),
   modifierKey,
 }
 
@@ -135,6 +133,13 @@ useEditorShortcuts({
               :subtitle="`Only the canvas · ${modifierKey} \\`"
               @click="toggleFocus"
             />
+            <VListItem
+              prepend-icon="mdi-palette-outline"
+              title="Design tab in Properties"
+              subtitle="Figma-style size, layout, radius and fill"
+              :append-icon="designTab ? 'mdi-check' : undefined"
+              @click="designTab = !designTab"
+            />
             <VListItem prepend-icon="mdi-compass-outline" title="Quick tour" @click="startTour" />
           </VList>
         </VMenu>
@@ -176,7 +181,9 @@ useEditorShortcuts({
         :style="{ width: `${leftWidth}px` }"
         aria-label="Components and layers"
       >
-        <SidebarTree @close="leftOpen = false" />
+        <SidebarTree @close="leftOpen = false">
+          <template #components><ComponentsPalette /></template>
+        </SidebarTree>
       </aside>
       <div
         v-if="leftOpen && !narrow && showChrome"

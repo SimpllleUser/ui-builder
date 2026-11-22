@@ -3,8 +3,12 @@ import assert from 'node:assert/strict'
 import { server, runtime, store } from './support.mjs'
 
 test('command palette: finds commands, components, pages, elements and settings, and runs them', async () => {
-  const { buildCommands } = await server.ssrLoadModule('/src/modules/ui-builder/model/commands.ts')
-  const { searchCommands } = await server.ssrLoadModule('/src/modules/ui-builder/model/commandSearch.ts')
+  const { buildCommands } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/widgets/command-palette/model/commands.ts',
+  )
+  const { searchCommands } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/widgets/command-palette/model/commandSearch.ts',
+  )
   const calls = []
   const host = {
     addPage: () => calls.push('addPage'),
@@ -227,4 +231,92 @@ test('history times read as “just now”, minutes, hours, and a date once a da
   assert.equal(ago(3599), '60 min ago')
   assert.equal(ago(3 * 3600), '3 h ago')
   assert.equal(ago(86400), shortDateTime.format(now - 86400 * 1000))
+})
+
+test('design controls: style reading and writing, sizes, alignment and spacing names', async () => {
+  const design = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/designStyle.ts')
+  const inline = await server.ssrLoadModule('/src/shared/lib/inlineStyle.ts')
+  const m = { ...design, ...inline }
+
+  // Style may be an object or CSS text (for example from MCP); both read the same.
+  assert.deepEqual(m.readStyle({ color: 'red', margin: 4 }), { color: 'red' }, 'non-text values are ignored')
+  assert.deepEqual(m.readStyle('background-color: #fff; border-radius: 8px;;  '), {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+  })
+  assert.deepEqual(m.readStyle(undefined), {})
+  assert.deepEqual(
+    m.withStyle({ a: '1', b: '2' }, { a: null, c: '3', b: '' }),
+    { c: '3' },
+    'null and empty remove a property',
+  )
+
+  // Design values carry !important so they beat Vuetify's utility classes; the controls read them without it.
+  assert.equal(m.markImportant('8px'), '8px !important')
+  assert.equal(m.markImportant('8px !important'), '8px !important', 'never doubled')
+  assert.equal(m.stripImportant('8px !important'), '8px')
+  assert.deepEqual(m.cleanStyle({ margin: '4px !important', color: 'red' }), { margin: '4px', color: 'red' })
+
+  assert.equal(m.parsePx('12px'), 12)
+  assert.equal(m.parsePx('-4.5'), -4.5)
+  assert.equal(m.parsePx('50%'), null)
+  assert.equal(m.parsePx(undefined), null)
+  assert.equal(m.toPx(8), '8px')
+  assert.equal(m.toPx(null), null)
+
+  assert.equal(m.sizeMode('100%'), m.SizeMode.Fill)
+  assert.equal(m.sizeMode('fit-content'), m.SizeMode.Hug)
+  assert.equal(m.sizeMode('240px'), m.SizeMode.Fixed)
+  assert.equal(m.sizeMode('auto'), null)
+  assert.equal(m.sizeValue(m.SizeMode.Fill, undefined, 100), '100%')
+  assert.equal(m.sizeValue(m.SizeMode.Fixed, '240px', 100), '240px', 'a fixed size keeps the pixels it has')
+  assert.equal(m.sizeValue(m.SizeMode.Fixed, '100%', 80), '80px', 'otherwise it starts from the fallback')
+
+  // Every cell of the alignment grid survives a write and a read, in a row and in a column.
+  for (const axis of [m.Axis.Row, m.Axis.Column]) {
+    for (const horizontal of Object.values(m.Position)) {
+      for (const vertical of Object.values(m.Position)) {
+        const style = {
+          display: 'flex',
+          ...(axis === m.Axis.Column ? { flexDirection: 'column' } : {}),
+          ...m.alignmentStyle(axis, { horizontal, vertical }),
+        }
+        assert.deepEqual(m.readAlignment(style), { horizontal, vertical }, `${axis} ${horizontal}/${vertical}`)
+      }
+    }
+  }
+  assert.deepEqual(m.alignmentStyle(m.Axis.Row, { horizontal: m.Position.End, vertical: m.Position.Start }), {
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+  })
+  assert.deepEqual(
+    m.alignmentStyle(m.Axis.Column, { horizontal: m.Position.End, vertical: m.Position.Start }),
+    { justifyContent: 'flex-start', alignItems: 'flex-end' },
+    'in a column the roles swap',
+  )
+  assert.equal(m.readAlignment({ justifyContent: 'space-between' }), null, 'values the grid cannot show')
+  assert.equal(m.isFlex({ display: 'flex' }), true)
+  assert.equal(m.isFlex({}), false)
+
+  assert.equal(m.spacingProperty(m.SpacingBox.Margin, m.Side.Top), 'marginTop')
+  assert.equal(m.spacingProperty(m.SpacingBox.Padding, m.Side.Left), 'paddingLeft')
+  assert.equal(m.cornerProperty(m.Corner.TopLeft), 'borderTopLeftRadius')
+})
+
+test('theme colours are kept as theme variables and recognised again', async () => {
+  const { THEME_COLORS, ThemeColor, themeColorValue, parseThemeColor } = await server.ssrLoadModule(
+    '/src/shared/lib/themeColors.ts',
+  )
+  assert.ok(
+    ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'surface', 'background'].every(name =>
+      THEME_COLORS.includes(name),
+    ),
+  )
+  assert.equal(themeColorValue(ThemeColor.Primary), 'rgb(var(--v-theme-primary))')
+  assert.equal(themeColorValue(ThemeColor.OnSurface), 'rgb(var(--v-theme-on-surface))')
+  for (const color of THEME_COLORS) assert.equal(parseThemeColor(themeColorValue(color)), color, color)
+  assert.equal(parseThemeColor(' rgb( var(--v-theme-error) ) '), 'error', 'spacing does not matter')
+  assert.equal(parseThemeColor('#ff0000'), null, 'a custom colour is not a theme colour')
+  assert.equal(parseThemeColor('rgb(var(--v-theme-nonsense))'), null, 'nor is an unknown name')
+  assert.equal(parseThemeColor(undefined), null)
 })

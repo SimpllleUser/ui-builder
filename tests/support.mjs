@@ -1,6 +1,7 @@
 // Shared setup of the editor tests: a Vite server to load the sources, and a fresh store for every test.
 // The variables are live bindings, so a test file can import them and always sees the current store.
 import { before, after, beforeEach, afterEach } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
 export let server,
@@ -27,6 +28,10 @@ before(async () => {
     server: { middlewareMode: true, watch: null, ws: false },
     optimizeDeps: { noDiscovery: true, include: [] },
     appType: 'custom',
+    // The tests never draw anything, so components come from an empty stand-in instead of loading Vuetify in Node.
+    resolve: {
+      alias: { 'vuetify/components': fileURLToPath(new URL('./vuetify-components.stub.mjs', import.meta.url)) },
+    },
   })
   ;({ useUiTreeStore: useStore } = await server.ssrLoadModule(
     '/src/modules/ui-builder/entities/ui-node/model/store.ts',

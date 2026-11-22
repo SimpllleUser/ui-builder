@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
-import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
+import { useUiTreeStore, getComponentDef, ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node'
 import { elementBox, findCanvasElement, labelTop, type ElementBox } from '../model/canvasGeometry'
 
 /** Names the element under the pointer and outlines it, so similar elements can be told apart without a click. */

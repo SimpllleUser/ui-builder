@@ -1,7 +1,5 @@
-import { SpacingType } from '../../../entities/ui-node/model/enums'
+import { SpacingType, readSpacing, writeSpacing, type UiNode } from '../../../entities/ui-node'
 import { ref, type ComputedRef, type Ref } from 'vue'
-import { readSpacing, writeSpacing } from '../../../entities/ui-node/model/layoutControls'
-import type { UiNode } from '../../../entities/ui-node/model/types'
 
 const SPACING_SIDES = [
   { label: 'All', value: 'a' },

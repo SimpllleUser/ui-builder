@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
-import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
+import { useUiTreeStore, getComponentDef, ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node'
 import { Icons } from '../../../../../shared/icons'
 import { useSettingsGroups } from '../model/useSettingsGroups'
 import { useClassEditor } from '../model/useClassEditor'
 import { defaultTab, sectionsForTab, InspectorTab } from '../model/fieldTabs'
 import { useMoveDialog, useSavePrefabDialog } from '../model/useNodeDialogs'
+import { useDesignTabPreference } from '../model/useDesignTabPreference'
+import DesignTab from './design/DesignTab.vue'
 import AdvancedProperties from './AdvancedProperties.vue'
 import InteractionsEditor from './InteractionsEditor.vue'
 import MoveNodeDialog from './MoveNodeDialog.vue'
@@ -32,6 +32,14 @@ const breadcrumb = computed(() => (selectedNode.value ? store.pathTo(selectedNod
 
 // ─── Tabs and groups of settings ─────────────────────────────────────────────
 const activeTab = ref<InspectorTab>(InspectorTab.Content)
+const designTabEnabled = useDesignTabPreference()
+const showDesignTab = computed(() => designTabEnabled.value && selectedNode.value?.type !== TEXT_NODE_TYPE)
+// Switching the Design tab off while it is open returns to the usual first tab.
+watch(showDesignTab, shown => {
+  if (!shown && activeTab.value === InspectorTab.Design)
+    activeTab.value = defaultTab(selectedNode.value, componentSections.value)
+})
+const showsDesign = computed(() => !query.value && activeTab.value === InspectorTab.Design)
 const tabSections = computed(() => sectionsForTab(componentSections.value, activeTab.value))
 const {
   searchText: settingsQuery,
@@ -128,7 +136,8 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
       />
       <VTabs v-if="!query" v-model="activeTab" density="compact" class="property-tabs"
         ><VTab :value="InspectorTab.Content">Content</VTab><VTab :value="InspectorTab.Layout">Layout</VTab
-        ><VTab :value="InspectorTab.Appearance">Style</VTab><VTab :value="InspectorTab.Advanced">Advanced</VTab></VTabs
+        ><VTab :value="InspectorTab.Appearance">Style</VTab><VTab :value="InspectorTab.Advanced">Advanced</VTab
+        ><VTab v-if="showDesignTab" :value="InspectorTab.Design">Design</VTab></VTabs
       >
 
       <VDivider class="mb-4" />
@@ -149,7 +158,10 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
         <p
           v-if="
             !visibleSections.length &&
-            (query || (activeTab !== InspectorTab.Advanced && !(activeTab === InspectorTab.Content && textChild)))
+            (query ||
+              (activeTab !== InspectorTab.Advanced &&
+                !showsDesign &&
+                !(activeTab === InspectorTab.Content && textChild)))
           "
           class="text-body-2 text-medium-emphasis"
         >
@@ -184,6 +196,8 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
           </div>
         </template>
       </div>
+
+      <DesignTab v-if="showsDesign && selectedNode" :node="selectedNode" />
 
       <!-- Behavior first: it is used far more often than the long list of CSS classes below it. -->
       <InteractionsEditor

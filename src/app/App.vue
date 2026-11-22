@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { AppView } from './appView'
 import { ref, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
-import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
+import { useUiTreeStore } from '../modules/ui-builder/entities/ui-node'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
-const LegacyBuilder = defineAsyncComponent(() => import('./features/ui-builder/ui/UiBuilder.vue'))
+const LegacyBuilder = defineAsyncComponent(() => import('../features/ui-builder/ui/UiBuilder.vue'))
 // The previous editor is no longer offered in the menus. It stays reachable at /?classic for anyone who still needs it.
 const view = ref<AppView>(new URLSearchParams(window.location.search).has('classic') ? AppView.Legacy : AppView.Current)
 const leaveClassic = () => {
@@ -14,7 +14,7 @@ const store = useUiTreeStore()
 let disconnectMcp = () => {}
 onMounted(async () => {
   if (!import.meta.env.DEV) return
-  const { connectMcpBridge } = await import('./modules/ui-builder/model/mcpBridge')
+  const { connectMcpBridge } = await import('../modules/ui-builder/features/mcp-bridge')
   disconnectMcp = connectMcpBridge(store)
 })
 onBeforeUnmount(() => disconnectMcp())

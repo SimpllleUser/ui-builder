@@ -1,6 +1,5 @@
-import { StepDirection } from '../../entities/ui-node/model/enums'
+import { StepDirection, type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 import { onBeforeUnmount, onMounted, type Ref } from 'vue'
-import type { useUiTreeStore } from '../../entities/ui-node/model/store'
 
 // Open menus and dialogs, but not messages and tooltips: those should not swallow Escape.
 const OPEN_OVERLAY = '.v-overlay--active:not(.v-snackbar):not(.v-tooltip)'

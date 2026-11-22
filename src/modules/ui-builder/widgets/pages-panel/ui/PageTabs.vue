@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { PageDialogMode } from '../model/pageDialogMode'
-import { StepDirection } from '../../../entities/ui-node/model/enums'
+import { StepDirection, useUiTreeStore, pagePathError } from '../../../entities/ui-node'
 import { computed, nextTick, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { pagePathError } from '../../../entities/ui-node/model/projectMutations'
 
 const LAYOUT_TAB = 'layout'
 

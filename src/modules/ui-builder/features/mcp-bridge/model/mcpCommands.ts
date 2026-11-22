@@ -1,10 +1,13 @@
-import { COMPONENT_DEFS } from '../entities/ui-node/model/componentDefinitions'
-import { TEXT_NODE_TYPE } from '../entities/ui-node/model/constants'
-import type { TemplateKind } from '../entities/ui-node/model/enums'
-import type { UiNode } from '../entities/ui-node/model/types'
+import { COMPONENT_DEFS, TEXT_NODE_TYPE, type TemplateKind, type UiNode } from '../../../entities/ui-node'
 import { need, ok, summarize, type Args, type McpCommand, type Store } from './mcpCommandUtils'
 import { MCP_PAGE_COMMANDS, pageSummary } from './mcpPageCommands'
 import { MCP_TABLE_COMMANDS } from './mcpTableCommands'
+import { MCP_DIAGNOSTIC_COMMANDS } from './mcpDiagnosticCommands'
+import { MCP_HISTORY_COMMANDS } from './mcpHistoryCommands'
+import { MCP_COMPONENT_COMMANDS } from './mcpComponentCommands'
+import { MCP_STYLE_COMMANDS } from './mcpStyleCommands'
+import { createBuildCommands } from './mcpBuildCommands'
+import { applyStyleInput } from './mcpStyle'
 
 /** Sets the text of a component, adding a text child when it can hold one (e.g. VCol). */
 const setText = (store: Store, node: UiNode, text: string) => {
@@ -17,15 +20,7 @@ const setText = (store: Store, node: UiNode, text: string) => {
   textNode.name = text
 }
 const applyStyleAndAttrs = (node: UiNode, a: Args) => {
-  if (a.style !== undefined) {
-    if (a.style === null) delete node.props.style
-    else if (typeof a.style === 'string') node.props.style = a.style
-    else {
-      const current = node.props.style
-      const base = current && typeof current === 'object' ? (current as Record<string, unknown>) : {}
-      node.props.style = { ...base, ...a.style }
-    }
-  }
+  if (a.style !== undefined) applyStyleInput(node, a.style)
   for (const [k, v] of Object.entries(a.attrs ?? {})) {
     if (v === null) delete node.props[k]
     else node.props[k] = v
@@ -34,6 +29,10 @@ const applyStyleAndAttrs = (node: UiNode, a: Args) => {
 export const MCP_COMMANDS: Record<string, McpCommand> = {
   ...MCP_PAGE_COMMANDS,
   ...MCP_TABLE_COMMANDS,
+  ...MCP_DIAGNOSTIC_COMMANDS,
+  ...MCP_STYLE_COMMANDS,
+  ...MCP_HISTORY_COMMANDS,
+  ...MCP_COMPONENT_COMMANDS,
   get_document: store => ({
     editing: store.editingLayout ? 'layout' : store.activePage.id,
     pages: pageSummary(store),
@@ -113,6 +112,9 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     return { notice: store.notice }
   },
 }
+
+// Defined after the table above because a batch can run any command in it.
+Object.assign(MCP_COMMANDS, createBuildCommands(MCP_COMMANDS))
 
 export function executeMcpCommand(store: Store, command: string, args: Args = {}) {
   const handler = MCP_COMMANDS[command]

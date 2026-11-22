@@ -15,6 +15,9 @@ import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
 import { usePreviewRuntime } from './previewRuntime'
+import { snapshotPreview } from './previewSnapshot'
+import { resolveTableData } from './tableBindings'
+import { bindAction } from './runtime'
 import {
   addPage as addPageMutation,
   deletePage as deletePageMutation,
@@ -144,17 +147,18 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => findNodeByIdInTree(id, node)
 
+  const applyProjectSnapshot = (snapshot: string) => {
+    const data = JSON.parse(snapshot)
+    // Checkpoints saved before pages existed hold a single page tree.
+    if (Array.isArray(data?.pages)) project.value = data
+    else rootNode.value = data
+    if (!project.value.layout) editingLayout.value = false
+    activePageId.value = activePage.value.id
+    selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
+  }
   const history = createHistory({
     serialize: () => JSON.stringify(project.value),
-    applySnapshot: snapshot => {
-      const data = JSON.parse(snapshot)
-      // Checkpoints saved before pages existed hold a single page tree.
-      if (Array.isArray(data?.pages)) project.value = data
-      else rootNode.value = data
-      if (!project.value.layout) editingLayout.value = false
-      activePageId.value = activePage.value.id
-      selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
-    },
+    applySnapshot: applyProjectSnapshot,
     maxEntries: MAX_HISTORY_ENTRIES,
     describe: describeChange,
     // Anything that was removed can be brought back from the message that says so.
@@ -163,9 +167,30 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     },
   })
   const { canUndo, canRedo, versions: historyVersions, commit: commitHistory } = history
+  // While a transaction runs, steps are not saved one by one: they become a single version at the end.
+  let transactionDepth = 0
   const commit = () => {
     clearTimeout(historyTimer)
-    if (!history.isRestoring.value) commitHistory()
+    if (transactionDepth === 0 && !history.isRestoring.value) commitHistory()
+  }
+  /**
+   * Runs several changes as one undo step. If one of them fails, everything it changed is put back and the error is passed on.
+   * Used by agents (MCP) that build a page in many small steps.
+   */
+  const transaction = <T>(run: () => T): T => {
+    if (transactionDepth > 0) return run()
+    commit()
+    const before = JSON.stringify(project.value)
+    transactionDepth++
+    try {
+      return run()
+    } catch (error) {
+      applyProjectSnapshot(before)
+      throw error
+    } finally {
+      transactionDepth--
+      commit()
+    }
   }
   const undo = () => {
     clearTimeout(historyTimer)
@@ -424,6 +449,38 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const updateNodeLogic = (id: string, patch: NodeLogicPatch) => updateNodeLogicMutation(mutationContext, id, patch)
   const preview = usePreviewRuntime({ project, activePage, isPreviewMode, setNotice })
+  /** Starts Preview at once, so what follows already sees the starting values. */
+  const startPreview = () => {
+    isPreviewMode.value = true
+    preview.start()
+  }
+  // Preview draws the page and, around it, the shared layout; a click can land on either.
+  const previewTrees = computed(() => [
+    preview.page.value.root,
+    ...(project.value.layout ? [project.value.layout] : []),
+  ])
+  const findInPreview = (id: string) =>
+    previewTrees.value.map(root => findNodeByIdInTree(id, root)).find(Boolean) ?? null
+  /** Clicks an element in Preview as a person would. For a table row, `row` says which one was clicked. */
+  const previewClick = (id: string, row?: number) => {
+    if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
+    const node = findInPreview(id)
+    if (!node) throw new Error(`Node not found on the preview page: ${id}`)
+    const click = node.events?.click
+    if (!click) throw new Error(`“${node.name}” has no click action.`)
+    const data = { ...node.props, ...resolveTableData(node.props, preview.state.value) }
+    const item = row === undefined ? undefined : (Array.isArray(data.items) ? data.items : [])[row]
+    if (row !== undefined && item === undefined) throw new Error(`The table has no row ${row}.`)
+    preview.dispatch(bindAction(click, { ...preview.state.value, ...(row === undefined ? {} : { item, index: row }) }))
+  }
+  /** Types into an input in Preview: sets the variable the input is linked to. */
+  const previewInput = (id: string, value: unknown) => {
+    if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
+    const node = findInPreview(id)
+    if (!node?.model) throw new Error('That element is not linked to a variable.')
+    preview.state.value[node.model] = value
+  }
+  const describePreview = () => snapshotPreview(project.value, preview.page.value, preview.state.value)
 
   const addTemplate = (kind: TemplateKind) => addTemplateMutation(mutationContext, kind)
 
@@ -483,6 +540,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       removeRow: (id: string, index: number) => tableMutations.removeRow(mutationContext, id, index),
     },
     resetPreview: preview.reset,
+    startPreview,
+    previewClick,
+    previewInput,
+    describePreview,
+    transaction,
     runtimeState: preview.state,
     previewPageId: preview.pageId,
     previewPage: preview.page,

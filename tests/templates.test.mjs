@@ -65,7 +65,9 @@ test('starter templates: dashboard, table page and sign-in form come ready with 
   const project = parseProject(store.exportDocument())
   assert.equal(project.pages[0].root.children.length, store.rootNode.children.length)
   // The command palette and MCP offer them too.
-  const { buildCommands } = await server.ssrLoadModule('/src/modules/ui-builder/model/commands.ts')
+  const { buildCommands } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/widgets/command-palette/model/commands.ts',
+  )
   const host = {
     addPage() {},
     renameCurrentPage() {},
@@ -82,7 +84,9 @@ test('starter templates: dashboard, table page and sign-in form come ready with 
   const count = store.rootNode.children.length
   commands.find(command => command.id === 'template:dashboard').run()
   assert.equal(store.rootNode.children.length, count + 1)
-  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { executeMcpCommand } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/features/mcp-bridge/model/mcpCommands.ts',
+  )
   executeMcpCommand(store, 'add_template', { kind: 'login' })
   assert.equal(store.rootNode.children.length, count + 2)
 })

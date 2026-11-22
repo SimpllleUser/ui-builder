@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { provide, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import { useUiTreeStore } from '../../../entities/ui-node'
 import { LAYERS_HELP } from '../model/sidebarViews'
 import SidebarTreeNode from './SidebarTreeNode.vue'
 

@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { PanelSide } from './panelSide'
-import type { useUiTreeStore } from '../../entities/ui-node/model/store'
+import { type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 
 const MIN_WIDTH = 260
 const MAX_WIDTH = 480

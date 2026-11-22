@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { LAYERS_HELP, SIDEBAR_VIEWS, SidebarView } from '../model/sidebarViews'
-import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
 import HistoryView from './HistoryView.vue'
 import LayersView from './LayersView.vue'
 import SavedComponentsView from './SavedComponentsView.vue'
@@ -53,7 +52,8 @@ const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeVi
             </span>
           </div>
 
-          <ComponentsPalette v-if="activeView === SidebarView.Components" />
+          <!-- The component library is another widget; the app puts it here, so this widget needs no import of it. -->
+          <slot v-if="activeView === SidebarView.Components" name="components" />
           <LayersView v-else-if="activeView === SidebarView.Layers" />
           <SavedComponentsView v-else-if="activeView === SidebarView.Prefabs" />
           <HistoryView v-else />

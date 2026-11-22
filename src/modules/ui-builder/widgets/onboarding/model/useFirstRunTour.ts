@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { useStorage } from '@vueuse/core'
-import type { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import { type useUiTreeStore } from '../../../entities/ui-node'
 import { isUntouched } from './tourSteps'
 
 /** The quick tour: shown once to someone starting an empty project, and on request afterwards. */

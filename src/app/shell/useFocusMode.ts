@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { useUiTreeStore } from '../../entities/ui-node/model/store'
+import { type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 
 /** Focus mode hides every panel, the toolbar and the page tabs so only the canvas is left. */
 export function useFocusMode(store: ReturnType<typeof useUiTreeStore>, modifierKey: string) {

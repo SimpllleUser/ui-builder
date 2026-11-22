@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { WRAP_CONTAINER_TYPES, getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
-import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
+import { useUiTreeStore, WRAP_CONTAINER_TYPES, getComponentDef, ROOT_NODE_ID } from '../../../entities/ui-node'
 
 /** Offers to wrap several selected siblings in a container, or to lift the children out of a selected container. */
 const store = useUiTreeStore()

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useUiTreeStore } from '../../../../entities/ui-node/model/store'
-import type { UiNode } from '../../../../entities/ui-node/model/types'
+import { useUiTreeStore, type UiNode } from '../../../../entities/ui-node'
 import { useStyleEditor } from '../../model/useStyleEditor'
 
 const JUSTIFY_OPTIONS = ['justify-start', 'justify-center', 'justify-space-between', 'justify-end']

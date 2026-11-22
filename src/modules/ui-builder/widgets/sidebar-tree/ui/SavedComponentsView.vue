@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
+import { useUiTreeStore, getComponentDef } from '../../../entities/ui-node'
 
 /** Elements saved to reuse: insert one into the page or remove it from the library. */
 const store = useUiTreeStore()

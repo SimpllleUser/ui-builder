@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../../entities/ui-node/model/store'
-import type { UiNode } from '../../../../entities/ui-node/model/types'
+import { useUiTreeStore, type UiNode } from '../../../../entities/ui-node'
 
 /** A setting that holds JSON, or a `{{variable}}` binding to the project's state. */
 const props = defineProps<{ node: UiNode; prop: string; label: string }>()

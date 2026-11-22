@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import { useUiTreeStore } from '../../../entities/ui-node'
 import { shortDateTime, timeAgo } from '../model/timeAgo'
 
 /** Every named change that can be restored, and checkpoints the person saved on purpose. */

@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ColumnAlign, TableData } from '../../../entities/ui-node/model/enums'
+import {
+  ColumnAlign,
+  TableData,
+  useUiTreeStore,
+  cellSlotName as slotName,
+  columnKeyError,
+  tableColumns,
+  tableRows,
+  type UiNode,
+} from '../../../entities/ui-node'
 import { TableEditorTab } from '../model/tableEditorTab'
 import { computed, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { cellSlotName as slotName } from '../../../entities/ui-node/model/componentDefinitions'
-import { useCheckedDrafts } from '../../../model/useCheckedDrafts'
-import { columnKeyError, tableColumns, tableRows } from '../../../entities/ui-node/model/tableMutations'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
 
 const props = defineProps<{ node: UiNode }>()
 const store = useUiTreeStore()

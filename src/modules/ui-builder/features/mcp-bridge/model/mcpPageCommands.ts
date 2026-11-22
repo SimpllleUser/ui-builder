@@ -1,5 +1,4 @@
-import { StepDirection } from '../entities/ui-node/model/enums'
-import type { UiAction } from '../entities/ui-node/model/types'
+import { StepDirection, type UiAction } from '../../../entities/ui-node'
 import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 export const pageSummary = (store: Store) =>

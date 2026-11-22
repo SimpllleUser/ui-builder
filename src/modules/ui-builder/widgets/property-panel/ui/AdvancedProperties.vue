@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { type UiNode } from '../../../entities/ui-node'
 
 defineProps<{
   node: UiNode

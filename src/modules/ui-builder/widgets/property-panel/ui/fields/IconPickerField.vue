@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Icons } from '../../../../../../shared/icons'
-import { useUiTreeStore } from '../../../../entities/ui-node/model/store'
-import type { UiNode } from '../../../../entities/ui-node/model/types'
+import { useUiTreeStore, type UiNode } from '../../../../entities/ui-node'
 
 /** Picks an icon by name. `preview` shows the chosen icon inside the field. */
 const props = defineProps<{ node: UiNode; prop: string; label: string; preview?: boolean }>()

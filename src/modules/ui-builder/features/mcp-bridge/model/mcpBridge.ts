@@ -1,5 +1,5 @@
 import { executeMcpCommand } from './mcpCommands'
-import type { useUiTreeStore } from '../entities/ui-node/model/store'
+import { type useUiTreeStore } from '../../../entities/ui-node'
 
 export const MCP_BRIDGE_URL = import.meta.env.VITE_MCP_BRIDGE_URL ?? 'http://127.0.0.1:3002'
 

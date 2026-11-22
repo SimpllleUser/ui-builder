@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef } from 'vue'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { type UiNode } from '../../../entities/ui-node'
 
 type ClassGroup = { title: string; classes: string[] }
 

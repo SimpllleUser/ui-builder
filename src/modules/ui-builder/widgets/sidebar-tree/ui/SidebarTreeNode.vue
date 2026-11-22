@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { StepDirection } from '../../../entities/ui-node/model/enums'
+import {
+  StepDirection,
+  type UiNode,
+  useUiTreeStore,
+  getComponentDef,
+  getNodeSlots,
+  PALETTE_COMPONENTS,
+  ROOT_NODE_ID,
+} from '../../../entities/ui-node'
 import { computed, ref, watch, nextTick, inject, type Ref } from 'vue'
 import draggable from 'vuedraggable'
-import type { UiNode } from '../../../entities/ui-node/model/types'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { getComponentDef, getNodeSlots, PALETTE_COMPONENTS } from '../../../entities/ui-node/model/componentDefinitions'
-import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
 const props = defineProps<{ node: UiNode; depth?: number }>()
 const store = useUiTreeStore()
 const expanded = ref(true)

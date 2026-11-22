@@ -17,6 +17,7 @@ On a first visit to an empty project, a three-step **quick tour** points at the 
 - Click a component in the library or drag it onto a container. The library shows where clicking will insert it. Search filters the library.
 - Start an empty page from a template: card, contact form, two columns, **Dashboard** (key numbers and a table), **Table with search** (search box, status filter, table and a details panel opening on click) or **Sign-in form** (fields that react in Preview). The last two bring the variables they need, and everything is one Undo step. Templates are also in the search (Ctrl/⌘ K → “template”) and MCP (`add_template`).
 - Select elements on the canvas or in Layers. Shift/Ctrl/Cmd-click selects several; the inspector then edits shared spacing.
+- The optional **Design** tab (⋯ menu → “Design tab in Properties” turns it on or off) has Figma-style controls: width and height (fixed, fill or hug), auto layout with a 3 × 3 alignment grid, direction, wrap and gap, text alignment, margin and padding per side (with a link for all sides), corner radius for all or each corner, fill, text colour and stroke (each with the theme's colours as one-click presets, which follow light and dark mode, or any custom colour) and opacity. Drag a field's letter to change its value; hold Shift to move by ten. These write the element's own style and win over classes; the older tabs stay as they are.
 - Use the inspector's Content, Layout, Style and Advanced tabs. Text inside a button or heading can be edited directly from its parent's Content tab.
 - **Search** (Ctrl/⌘ K, or the Search button) finds anything by typing: add a component ("data table"), go to a page, select an element by name, change a setting of the selected element ("striped", "header color"), preview, undo, export. Arrow keys move, Enter runs, Esc closes; recent commands come first.
 - Hovering an element on the canvas outlines it and shows its name (and component type), so identical-looking elements can be told apart without clicking.
@@ -55,7 +56,29 @@ The previous **Classic** editor is no longer in the menus, so there is one edito
 1. `npm run dev` and open http://localhost:3001 (the tab must stay open).
 2. Claude Code picks up `.mcp.json` automatically. For other clients, run `node mcp/server.mjs` over stdio.
 
-Tools: `get_document`, `list_pages`, `add_page`, `set_route`, `select_page`, `delete_page`, `edit_layout`, `set_state`, `set_binding`, `set_event`, `describe_component`, `get_table`, `add_table_column`, `update_table_column`, `remove_table_column`, `add_table_row`, `update_table_row`, `remove_table_row`, `get_node`, `list_components`, `add_component`, `update_node`, `delete_node`, `move_node`, `duplicate_node`, `add_template`, `select_node`, `undo`, `redo`, `export_document`, `import_document`. Every change goes through the editor's store, so it appears live and can be undone. Change the port with `UI_BUILDER_MCP_PORT` (and `VITE_MCP_BRIDGE_URL` for the editor); see `.env.mcp.example`.
+Tools (56):
+
+- **Read:** `get_document`, `get_node`, `list_components`, `describe_component`, `list_pages`, `get_table`, `export_document`.
+- **Build:** `add_subtree` (a whole nested tree in one call and one Undo step; `ref` names come back as ids), `batch` (several tools as one Undo step; `"$0.id"` uses the result of step 0; if a step fails, all are undone), `add_component`, `add_template`, `move_node`, `duplicate_node`, `delete_node`, `import_document`.
+- **Change:** `update_node`, `set_style` (numbers are px, theme colour names such as `primary`, and values win over utility classes, like the Design tab), `set_binding`, `set_event`, `set_state`, and the table tools (`add_/update_/remove_table_column`, `add_/update_/remove_table_row`).
+- **Pages:** `add_page`, `set_route`, `select_page`, `duplicate_page`, `move_page`, `delete_page`, `edit_layout`.
+- **Check:** `check_project` (unknown variables, links to missing pages, invalid conditions, empty tables, a layout without Page content, unused variables) and a Preview you can drive: `preview_start`, `preview_click`, `preview_input`, `preview_navigate`, `preview_state`, `preview_reset`, `preview_stop`. Each answers with the variables, the texts shown, hidden elements and table rows.
+- **History and reuse:** `get_status`, `get_history`, `create_checkpoint`, `restore_checkpoint`, `delete_checkpoint`, `restore_version`, `list_saved_components`, `save_component`, `insert_saved_component`, `delete_saved_component`, `wrap_nodes`, `unwrap_node`.
+- `select_node`, `undo`, `redo`.
+
+The server also gives agents instructions, a **guide** resource (`ui-builder://guide`, from `mcp/guide.md`) with the editor's conventions, and a `build_page` prompt. Every change goes through the editor's store, so it appears live and can be undone. Change the port with `UI_BUILDER_MCP_PORT` (and `VITE_MCP_BRIDGE_URL` for the editor); see `.env.mcp.example`.
+
+## Code structure
+
+The code follows Feature-Sliced Design, from the top layer down:
+
+- `src/app`: the application shell (`App.vue`, `BuilderApp.vue`, and in `shell/` the panels, keyboard shortcuts, focus mode and project files). It puts the other layers together.
+- `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour).
+- `src/modules/ui-builder/features/mcp-bridge`: lets an MCP client edit the page open in the browser.
+- `src/modules/ui-builder/entities/ui-node`: the document, its store, validation and rendering.
+- `src/shared`: code with no knowledge of the editor (icons, DOM helpers, `useCheckedDrafts`, table styles).
+
+Every slice has a public API in its `index.ts`. Code outside a slice imports from there and never from files inside it, a layer imports only from layers below it, and slices of the same layer do not import each other (they are combined in `app`, for example through a slot or by passing what they need in). Fixed sets of values are enums, not union types.
 
 ## Checks
 

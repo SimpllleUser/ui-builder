@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { server, store } from './support.mjs'
 
 test('MCP commands edit the page through the store', async () => {
-  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { executeMcpCommand } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/features/mcp-bridge/model/mcpCommands.ts',
+  )
   const { id } = executeMcpCommand(store, 'add_component', { type: 'VBtn', text: 'Hi', props: { color: 'primary' } })
   assert.equal(store.findNodeById(id).props.color, 'primary')
   executeMcpCommand(store, 'update_node', { id, props: { color: null }, name: 'Go' })
@@ -16,7 +18,9 @@ test('MCP commands edit the page through the store', async () => {
 })
 
 test('MCP page, binding, event and text tools', async () => {
-  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { executeMcpCommand } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/features/mcp-bridge/model/mcpCommands.ts',
+  )
   const { id: pageId } = executeMcpCommand(store, 'add_page', { name: 'Orders' })
   executeMcpCommand(store, 'set_route', { id: pageId, path: '/orders-list' })
   assert.deepEqual(
@@ -35,9 +39,9 @@ test('MCP page, binding, event and text tools', async () => {
     attrs: { 'aria-label': 'x' },
   })
   assert.equal(store.findNodeById(col).children[0].name, 'Hello')
-  assert.deepEqual(store.findNodeById(col).props.style, { color: 'red' })
+  assert.deepEqual(store.findNodeById(col).props.style, { color: 'red !important' })
   executeMcpCommand(store, 'update_node', { id: col, style: { margin: '1px' }, text: 'Bye' })
-  assert.deepEqual(store.findNodeById(col).props.style, { color: 'red', margin: '1px' })
+  assert.deepEqual(store.findNodeById(col).props.style, { color: 'red !important', margin: '1px !important' })
   assert.equal(store.findNodeById(col).children[0].name, 'Bye')
   const { id: btn } = executeMcpCommand(store, 'add_component', { type: 'VBtn', text: 'Go' })
   executeMcpCommand(store, 'set_event', { id: btn, click: { type: 'navigate', to: '/orders-list' } })

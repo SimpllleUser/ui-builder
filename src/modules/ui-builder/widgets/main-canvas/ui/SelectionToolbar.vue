@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { StepDirection } from '../../../entities/ui-node/model/enums'
+import { StepDirection, useUiTreeStore, ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
 import { elementBox, findCanvasElement, labelLeft, labelTop } from '../model/canvasGeometry'
 
 /** Quick actions next to the selected element, so common edits do not need a trip to the Inspector. */

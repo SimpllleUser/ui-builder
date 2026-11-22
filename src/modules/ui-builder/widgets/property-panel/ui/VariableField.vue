@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { parseLiteral } from '../../../entities/ui-node/model/runtime'
-import { variableNameError } from '../../../entities/ui-node/model/projectMutations'
+import { useUiTreeStore, parseLiteral, variableNameError } from '../../../entities/ui-node'
 
 /**
  * Picks a variable by name. A name that does not exist yet is accepted and the parent creates the variable,

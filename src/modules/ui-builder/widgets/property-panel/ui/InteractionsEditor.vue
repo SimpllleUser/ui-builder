@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { ActionType } from '../../../entities/ui-node/model/enums'
+import { ActionType, useUiTreeStore, conditionError, type UiAction, type UiNode } from '../../../entities/ui-node'
 import { BehaviorKind } from '../model/behaviorKinds'
 import { computed, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { conditionError } from '../../../entities/ui-node/model/runtime'
-import type { UiAction, UiNode } from '../../../entities/ui-node/model/types'
-import { useCheckedDrafts } from '../../../model/useCheckedDrafts'
+import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
 import VariableField from './VariableField.vue'
 
 const props = defineProps<{ node: UiNode }>()

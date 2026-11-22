@@ -75,3 +75,21 @@ export enum StepDirection {
   Back = -1,
   Forward = 1,
 }
+
+/** What a problem found in a project is about. */
+export enum IssueKind {
+  UnknownVariable = 'unknown-variable',
+  UnusedVariable = 'unused-variable',
+  MissingRoute = 'missing-route',
+  InvalidCondition = 'invalid-condition',
+  EmptyTable = 'empty-table',
+  MissingOutlet = 'missing-outlet',
+  EmptyPage = 'empty-page',
+}
+
+/** How serious a problem is: an error breaks what the person built, a warning probably does, info is advice. */
+export enum IssueSeverity {
+  Error = 'error',
+  Warning = 'warning',
+  Info = 'info',
+}

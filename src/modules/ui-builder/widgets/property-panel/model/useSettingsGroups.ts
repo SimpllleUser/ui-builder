@@ -1,12 +1,12 @@
-import { FieldKind } from '../../../entities/ui-node/model/enums'
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
-import { useStorage } from '@vueuse/core'
 import {
+  FieldKind,
   getComponentDef,
   type PropField,
   type PropertySection,
-} from '../../../entities/ui-node/model/componentDefinitions'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+  type UiNode,
+} from '../../../entities/ui-node'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { useStorage } from '@vueuse/core'
 
 /** Components with this many settings or more get a search box. */
 const SEARCH_MIN_SETTINGS = 8

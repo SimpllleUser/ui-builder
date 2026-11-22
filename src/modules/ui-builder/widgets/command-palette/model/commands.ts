@@ -1,15 +1,16 @@
-import { FieldKind, StepDirection } from '../entities/ui-node/model/enums'
-import { PanelSide } from './shell/panelSide'
 import {
+  FieldKind,
+  StepDirection,
   PALETTE_COMPONENTS,
   getComponentCategory,
   getComponentDef,
-} from '../entities/ui-node/model/componentDefinitions'
-import { TEXT_NODE_TYPE, ROOT_NODE_ID } from '../entities/ui-node/model/constants'
-import { describeFields } from '../entities/ui-node/model/propertyFields'
-import { TEMPLATES } from '../entities/ui-node/model/templateFactory'
-import type { useUiTreeStore } from '../entities/ui-node/model/store'
-import type { UiNode } from '../entities/ui-node/model/types'
+  TEXT_NODE_TYPE,
+  ROOT_NODE_ID,
+  describeFields,
+  TEMPLATES,
+  type useUiTreeStore,
+  type UiNode,
+} from '../../../entities/ui-node'
 
 type Store = ReturnType<typeof useUiTreeStore>
 
@@ -34,7 +35,8 @@ export interface CommandHost {
   exportProject(): void
   startTour(): void
   toggleFocus(): void
-  togglePanel(side: PanelSide): void
+  toggleLayersPanel(): void
+  toggleProperties(): void
   /** ⌘ on macOS, Ctrl elsewhere. */
   modifierKey: string
 }
@@ -247,7 +249,7 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
     group: 'Editor',
     icon: 'mdi-view-list-outline',
     keywords: 'layers components sidebar',
-    run: () => host.togglePanel(PanelSide.Left),
+    run: () => host.toggleLayersPanel(),
   })
   add({
     id: 'editor:properties',
@@ -255,7 +257,7 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
     group: 'Editor',
     icon: 'mdi-tune-variant',
     keywords: 'inspector right panel',
-    run: () => host.togglePanel(PanelSide.Right),
+    run: () => host.toggleProperties(),
   })
   add({
     id: 'editor:export',

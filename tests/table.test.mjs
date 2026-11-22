@@ -49,7 +49,9 @@ test('data table cell slots follow its columns and survive export', () => {
 })
 
 test('table columns and rows can be edited by the editor and through MCP', async () => {
-  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { executeMcpCommand } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/features/mcp-bridge/model/mcpCommands.ts',
+  )
   const { id } = executeMcpCommand(store, 'add_component', { type: 'VDataTable' })
   const added = executeMcpCommand(store, 'add_table_column', {
     id,

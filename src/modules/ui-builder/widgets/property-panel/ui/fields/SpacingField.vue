@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { SpacingType } from '../../../../entities/ui-node/model/enums'
+import { SpacingType, useUiTreeStore, type UiNode } from '../../../../entities/ui-node'
 import { computed } from 'vue'
-import { useUiTreeStore } from '../../../../entities/ui-node/model/store'
-import type { UiNode } from '../../../../entities/ui-node/model/types'
 import { useSpacingEditor } from '../../model/useSpacingEditor'
 
 /** Margin, and optionally padding, on each side of the element. */

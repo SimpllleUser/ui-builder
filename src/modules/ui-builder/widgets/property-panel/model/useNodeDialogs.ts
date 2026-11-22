@@ -1,8 +1,5 @@
 import { computed, ref, type ComputedRef } from 'vue'
-import { getNodeSlots } from '../../../entities/ui-node/model/componentDefinitions'
-import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
-import type { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { getNodeSlots, ROOT_NODE_ID, type useUiTreeStore, type UiNode } from '../../../entities/ui-node'
 import { canSavePrefabName, parseMoveDestination } from './propertyPanelUtils'
 
 type Store = ReturnType<typeof useUiTreeStore>

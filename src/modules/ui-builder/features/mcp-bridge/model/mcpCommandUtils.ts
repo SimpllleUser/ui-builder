@@ -1,5 +1,4 @@
-import type { useUiTreeStore } from '../entities/ui-node/model/store'
-import type { UiNode } from '../entities/ui-node/model/types'
+import { type useUiTreeStore, type UiNode } from '../../../entities/ui-node'
 
 export type Store = ReturnType<typeof useUiTreeStore>
 export type Args = Record<string, any>

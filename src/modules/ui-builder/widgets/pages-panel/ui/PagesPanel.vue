@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { useCheckedDrafts } from '../../../model/useCheckedDrafts'
-import { parseLiteral } from '../../../entities/ui-node/model/runtime'
-import { pagePathError, variableNameError } from '../../../entities/ui-node/model/projectMutations'
+import { useUiTreeStore, parseLiteral, pagePathError, variableNameError } from '../../../entities/ui-node'
+import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
 
 const store = useUiTreeStore()
 const open = ref(false)

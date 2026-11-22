@@ -2,6 +2,7 @@
 // MCP server for UI Builder. Talks MCP over stdio and relays commands to the editor open in the browser
 // through a local HTTP/SSE bridge (the document lives in the browser, not on disk).
 import http from 'node:http'
+import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -72,7 +73,36 @@ function call(command, args = {}) {
   })
 }
 
-const server = new McpServer({ name: 'ui-builder', version: '0.1.0' })
+const GUIDE_URL = new URL('./guide.md', import.meta.url)
+const GUIDE = readFileSync(GUIDE_URL, 'utf8')
+const server = new McpServer(
+  { name: 'ui-builder', version: '0.2.0' },
+  {
+    instructions:
+      'Edits the page open in the UI Builder editor. Read the ui-builder://guide resource first. Build with add_subtree or batch (one Undo step), style with set_style, then run check_project and try the page with preview_start and preview_click.',
+  },
+)
+server.registerResource(
+  'guide',
+  'ui-builder://guide',
+  { title: 'How to build pages with UI Builder', mimeType: 'text/markdown' },
+  async uri => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: GUIDE }] }),
+)
+server.registerPrompt(
+  'build_page',
+  { description: 'Build a page from a description, then check and try it.', argsSchema: { description: z.string() } },
+  ({ description }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Read the ui-builder://guide resource. Then build this in UI Builder: ${description}\nUse add_subtree or batch, finish with check_project (fix every error) and try the main flow with preview_start and preview_click.`,
+        },
+      },
+    ],
+  }),
+)
 const tool = (name, description, shape, command = name) =>
   server.registerTool(name, { description, inputSchema: shape }, async args => {
     try {
@@ -100,9 +130,11 @@ tool('add_component', 'Add a component to a container. Returns the new node id.'
   classes: z.array(z.string()).optional(),
   text: z.string().optional().describe('Text content for buttons, headings, columns, …'),
   style: z
-    .union([z.string(), z.record(z.string(), z.string())])
+    .union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()]))])
     .optional()
-    .describe('Inline style: CSS string or object'),
+    .describe(
+      'Inline style: CSS string or object. Numbers are px, theme colour names (primary…) work, values beat classes.',
+    ),
   attrs: z.record(z.string(), z.unknown()).optional().describe('Extra attributes/props merged into props'),
 })
 tool('update_node', 'Change a node. props are merged; a null prop value removes it; classes replaces all classes.', {
@@ -112,14 +144,21 @@ tool('update_node', 'Change a node. props are merged; a null prop value removes 
   classes: z.array(z.string()).optional(),
   text: z.string().optional().describe('Text content; added as a text child when the component has none (e.g. VCol)'),
   style: z
-    .union([z.string(), z.record(z.string(), z.string()), z.null()])
+    .union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()])
     .optional()
-    .describe('Inline style: CSS string, or object merged into the current style (null removes it)'),
+    .describe(
+      'Inline style: CSS string, or object merged into the current style (null removes it, or one property). Numbers are px, theme colour names work, values beat classes.',
+    ),
   attrs: z
     .record(z.string(), z.unknown())
     .optional()
     .describe('Extra attributes/props merged into props (null removes one), e.g. { "aria-label": "Close" }'),
 })
+tool(
+  'set_style',
+  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, and every value wins over utility classes. A property set to null is removed; style null clears all. Returns the resulting style.',
+  { id, style: z.union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()]) },
+)
 tool('delete_node', 'Delete a node and its subtree.', { id })
 tool('move_node', 'Move a node into another container.', { id, parentId: z.string(), slot })
 tool('duplicate_node', 'Duplicate a node next to the original.', { id })
@@ -180,6 +219,101 @@ tool('set_event', 'Set what a click does in preview, or null to clear.', {
     z.null(),
   ]),
 })
+
+const subtree = z.lazy(() =>
+  z.object({
+    type: z.string().describe('Component type, e.g. VCard, VBtn, div'),
+    name: z.string().optional(),
+    ref: z.string().optional().describe('Your name for this element; the answer maps it to its id'),
+    text: z.string().optional().describe('Text of a button, heading, column…'),
+    props: z.record(z.string(), z.unknown()).optional(),
+    classes: z.array(z.string()).optional(),
+    style: z.record(z.string(), z.union([z.string(), z.number(), z.null()])).optional(),
+    model: z.string().optional().describe('Variable linked to an input'),
+    vIf: z.string().optional(),
+    vFor: z.string().optional(),
+    click: z
+      .object({
+        type: z.enum(['navigate', 'set', 'toggle']),
+        to: z.string().optional(),
+        key: z.string().optional(),
+        value: z.string().optional(),
+      })
+      .optional(),
+    children: z.array(subtree).optional(),
+    slots: z.record(z.string(), z.array(subtree)).optional(),
+  }),
+)
+tool(
+  'add_subtree',
+  'Build a whole nested tree in one call (one Undo step; nothing is added if any element is invalid). Returns { id, refs } where refs maps each element ref to its node id. Prefer this to many add_component calls.',
+  { tree: subtree, parentId: z.string().optional().describe('Container id; defaults to the page root'), slot },
+)
+tool(
+  'batch',
+  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document.',
+  {
+    steps: z
+      .array(z.object({ tool: z.string(), args: z.record(z.string(), z.unknown()).optional() }))
+      .min(1)
+      .max(100),
+  },
+)
+tool(
+  'check_project',
+  'Find problems without running anything: unknown variables, links to missing pages, invalid conditions, empty tables, a layout without Page content, unused variables. Each issue names the page and node.',
+  {},
+)
+tool(
+  'get_status',
+  'Where the editor is: current page, variables, selection, whether Preview runs, undo/redo, counts of saved components and checkpoints. Cheap; use it to check the editor is connected.',
+  {},
+)
+tool(
+  'get_history',
+  'The named steps of the history (newest first, with index) and the checkpoints. Use before a risky change, or to see what was done.',
+  {},
+)
+tool(
+  'create_checkpoint',
+  'Save the whole project under a name so you can come back to it with restore_checkpoint. Do this before a big change.',
+  { name: z.string() },
+)
+tool(
+  'restore_checkpoint',
+  'Put the project back as it was at a checkpoint. This is one Undo step, so undo brings the current state back.',
+  { checkpointId: z.string() },
+)
+tool('delete_checkpoint', 'Delete a checkpoint.', { checkpointId: z.string() })
+tool('restore_version', 'Go back to a step of the history by its index (see get_history).', { index: z.number() })
+tool('list_saved_components', 'The elements saved in My components, with their ids.', {})
+tool('save_component', 'Save an element (with its children) in My components for reuse.', { id, name: z.string() })
+tool(
+  'insert_saved_component',
+  'Insert a saved component into a container (defaults to where the editor would insert).',
+  { prefabId: z.string(), parentId: z.string().optional(), slot },
+)
+tool('delete_saved_component', 'Delete a saved component.', { prefabId: z.string() })
+tool(
+  'wrap_nodes',
+  'Put sibling elements into a new container (for example VContainer, VRow, VCard, div). Returns the container id.',
+  { ids: z.array(z.string()).min(1), type: z.string() },
+)
+tool('unwrap_node', 'Replace a container by its children.', { id })
+tool(
+  'preview_start',
+  'Start Preview from the initial variable values and return what is shown: variables, texts, hidden elements, inputs and tables.',
+  {},
+)
+tool('preview_state', 'What Preview shows now: variables, texts, hidden elements, inputs, table rows.', {})
+tool('preview_click', 'Click an element in Preview. For a table with a row click action pass row (0-based).', {
+  id,
+  row: z.number().optional(),
+})
+tool('preview_input', 'Type into an input in Preview (sets the variable it is linked to).', { id, value: z.unknown() })
+tool('preview_navigate', 'Go to a page by route in Preview.', { path: z.string() })
+tool('preview_reset', 'Put every variable back to its starting value and return to the first page.', {})
+tool('preview_stop', 'Leave Preview and return to editing.', {})
 
 const columnKey = z.string().describe('Column key (the field name used in rows)')
 tool(

@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { FieldKind } from '../../../entities/ui-node/model/enums'
-import type { PropField } from '../../../entities/ui-node/model/componentDefinitions'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { FieldKind, type PropField, useUiTreeStore, type UiNode } from '../../../entities/ui-node'
 import FlexLayoutField from './fields/FlexLayoutField.vue'
 import IconPickerField from './fields/IconPickerField.vue'
 import JsonField from './fields/JsonField.vue'

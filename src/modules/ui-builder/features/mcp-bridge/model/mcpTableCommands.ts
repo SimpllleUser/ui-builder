@@ -1,6 +1,4 @@
-import { COMPONENT_DEFS, cellSlotName } from '../entities/ui-node/model/componentDefinitions'
-import { describeFields } from '../entities/ui-node/model/propertyFields'
-import { tableColumns, tableRows } from '../entities/ui-node/model/tableMutations'
+import { COMPONENT_DEFS, cellSlotName, describeFields, tableColumns, tableRows } from '../../../entities/ui-node'
 import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 const needTable = (store: Store, id: unknown) => {

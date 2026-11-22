@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import { useUiTreeStore } from '../../../entities/ui-node'
 import { TOUR_STEPS, stepAfterProgress } from '../model/tourSteps'
 
 /**
