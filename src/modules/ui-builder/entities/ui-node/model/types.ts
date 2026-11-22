@@ -1,20 +1,10 @@
-export type ComponentType =
-  | 'VBtn'
-  | 'VTextField'
-  | 'VCard'
-  | 'VCardTitle'
-  | 'VCardText'
-  | 'VList'
-  | 'VListItem'
-  | 'VRow'
-  | 'VCol'
-  | 'div'
-  | 'VIcon'
-  | 'VImg'
+import type { ActionType } from './enums'
 
 /** What happens when an element is clicked in preview. `set` values are parsed as JSON, falling back to text. */
 export type UiAction =
-  { type: 'navigate'; to: string } | { type: 'set'; key: string; value: string } | { type: 'toggle'; key: string }
+  | { type: ActionType.Navigate; to: string }
+  | { type: ActionType.Set; key: string; value: string }
+  | { type: ActionType.Toggle; key: string }
 
 export interface UiNodeEvents {
   click?: UiAction
@@ -22,7 +12,8 @@ export interface UiNodeEvents {
 
 export interface UiNode {
   id: string
-  type: ComponentType | string
+  /** The component's name, such as `VBtn`, `VCard` or `div`. */
+  type: string
   name: string
   props: Record<string, unknown>
   classes: string[]

@@ -1,3 +1,4 @@
+import { ActionType } from './enums'
 import type { UiAction } from './types'
 
 /** Variables visible to bindings: project state plus `item`/`index` inside a repeated element. */
@@ -57,9 +58,17 @@ const COMPARISONS: Record<string, (a: unknown, b: unknown) => boolean> = {
  * Supports `key`, `!key`, and comparisons `key == value`, `!=`, `>=`, `<=`, `>`, `<` (numeric for the last four).
  * Paths may be dotted (`selected.step >= 2`). An empty or invalid condition shows the element.
  */
+const CONDITION = /^\s*(!)?\s*([A-Za-z_$][\w$.[\]]*)\s*(?:(==|!=|>=|<=|>|<)\s*(.+?))?\s*$/
+
+/** Why a condition cannot be used, or null when it is fine (or empty). */
+export function conditionError(expression: string | undefined): string | null {
+  if (!expression?.trim() || CONDITION.test(expression)) return null
+  return 'Write a variable name, !name, or a comparison such as name == value or count >= 2.'
+}
+
 export function evaluateCondition(expression: string | undefined, scope: Scope): boolean {
   if (!expression?.trim()) return true
-  const match = /^\s*(!)?\s*([A-Za-z_$][\w$.[\]]*)\s*(?:(==|!=|>=|<=|>|<)\s*(.+?))?\s*$/.exec(expression)
+  const match = CONDITION.exec(expression)
   if (!match) return true
   const [, negate, path, operator, literal] = match
   const value = resolvePath(path, scope)
@@ -102,12 +111,13 @@ export interface RuntimeHost {
 }
 
 /** An action whose `{{ }}` values were filled in. A `set` value that was a single binding keeps its type (e.g. a whole row). */
-export type BoundAction = Exclude<UiAction, { type: 'set' }> | { type: 'set'; key: string; value: unknown }
+export type BoundAction =
+  Exclude<UiAction, { type: ActionType.Set }> | { type: ActionType.Set; key: string; value: unknown }
 
 /** Fills `{{ item.id }}`-style values of an action from the scope it was triggered in (e.g. a table row). */
 export function bindAction(action: UiAction, scope: Scope): BoundAction {
-  if (action.type === 'navigate') return { ...action, to: String(interpolate(action.to, scope) ?? '') }
-  if (action.type === 'set') {
+  if (action.type === ActionType.Navigate) return { ...action, to: String(interpolate(action.to, scope) ?? '') }
+  if (action.type === ActionType.Set) {
     const value = interpolate(action.value, scope)
     // Copy objects so the saved selection does not change with the table it came from.
     return { ...action, value: value !== null && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value }
@@ -117,8 +127,8 @@ export function bindAction(action: UiAction, scope: Scope): BoundAction {
 
 export function runAction(action: UiAction | BoundAction | undefined, host: RuntimeHost) {
   if (!action) return
-  if (action.type === 'navigate') host.navigate(action.to)
-  else if (action.type === 'set' && action.key) {
+  if (action.type === ActionType.Navigate) host.navigate(action.to)
+  else if (action.type === ActionType.Set && action.key) {
     host.state[action.key] = typeof action.value === 'string' ? parseLiteral(action.value) : action.value
-  } else if (action.type === 'toggle' && action.key) host.state[action.key] = !host.state[action.key]
+  } else if (action.type === ActionType.Toggle && action.key) host.state[action.key] = !host.state[action.key]
 }

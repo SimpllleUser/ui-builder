@@ -1,6 +1,6 @@
 import { COMPONENT_DEFS } from '../entities/ui-node/model/componentDefinitions'
 import { TEXT_NODE_TYPE } from '../entities/ui-node/model/constants'
-import type { TemplateKind } from '../entities/ui-node/model/templateFactory'
+import type { TemplateKind } from '../entities/ui-node/model/enums'
 import type { UiNode } from '../entities/ui-node/model/types'
 import { need, ok, summarize, type Args, type McpCommand, type Store } from './mcpCommandUtils'
 import { MCP_PAGE_COMMANDS, pageSummary } from './mcpPageCommands'

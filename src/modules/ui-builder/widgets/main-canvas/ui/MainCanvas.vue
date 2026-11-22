@@ -3,6 +3,9 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import { TEMPLATES } from '../../../entities/ui-node/model/templateFactory'
+import HoverBadge from './HoverBadge.vue'
+import SelectionToolbar from './SelectionToolbar.vue'
 import NodeRenderer, { canvasDragTargetId } from '../../../entities/ui-node/ui/NodeRenderer'
 const emit = defineEmits<{ 'open-components': [] }>()
 const store = useUiTreeStore()
@@ -14,6 +17,12 @@ const previewTarget = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLElement>()
 const empty = computed(
   () => !rootNode.value.children.length && !Object.values(rootNode.value.slots).some(nodes => nodes.length),
+)
+const variables = computed(() =>
+  Object.entries(store.runtimeState).map(([name, value]) => ({
+    name,
+    value: (typeof value === 'string' ? JSON.stringify(value) : (JSON.stringify(value) ?? 'undefined')).slice(0, 80),
+  })),
 )
 const pageItems = computed(() => store.pages.map(page => ({ title: page.name, subtitle: page.path, value: page.id })))
 const devices = [
@@ -61,16 +70,58 @@ const leaveCanvas = (event: DragEvent) => {
         {{ isPreviewMode ? 'Preview' : selectedNodeIds.length ? `${selectedNodeIds.length} selected` : 'Canvas' }}
       </div>
       <template v-if="isPreviewMode">
-        <VSelect
-          v-if="store.pages.length > 1"
-          v-model="store.previewPageId"
-          :items="pageItems"
-          label="Page"
-          variant="outlined"
-          density="compact"
-          hide-details
-          class="viewport-select"
-        />
+        <!-- Where the preview is now, like a browser's address bar; click to jump to another page. -->
+        <VMenu location="bottom start">
+          <template #activator="{ props: menu }">
+            <VBtn
+              v-bind="menu"
+              class="route-pill"
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-web"
+              append-icon="mdi-menu-down"
+              :aria-label="`Preview is on ${store.previewPage.name}, route ${store.previewPage.path}. Choose another page`"
+            >
+              <span class="route-pill__path">{{ store.previewPage.path }}</span>
+            </VBtn>
+          </template>
+          <VList density="compact" aria-label="Pages">
+            <VListItem
+              v-for="item in pageItems"
+              :key="item.value"
+              :title="item.title"
+              :subtitle="item.subtitle"
+              :active="item.value === store.previewPage.id"
+              @click="store.previewPageId = item.value"
+            />
+          </VList>
+        </VMenu>
+        <!-- What the variables are right now, to see why something does or does not show. -->
+        <VMenu v-if="variables.length" location="bottom start" :close-on-content-click="false">
+          <template #activator="{ props: menu }">
+            <VBtn v-bind="menu" size="small" variant="text" prepend-icon="mdi-variable">
+              {{ variables.length }} {{ variables.length === 1 ? 'variable' : 'variables' }}
+            </VBtn>
+          </template>
+          <VCard min-width="240" class="pa-3">
+            <div class="text-overline mb-1">Current values</div>
+            <dl class="variable-list">
+              <template v-for="variable in variables" :key="variable.name">
+                <dt>{{ variable.name }}</dt>
+                <dd>{{ variable.value }}</dd>
+              </template>
+            </dl>
+          </VCard>
+        </VMenu>
+        <VBtn
+          size="small"
+          variant="text"
+          prepend-icon="mdi-restore"
+          title="Set every variable back to its starting value and return to the first page"
+          @click="store.resetPreview()"
+        >
+          Reset
+        </VBtn>
         <VSelect
           v-model="viewport"
           :items="devices"
@@ -116,6 +167,7 @@ const leaveCanvas = (event: DragEvent) => {
           size="small"
           :variant="isPreviewMode ? 'flat' : 'tonal'"
           color="primary"
+          data-tour="preview"
           @click="isPreviewMode = !isPreviewMode"
         >
           {{ isPreviewMode ? 'Back to editor' : 'Preview' }}
@@ -139,7 +191,14 @@ const leaveCanvas = (event: DragEvent) => {
         </div>
       </Teleport>
     </div>
-    <div v-else ref="canvas" class="main-canvas-wrapper" @click="store.selectNode(null)" @dragleave="leaveCanvas">
+    <div
+      v-else
+      ref="canvas"
+      class="main-canvas-wrapper"
+      data-tour="canvas"
+      @click="store.selectNode(null)"
+      @dragleave="leaveCanvas"
+    >
       <div v-if="empty" class="canvas-empty" @click.stop>
         <VIcon icon="mdi-view-dashboard-outline" size="40" color="primary" />
         <h1>Build your first page</h1>
@@ -147,19 +206,16 @@ const leaveCanvas = (event: DragEvent) => {
         <VBtn color="primary" prepend-icon="mdi-plus" class="my-4" @click="emit('open-components')"
           >Browse components</VBtn
         >
-        <div class="template-grid">
-          <button @click="store.addTemplate('card')">
-            <VIcon icon="mdi-card-outline" /><strong>Card</strong><span>Title, text and action</span>
-          </button>
-          <button @click="store.addTemplate('form')">
-            <VIcon icon="mdi-form-textbox" /><strong>Contact form</strong><span>Fields and submit button</span>
-          </button>
-          <button @click="store.addTemplate('columns')">
-            <VIcon icon="mdi-view-column-outline" /><strong>Two columns</strong><span>Responsive layout</span>
+        <div class="template-grid" data-tour="start">
+          <button v-for="template in TEMPLATES" :key="template.kind" @click="store.addTemplate(template.kind)">
+            <VIcon :icon="template.icon" /><strong>{{ template.label }}</strong
+            ><span>{{ template.description }}</span>
           </button>
         </div>
       </div>
       <NodeRenderer :node="rootNode" />
+      <HoverBadge :container="canvas" />
+      <SelectionToolbar :container="canvas" />
       <p v-if="empty" class="drop-hint">Drop components in the outlined area above.</p>
     </div>
   </div>
@@ -199,6 +255,33 @@ const leaveCanvas = (event: DragEvent) => {
 .zoom-select {
   flex: 0 1 120px !important;
   min-width: 110px;
+}
+.main-canvas-wrapper {
+  position: relative;
+}
+.route-pill {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.route-pill__path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.variable-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+.variable-list dt {
+  font-weight: 600;
+}
+.variable-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.85;
 }
 .main-canvas-wrapper,
 .preview-workspace {

@@ -1,13 +1,33 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useStorage } from '@vueuse/core'
 import {
   COMPONENT_CATEGORY_ORDER,
   getComponentCategory,
   PALETTE_COMPONENTS,
+  getComponentDef,
 } from '../../../entities/ui-node/model/componentDefinitions'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import PaletteItem from './PaletteItem.vue'
+import { quickSections } from '../model/quickSections'
 const store = useUiTreeStore()
 const search = ref('')
+const favorites = useStorage<string[]>('ui-builder:favorite-components', [])
+// "All components" stays folded until asked for, so the first screen is short.
+const showAll = useStorage('ui-builder:palette-show-all', false)
+const searching = computed(() => !!search.value?.trim())
+const available = new Set(PALETTE_COMPONENTS.map(component => component.type))
+const quick = computed(() =>
+  quickSections(favorites.value, store.recentComponentTypes, available).map(section => ({
+    ...section,
+    items: section.types.map(type => getComponentDef(type)!),
+  })),
+)
+const toggleFavorite = (type: string) => {
+  favorites.value = favorites.value.includes(type)
+    ? favorites.value.filter(item => item !== type)
+    : [...favorites.value, type]
+}
 const components = computed(() =>
   PALETTE_COMPONENTS.filter(c => c.label.toLowerCase().includes((search.value ?? '').toLowerCase())),
 )
@@ -41,25 +61,55 @@ const onDragStart = (e: DragEvent, type: string) => {
       <p class="insertion-hint" aria-live="polite">
         Add to <strong>{{ store.insertionTarget.name }}</strong>. Choose a component or drag it onto the canvas.
       </p>
-      <div class="palette-groups" :aria-label="`Components, ${components.length} available`">
+      <!-- The few things most people reach for, before the full library. -->
+      <template v-if="!searching">
+        <section v-for="section in quick" :key="section.id" class="palette-group" :aria-label="section.title">
+          <h3 class="palette-group__title">{{ section.title }}</h3>
+          <div class="palette-grid" role="list" :aria-label="`${section.title} components`">
+            <PaletteItem
+              v-for="comp in section.items"
+              :key="comp.type"
+              :component="comp"
+              :favorite="favorites.includes(comp.type)"
+              :target="store.insertionTarget.name"
+              @add="store.addComponent(comp.type)"
+              @toggle-favorite="toggleFavorite(comp.type)"
+              @dragstart="onDragStart($event, comp.type)"
+            />
+          </div>
+        </section>
+        <button
+          type="button"
+          class="palette-all-toggle"
+          :aria-expanded="showAll"
+          aria-controls="palette-all"
+          @click="showAll = !showAll"
+        >
+          <VIcon :icon="showAll ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" aria-hidden="true" />
+          All components <span>{{ PALETTE_COMPONENTS.length }}</span>
+        </button>
+      </template>
+      <div
+        v-show="searching || showAll"
+        id="palette-all"
+        class="palette-groups"
+        :aria-label="`Components, ${components.length} available`"
+      >
         <section v-for="group in componentGroups" :key="group.label" class="palette-group" :aria-label="group.label">
           <h3 class="palette-group__title">
             {{ group.label }} <span>{{ group.items.length }}</span>
           </h3>
           <div class="palette-grid" role="list" :aria-label="`${group.label} components`">
-            <div v-for="comp in group.items" :key="comp.type" role="listitem">
-              <button
-                type="button"
-                class="palette-item"
-                draggable="true"
-                :aria-label="`Add ${comp.label} to ${store.insertionTarget.name}`"
-                :title="`Add ${comp.label} to ${store.insertionTarget.name}`"
-                @click="store.addComponent(comp.type)"
-                @dragstart="onDragStart($event, comp.type)"
-              >
-                <VIcon :icon="comp.treeIcon" size="20" aria-hidden="true" /><span>{{ comp.label }}</span>
-              </button>
-            </div>
+            <PaletteItem
+              v-for="comp in group.items"
+              :key="comp.type"
+              :component="comp"
+              :favorite="favorites.includes(comp.type)"
+              :target="store.insertionTarget.name"
+              @add="store.addComponent(comp.type)"
+              @toggle-favorite="toggleFavorite(comp.type)"
+              @dragstart="onDragStart($event, comp.type)"
+            />
           </div>
         </section>
       </div>
@@ -138,33 +188,23 @@ const onDragStart = (e: DragEvent, type: string) => {
   align-content: start;
   gap: 8px;
 }
-.palette-item {
+.palette-all-toggle {
   display: flex;
-  width: 100%;
-  min-height: 64px;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 7px 5px;
-  gap: 5px;
-  border: 1px solid rgba(var(--v-border-color), 0.2);
-  border-radius: 8px;
-  background: rgb(var(--v-theme-surface));
-  cursor: grab;
-}
-.palette-item:hover {
-  border-color: rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), 0.07);
-}
-.palette-item:active {
-  cursor: grabbing;
-}
-.palette-item span {
-  max-width: 100%;
+  gap: 4px;
+  width: 100%;
+  margin: 12px 0 8px;
+  padding: 4px 0;
+  color: rgb(var(--v-theme-primary));
   font-size: 12px;
-  line-height: 1.3;
-  text-align: center;
-  overflow-wrap: anywhere;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.palette-all-toggle span {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.6;
 }
 @container (min-width: 360px) {
   .palette-grid {

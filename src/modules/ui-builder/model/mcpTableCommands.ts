@@ -1,26 +1,7 @@
-import { COMPONENT_DEFS, cellSlotName, type PropField } from '../entities/ui-node/model/componentDefinitions'
+import { COMPONENT_DEFS, cellSlotName } from '../entities/ui-node/model/componentDefinitions'
+import { describeFields } from '../entities/ui-node/model/propertyFields'
 import { tableColumns, tableRows } from '../entities/ui-node/model/tableMutations'
 import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
-
-/** Settings of a component as an AI client needs them: prop name, kind and allowed values. */
-function describeFields(type: string) {
-  const fields: Array<{ prop: string; kind: string; label: string; options?: string[]; min?: number; max?: number }> =
-    []
-  for (const section of COMPONENT_DEFS[type]?.propertySections ?? []) {
-    for (const field of section.fields as PropField[]) {
-      if ('prop' in field) {
-        fields.push({
-          prop: field.prop,
-          kind: field.kind,
-          label: field.label,
-          ...('options' in field ? { options: field.options } : {}),
-          ...('min' in field ? { min: field.min, max: field.max } : {}),
-        })
-      }
-    }
-  }
-  return fields
-}
 
 const needTable = (store: Store, id: unknown) => {
   const node = need(store, id)

@@ -1,3 +1,4 @@
+import { StepDirection } from '../entities/ui-node/model/enums'
 import type { UiAction } from '../entities/ui-node/model/types'
 import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
@@ -36,7 +37,10 @@ export const MCP_PAGE_COMMANDS: Record<string, McpCommand> = {
     return { id: copy!.id, path: copy!.path }
   },
   move_page(store, a) {
-    ok(store.movePage(needPage(store, a.id).id, a.direction === 'left' ? -1 : 1), 'Page cannot move further')
+    ok(
+      store.movePage(needPage(store, a.id).id, a.direction === 'left' ? StepDirection.Back : StepDirection.Forward),
+      'Page cannot move further',
+    )
     return { pages: pageSummary(store) }
   },
   select_page(store, a) {

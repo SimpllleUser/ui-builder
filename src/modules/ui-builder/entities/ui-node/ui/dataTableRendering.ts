@@ -2,7 +2,7 @@ import { h, type VNode } from 'vue'
 import { VChip } from 'vuetify/components'
 import { cellSlotName } from '../model/componentDefinitions'
 
-type CellSlot = (cell: { item: unknown; value: unknown; index: number }) => VNode | VNode[]
+type CellSlot = (cell: { item: unknown; value: unknown; index: number }) => VNode[]
 
 const STATUS_COLORS: Record<string, string> = {
   paid: 'success',
@@ -30,8 +30,9 @@ export function statusChipSlots(headers: unknown): Record<string, CellSlot> {
       .filter((header): header is { key: string; chip: true } => !!header?.chip && typeof header.key === 'string')
       .map(header => [
         cellSlotName(header.key),
-        ({ value }: { value: unknown }) =>
+        ({ value }: { value: unknown }) => [
           h(VChip, { size: 'small', variant: 'tonal', color: statusColor(value) }, () => String(value ?? '')),
+        ],
       ]),
   )
 }

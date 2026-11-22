@@ -1,4 +1,5 @@
 import { CELL_SLOT_PREFIX, getComponentDef, getNodeSlots } from './componentDefinitions'
+import { ActionType } from './enums'
 import { DOCUMENT_VERSION, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_NODES, MAX_PAGES, ROOT_NODE_ID } from './constants'
 import type { Page, Project, UiNode, UiNodeEvents } from './types'
 
@@ -7,7 +8,7 @@ export function validateProject(value: unknown): Project {
   // v1: a single page tree under `root`.
   if (value.version === 1) {
     return {
-      pages: [{ id: 'page-home', name: 'Home', path: '/', root: validateTree(value.root) }],
+      pages: [{ id: 'page-home', name: 'Home', path: '/', root: { ...validateTree(value.root), name: 'Home' } }],
       layout: null,
       state: {},
     }
@@ -31,7 +32,8 @@ export function validateProject(value: unknown): Project {
       throw new Error('Invalid page in document.')
     pageIds.add(page.id)
     paths.add(page.path)
-    return { id: page.id, name: page.name, path: page.path, root: validateTree(page.root) }
+    // A page's root is shown under the page's own name.
+    return { id: page.id, name: page.name, path: page.path, root: { ...validateTree(page.root), name: page.name } }
   })
   if (state !== undefined && !isRecord(state)) throw new Error('Invalid state in document.')
   return {
@@ -115,9 +117,9 @@ function validateLogic({ model, vIf, vFor, events }: Record<string, unknown>) {
     Object.keys(events).every(key => key === 'click') &&
     (click === undefined ||
       (isRecord(click) &&
-        ((click.type === 'navigate' && typeof click.to === 'string') ||
-          (click.type === 'set' && typeof click.key === 'string' && typeof click.value === 'string') ||
-          (click.type === 'toggle' && typeof click.key === 'string'))))
+        ((click.type === ActionType.Navigate && typeof click.to === 'string') ||
+          (click.type === ActionType.Set && typeof click.key === 'string' && typeof click.value === 'string') ||
+          (click.type === ActionType.Toggle && typeof click.key === 'string'))))
   if (!valid) throw new Error('Invalid event in document.')
 }
 

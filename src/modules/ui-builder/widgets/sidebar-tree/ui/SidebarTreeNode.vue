@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { StepDirection } from '../../../entities/ui-node/model/enums'
 import { computed, ref, watch, nextTick, inject, type Ref } from 'vue'
 import draggable from 'vuedraggable'
 import type { UiNode } from '../../../entities/ui-node/model/types'
@@ -24,6 +25,15 @@ const slots = computed(() =>
     s => s.name !== 'default' && (props.node.id !== ROOT_NODE_ID || props.node.slots[s.name]?.length),
   ),
 )
+// Named areas (slots) that are still empty are offered from the actions menu instead of cluttering the tree.
+// A data table's cell content is added from its Content settings.
+const hasEmptySlots = computed(
+  () => props.node.type !== 'VDataTable' && slots.value.some(slot => !props.node.slots[slot.name]?.length),
+)
+const showSlots = () => {
+  expanded.value = true
+  showEmptySlots.value = true
+}
 const visibleSlots = computed(() => slots.value.filter(s => showEmptySlots.value || props.node.slots[s.name]?.length))
 const canMove = (event: { draggedContext: { element: UiNode }; to: HTMLElement }) => {
   const parent = store.findNodeById(event.to.dataset.parentId ?? '')
@@ -49,15 +59,16 @@ watch(
     }
   },
 )
+const label = computed(() => store.nodeLabel(props.node))
 const rename = async () => {
-  draftName.value = props.node.name
+  draftName.value = label.value
   renaming.value = true
   await nextTick()
   renameInput.value?.focus()
   renameInput.value?.select()
 }
 const cancelRename = () => {
-  draftName.value = props.node.name
+  draftName.value = label.value
   renaming.value = false
 }
 const finishRename = () => {
@@ -98,7 +109,7 @@ const keydown = (e: KeyboardEvent) => {
       role="treeitem"
       :id="`treeitem-${node.id}`"
       :data-tree-id="node.id"
-      :aria-label="`${node.name}, ${componentLabel}`"
+      :aria-label="`${label}, ${componentLabel}`"
       :aria-selected="selected"
       :aria-level="depth + 1"
       :aria-expanded="hasContent ? expanded : undefined"
@@ -117,7 +128,7 @@ const keydown = (e: KeyboardEvent) => {
       <button
         v-if="hasContent"
         class="tree-btn"
-        :aria-label="`${expanded ? 'Collapse' : 'Expand'} ${node.name}`"
+        :aria-label="`${expanded ? 'Collapse' : 'Expand'} ${label}`"
         @click.stop="expanded = !expanded"
       >
         <VIcon :icon="expanded ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" />
@@ -138,11 +149,11 @@ const keydown = (e: KeyboardEvent) => {
         @keydown.esc.stop="cancelRename"
         @blur="finishRename"
       />
-      <span v-else class="node-label" :title="node.name">{{ node.name }}</span>
+      <span v-else class="node-label" :title="label">{{ label }}</span>
       <span class="node-actions" @click.stop @dblclick.stop>
         <VMenu v-if="store.canContain(node)">
           <template #activator="{ props: menuProps }"
-            ><button v-bind="menuProps" class="tree-btn" :aria-label="`Add inside ${node.name}`">
+            ><button v-bind="menuProps" class="tree-btn" :aria-label="`Add inside ${label}`">
               <VIcon icon="mdi-plus" size="18" /></button
           ></template>
           <VList density="compact"
@@ -155,23 +166,29 @@ const keydown = (e: KeyboardEvent) => {
         </VMenu>
         <VMenu>
           <template #activator="{ props: menuProps }"
-            ><button v-bind="menuProps" class="tree-btn" :aria-label="`Actions for ${node.name}`">
+            ><button v-bind="menuProps" class="tree-btn" :aria-label="`Actions for ${label}`">
               <VIcon icon="mdi-dots-horizontal" size="18" /></button
           ></template>
           <VList density="compact">
             <VListItem title="Rename" prepend-icon="mdi-pencil" @click="rename" />
+            <VListItem
+              v-if="hasEmptySlots && !showEmptySlots"
+              title="Add to named areas (slots)…"
+              prepend-icon="mdi-view-dashboard-edit-outline"
+              @click="showSlots"
+            />
             <template v-if="node.id !== ROOT_NODE_ID">
               <VListItem
                 title="Move up"
-                :disabled="!store.canReorder(node.id, -1)"
+                :disabled="!store.canReorder(node.id, StepDirection.Back)"
                 prepend-icon="mdi-arrow-up"
-                @click="store.reorderNode(node.id, -1)"
+                @click="store.reorderNode(node.id, StepDirection.Back)"
               />
               <VListItem
                 title="Move down"
-                :disabled="!store.canReorder(node.id, 1)"
+                :disabled="!store.canReorder(node.id, StepDirection.Forward)"
                 prepend-icon="mdi-arrow-down"
-                @click="store.reorderNode(node.id, 1)"
+                @click="store.reorderNode(node.id, StepDirection.Forward)"
               />
               <VListItem title="Duplicate" prepend-icon="mdi-content-copy" @click="store.duplicateNode(node.id)" />
               <VListItem title="Delete" prepend-icon="mdi-delete-outline" @click="store.deleteNode(node.id)" />
@@ -201,20 +218,20 @@ const keydown = (e: KeyboardEvent) => {
         <template #item="{ element }"><SidebarTreeNode :node="element" :depth="depth + 1" /></template>
       </draggable>
       <button
-        v-if="slots.some(s => !node.slots[s.name]?.length)"
+        v-if="showEmptySlots"
         class="slots-toggle"
         :style="{ marginLeft: `${depth * 12 + 24}px` }"
         :aria-expanded="showEmptySlots"
         @click="showEmptySlots = !showEmptySlots"
       >
-        {{ showEmptySlots ? 'Hide empty slots' : 'Add slot content…' }}
+        Hide empty areas
       </button>
       <div v-for="slot in visibleSlots" :key="slot.name">
         <div class="slot-row" :style="{ paddingLeft: `${depth * 12 + 28}px` }">
           <span>{{ slot.label }}</span>
           <VMenu
             ><template #activator="{ props: menuProps }"
-              ><button v-bind="menuProps" class="tree-btn" :aria-label="`Add to ${node.name}, ${slot.label}`">
+              ><button v-bind="menuProps" class="tree-btn" :aria-label="`Add to ${label}, ${slot.label}`">
                 <VIcon icon="mdi-plus" size="18" /></button
             ></template>
             <VList density="compact"

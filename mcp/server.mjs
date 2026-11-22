@@ -123,7 +123,11 @@ tool('update_node', 'Change a node. props are merged; a null prop value removes 
 tool('delete_node', 'Delete a node and its subtree.', { id })
 tool('move_node', 'Move a node into another container.', { id, parentId: z.string(), slot })
 tool('duplicate_node', 'Duplicate a node next to the original.', { id })
-tool('add_template', 'Insert a starter template.', { kind: z.enum(['card', 'form', 'columns']) })
+tool(
+  'add_template',
+  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn).',
+  { kind: z.enum(['card', 'form', 'columns', 'dashboard', 'table', 'login']) },
+)
 tool('select_node', 'Select a node in the editor (omit id to clear).', { id: z.string().optional() })
 tool('undo', 'Undo the last change.', {})
 tool('redo', 'Redo the last undone change.', {})

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { PageDialogMode } from '../model/pageDialogMode'
+import { StepDirection } from '../../../entities/ui-node/model/enums'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
+import { pagePathError } from '../../../entities/ui-node/model/projectMutations'
 
 const LAYOUT_TAB = 'layout'
 
@@ -40,7 +43,7 @@ const onKeydown = (event: KeyboardEvent) => {
 }
 
 // ─── Add / edit page dialog ──────────────────────────────────────────────────
-const dialog = ref<{ mode: 'add' | 'edit'; id?: string } | null>(null)
+const dialog = ref<{ mode: PageDialogMode; id?: string } | null>(null)
 const draftName = ref('')
 const draftPath = ref('')
 const open = computed({
@@ -53,22 +56,30 @@ const open = computed({
 const openAdd = () => {
   draftName.value = ''
   draftPath.value = ''
-  dialog.value = { mode: 'add' }
+  dialog.value = { mode: PageDialogMode.Add }
 }
 const openEdit = () => {
   draftName.value = store.activePage.name
   draftPath.value = store.activePage.path
-  dialog.value = { mode: 'edit', id: store.activePage.id }
+  dialog.value = { mode: PageDialogMode.Edit, id: store.activePage.id }
 }
+// The command palette opens these dialogs.
+defineExpose({ openAdd, openEdit })
 const editPage = (id: string) => {
   store.selectPage(id)
   openEdit()
 }
+// The route is checked while typing, so the problem shows next to the field instead of in a message that fades.
+const routeError = computed(() => {
+  const path = draftPath.value.trim()
+  if (!path) return dialog.value?.mode === PageDialogMode.Edit ? 'Enter a route.' : null
+  return pagePathError(store.pages, path, dialog.value?.id)
+})
 const submit = () => {
   const current = dialog.value
-  if (!current || !draftName.value.trim()) return
+  if (!current || !draftName.value.trim() || routeError.value) return
   const done =
-    current.mode === 'add'
+    current.mode === PageDialogMode.Add
       ? !!store.addPage(draftName.value, draftPath.value || undefined)
       : store.updatePage(current.id!, { name: draftName.value, path: draftPath.value })
   if (done) dialog.value = null
@@ -132,13 +143,13 @@ const submit = () => {
           prepend-icon="mdi-arrow-left"
           title="Move left"
           :disabled="activeIndex < 1"
-          @click="store.movePage(store.activePage.id, -1)"
+          @click="store.movePage(store.activePage.id, StepDirection.Back)"
         />
         <VListItem
           prepend-icon="mdi-arrow-right"
           title="Move right"
           :disabled="activeIndex >= store.pages.length - 1"
-          @click="store.movePage(store.activePage.id, 1)"
+          @click="store.movePage(store.activePage.id, StepDirection.Forward)"
         />
         <VDivider />
         <VListItem
@@ -158,24 +169,25 @@ const submit = () => {
     </VMenu>
 
     <VDialog v-model="open" max-width="420">
-      <VCard :title="dialog?.mode === 'add' ? 'New page' : 'Page settings'">
+      <VCard :title="dialog?.mode === PageDialogMode.Add ? 'New page' : 'Page settings'">
         <form @submit.prevent="submit">
           <VCardText class="d-flex flex-column ga-3">
             <VTextField v-model="draftName" label="Name" variant="outlined" density="compact" autofocus hide-details />
             <VTextField
               v-model="draftPath"
               label="Route"
-              :placeholder="dialog?.mode === 'add' ? 'Created from the name, e.g. /orders' : '/orders'"
+              :placeholder="dialog?.mode === PageDialogMode.Add ? 'Created from the name, e.g. /orders' : '/orders'"
+              :error-messages="routeError ?? []"
               variant="outlined"
               density="compact"
-              hide-details
+              hide-details="auto"
             />
           </VCardText>
           <VCardActions>
             <VSpacer />
             <VBtn @click="dialog = null">Cancel</VBtn>
-            <VBtn type="submit" color="primary" variant="flat" :disabled="!draftName.trim()">
-              {{ dialog?.mode === 'add' ? 'Add page' : 'Save' }}
+            <VBtn type="submit" color="primary" variant="flat" :disabled="!draftName.trim() || !!routeError">
+              {{ dialog?.mode === PageDialogMode.Add ? 'Add page' : 'Save' }}
             </VBtn>
           </VCardActions>
         </form>

@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { AppView } from './appView'
 import { ref, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
 import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
 const LegacyBuilder = defineAsyncComponent(() => import('./features/ui-builder/ui/UiBuilder.vue'))
-const view = ref<'current' | 'legacy'>('current')
+// The previous editor is no longer offered in the menus. It stays reachable at /?classic for anyone who still needs it.
+const view = ref<AppView>(new URLSearchParams(window.location.search).has('classic') ? AppView.Legacy : AppView.Current)
+const leaveClassic = () => {
+  view.value = AppView.Current
+  window.history.replaceState(null, '', window.location.pathname)
+}
 const store = useUiTreeStore()
 let disconnectMcp = () => {}
 onMounted(async () => {
@@ -16,23 +22,13 @@ onBeforeUnmount(() => disconnectMcp())
 
 <template>
   <VApp>
-    <VToolbar v-if="!store.isPreviewMode" height="56" class="app-header" title="UI Builder">
+    <!-- The current editor has its own toolbar; this header only exists to get back from the Classic editor. -->
+    <VToolbar v-if="view === AppView.Legacy" height="56" class="app-header" title="UI Builder — Classic">
       <template #append>
-        <VBtn v-if="view === 'legacy'" prepend-icon="mdi-arrow-left" @click="view = 'current'">Back to editor</VBtn>
-        <VMenu v-else>
-          <template #activator="{ props }"
-            ><VBtn v-bind="props" icon="mdi-dots-horizontal" aria-label="More options" title="More options"
-          /></template>
-          <VList
-            ><VListItem
-              title="Classic — previous version"
-              subtitle="Separate workspace; changes are not shared"
-              @click="view = 'legacy'"
-          /></VList>
-        </VMenu>
+        <VBtn prepend-icon="mdi-arrow-left" @click="leaveClassic">Back to editor</VBtn>
       </template>
     </VToolbar>
-    <BuilderApp v-if="view === 'current'" />
+    <BuilderApp v-if="view === AppView.Current" />
     <div v-else class="legacy-workspace pa-4">
       <VAlert type="info" variant="tonal" class="mb-4"
         >Classic is the previous editor. Its document is separate and is not saved automatically.</VAlert
@@ -54,6 +50,14 @@ html {
 .app-header {
   flex: 0 0 auto !important;
   border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .legacy-workspace {
   flex: 1;

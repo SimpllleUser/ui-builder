@@ -2,8 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch, onScopeDispose } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { getComponentDef, getNodeSlots } from './componentDefinitions'
-import { HISTORY_COMMIT_DELAY_MS, MAX_CHECKPOINTS, MAX_HISTORY_ENTRIES, TEXT_NODE_TYPE } from './constants'
+import {
+  HISTORY_COMMIT_DELAY_MS,
+  MAX_CHECKPOINTS,
+  MAX_HISTORY_ENTRIES,
+  MAX_RECENT_COMPONENTS,
+  ROOT_NODE_ID,
+  TEXT_NODE_TYPE,
+} from './constants'
 import { DOCUMENT_KEY, emptyProject, parseProject, serializeProject } from './document'
+import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
 import { usePreviewRuntime } from './previewRuntime'
@@ -50,7 +58,8 @@ import {
   savePrefab as savePrefabMutation,
   type PrefabMutationContext,
 } from './prefabMutations'
-import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateKind } from './templateFactory'
+import { addTemplate as addTemplateMutation, type TemplateContext } from './templateFactory'
+import { SaveState, type StepDirection, type TemplateKind } from './enums'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
 const ACTIVE_PAGE_KEY = 'ui-builder:active-page'
@@ -68,15 +77,23 @@ function restoreActivePageId(project: Project): string {
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
-  const saveState = ref<'saved' | 'saving' | 'error'>('saved')
+  /** Whether the message offers an Undo button, and a counter so the same message shows again. */
+  const noticeUndo = ref(false)
+  const noticeSerial = ref(0)
+  const setNotice = (message: string, undoable = false) => {
+    notice.value = message
+    noticeUndo.value = undoable
+    noticeSerial.value++
+  }
+  const saveState = ref<SaveState>(SaveState.Saved)
   let initial: Project = emptyProject()
   if (typeof window !== 'undefined') {
     try {
       const saved = window.localStorage.getItem(DOCUMENT_KEY)
       if (saved) initial = parseProject(saved)
     } catch {
-      notice.value = 'Could not restore this page. The saved copy has not been changed. Import a backup to recover it.'
-      saveState.value = 'error'
+      setNotice('Could not restore this page. The saved copy has not been changed. Import a backup to recover it.')
+      saveState.value = SaveState.Error
     }
   }
   const project = ref<Project>(initial)
@@ -97,9 +114,6 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     () => project.value.pages.find(page => page.id === activePageId.value) ?? project.value.pages[0],
   )
   /** The tree being edited: the shared layout or the active page. Every editing command works on it. */
-  const setNotice = (message: string) => {
-    notice.value = message
-  }
   const rootNode = computed<UiNode>({
     get: () => (editingLayout.value && project.value.layout) || activePage.value.root,
     set: value => {
@@ -111,6 +125,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const selectedNodeId = computed(() => selectedNodeIds.value[0] ?? null)
   const isPreviewMode = ref(false)
   const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
+  /** Component types added lately, newest first. The library lists them up front. */
+  const recentComponentTypes = useStorage<string[]>('ui-builder:recent-components', [])
   const checkpoints = useStorage<HistoryCheckpoint[]>('ui-builder:history-checkpoints', [])
   let historyTimer: ReturnType<typeof setTimeout> | undefined
   let saveTimer: ReturnType<typeof setTimeout> | undefined
@@ -120,17 +136,17 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (typeof window === 'undefined') return
     try {
       window.localStorage.setItem(DOCUMENT_KEY, serializeProject(project.value))
-      saveState.value = 'saved'
+      saveState.value = SaveState.Saved
     } catch {
-      saveState.value = 'error'
-      notice.value = 'Could not save in this browser. Export your page to keep a backup.'
+      saveState.value = SaveState.Error
+      setNotice('Could not save in this browser. Export your page to keep a backup.')
     }
   }
   const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => findNodeByIdInTree(id, node)
 
-  const history = createHistory(
-    () => JSON.stringify(project.value),
-    snapshot => {
+  const history = createHistory({
+    serialize: () => JSON.stringify(project.value),
+    applySnapshot: snapshot => {
       const data = JSON.parse(snapshot)
       // Checkpoints saved before pages existed hold a single page tree.
       if (Array.isArray(data?.pages)) project.value = data
@@ -139,8 +155,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       activePageId.value = activePage.value.id
       selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
     },
-    MAX_HISTORY_ENTRIES,
-  )
+    maxEntries: MAX_HISTORY_ENTRIES,
+    describe: describeChange,
+    // Anything that was removed can be brought back from the message that says so.
+    onCommit: entry => {
+      if (/^(Deleted|Removed)/.test(entry.label)) setNotice(`${entry.label}.`, true)
+    },
+  })
   const { canUndo, canRedo, versions: historyVersions, commit: commitHistory } = history
   const commit = () => {
     clearTimeout(historyTimer)
@@ -181,7 +202,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       history.restoreSnapshot(checkpoint.snapshot)
       return true
     } catch {
-      notice.value = 'This checkpoint is invalid and could not be restored.'
+      setNotice('This checkpoint is invalid and could not be restored.')
       return false
     }
   }
@@ -192,7 +213,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   watch(
     project,
     () => {
-      saveState.value = 'saving'
+      saveState.value = SaveState.Saving
       clearTimeout(saveTimer)
       saveTimer = setTimeout(saveDocument, 250)
       if (!history.isRestoring.value) {
@@ -226,10 +247,15 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const selectNode = (id: string | null) => {
     selectedNodeIds.value = id && findNodeById(id) ? [id] : []
   }
+  /** The name shown for an element. A page's root is shown under the page's own name, so it never has two names. */
+  const nodeLabel = (node: UiNode) =>
+    node.id === ROOT_NODE_ID ? (editingLayout.value ? node.name : activePage.value.name) : node.name
+  const isPageRoot = (id: string) => id === ROOT_NODE_ID && !editingLayout.value
   const renameNode = (id: string, name: string) => {
     const node = findNodeById(id)
     const trimmedName = name.trim()
     if (!node || !trimmedName) return false
+    if (isPageRoot(id)) return updatePageMutation(projectContext, activePage.value.id, { name: trimmedName })
     commit()
     node.name = trimmedName
     commit()
@@ -250,8 +276,27 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const updateNodeName = (id: string, name: string) => {
     const node = findNodeById(id)
     if (!node) return false
+    if (isPageRoot(id)) {
+      // Typing in the name field: keep the page name and its root in step (an empty name is not allowed).
+      if (!name.trim()) return false
+      activePage.value.name = name
+    }
     node.name = name
     return true
+  }
+  /** `Data table`, then `Data table 2`, `Data table 3`… so similar elements can be told apart in Layers. */
+  const uniqueNodeName = (name: string) => {
+    const taken = new Set<string>()
+    const collect = (node: UiNode) => {
+      taken.add(node.name)
+      node.children.forEach(collect)
+      Object.values(node.slots).flat().forEach(collect)
+    }
+    collect(rootNode.value)
+    if (!taken.has(name)) return name
+    let n = 2
+    while (taken.has(`${name} ${n}`)) n++
+    return `${name} ${n}`
   }
   const updateNodeProp = (id: string, prop: string, value: unknown) => {
     const node = findNodeById(id)
@@ -280,8 +325,15 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     setPrefabs: value => {
       prefabs.value = value
     },
+    uniqueName: uniqueNodeName,
     getInsertionTargetId: () => insertionTarget.value.id,
-    appendNode: (parentId, node, slotName) => appendNode(mutationContext, parentId, node, slotName),
+    appendNode: (parentId, node, slotName, prepare?: () => void) =>
+      appendNode(mutationContext, parentId, node, slotName, prepare),
+    ensureVariables: variables => {
+      for (const [name, value] of Object.entries(variables)) {
+        if (!(name in project.value.state)) project.value.state[name] = value
+      }
+    },
   }
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
@@ -309,7 +361,16 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const append = (parentId: string, node: UiNode, slotName: string | null = null) =>
     appendNode(mutationContext, parentId, node, slotName)
-  const addComponent = (type: string, parentId = insertionTarget.value.id) => append(parentId, createNode(type))
+  const addComponent = (type: string, parentId = insertionTarget.value.id) => {
+    const added = append(parentId, createNode(type))
+    if (added) {
+      recentComponentTypes.value = [type, ...recentComponentTypes.value.filter(item => item !== type)].slice(
+        0,
+        MAX_RECENT_COMPONENTS,
+      )
+    }
+    return added
+  }
   const savePrefab = (nodeId: string, name: string) => savePrefabMutation(mutationContext, nodeId, name)
   const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) =>
     insertPrefabMutation(mutationContext, prefabId, parentId, slotName)
@@ -327,8 +388,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const moveNode = (id: string, parentId: string, slotName: string | null = null) =>
     moveNodeMutation(mutationContext, id, parentId, slotName)
-  const canReorder = (id: string, direction: number) => canReorderNode(mutationContext, id, direction)
-  const reorderNode = (id: string, direction: number) => reorderNodeMutation(mutationContext, id, direction)
+  const canReorder = (id: string, direction: StepDirection) => canReorderNode(mutationContext, id, direction)
+  const reorderNode = (id: string, direction: StepDirection) => reorderNodeMutation(mutationContext, id, direction)
   const importDocument = (text: string) => {
     const imported = parseProject(text)
     commit()
@@ -338,7 +399,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     selectedNodeIds.value = []
     commit()
     saveDocument()
-    notice.value = 'Page imported. Use Undo to return to the previous page.'
+    setNotice('Page imported. Undo returns to the previous page.', true)
   }
 
   // ─── Pages, shared layout and project state ──────────────────────────────
@@ -377,7 +438,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     selectedNodeId,
     isPreviewMode,
     prefabs,
+    recentComponentTypes,
     notice,
+    noticeUndo,
+    noticeSerial,
+    setNotice,
     saveState,
     canUndo,
     canRedo,
@@ -399,7 +464,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     updatePage: (id: string, patch: { name?: string; path?: string }) => updatePageMutation(projectContext, id, patch),
     deletePage: (id: string) => deletePageMutation(projectContext, id),
     duplicatePage: (id: string) => duplicatePageMutation(projectContext, id),
-    movePage: (id: string, direction: -1 | 1) => movePageMutation(projectContext, id, direction),
+    movePage: (id: string, direction: StepDirection) => movePageMutation(projectContext, id, direction),
     editLayout: (on: boolean) => editLayoutMutation(projectContext, on),
     removeLayout: () => removeLayoutMutation(projectContext),
     setStateVariable: (name: string, value: unknown) => setStateVariableMutation(projectContext, name, value),
@@ -417,12 +482,14 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
         tableMutations.updateRow(mutationContext, id, index, values),
       removeRow: (id: string, index: number) => tableMutations.removeRow(mutationContext, id, index),
     },
+    resetPreview: preview.reset,
     runtimeState: preview.state,
     previewPageId: preview.pageId,
     previewPage: preview.page,
     previewRoot: preview.root,
     navigate: preview.navigate,
     dispatchAction: preview.dispatch,
+    nodeLabel,
     findNodeById,
     findParentAndIndex,
     pathTo,

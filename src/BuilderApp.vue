@@ -1,177 +1,150 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useMediaQuery, useStorage } from '@vueuse/core'
+import { SaveState } from './modules/ui-builder/entities/ui-node/model/enums'
+import { PanelSide } from './modules/ui-builder/model/shell/panelSide'
+import { ref, watch } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import MainCanvas from './modules/ui-builder/widgets/main-canvas/ui/MainCanvas.vue'
 import SidebarTree from './modules/ui-builder/widgets/sidebar-tree/ui/SidebarTree.vue'
+import OnboardingTour from './modules/ui-builder/widgets/onboarding/ui/OnboardingTour.vue'
+import { useFirstRunTour } from './modules/ui-builder/widgets/onboarding/model/useFirstRunTour'
+import CommandPalette from './modules/ui-builder/widgets/command-palette/ui/CommandPalette.vue'
+import type { CommandHost } from './modules/ui-builder/model/commands'
 import PageTabs from './modules/ui-builder/widgets/pages-panel/ui/PageTabs.vue'
 import PagesPanel from './modules/ui-builder/widgets/pages-panel/ui/PagesPanel.vue'
 import PropertyPanel from './modules/ui-builder/widgets/property-panel/ui/PropertyPanel.vue'
 import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
+import { ROOT_NODE_ID } from './modules/ui-builder/entities/ui-node/model/constants'
+import { useEditorPanels } from './modules/ui-builder/model/shell/useEditorPanels'
+import { useEditorShortcuts } from './modules/ui-builder/model/shell/useEditorShortcuts'
+import { platformModifierKey, useFocusMode } from './modules/ui-builder/model/shell/useFocusMode'
+import { useProjectFiles } from './modules/ui-builder/model/shell/useProjectFiles'
 
 const store = useUiTreeStore()
 const narrow = useMediaQuery('(max-width: 1100px)')
-const leftOpen = ref(true)
-const rightOpen = ref(true)
-const leftWidth = useStorage('ui-builder:left-width', 300)
-const rightWidth = useStorage('ui-builder:right-width', 340)
+const modifierKey = platformModifierKey()
+
+const panels = useEditorPanels(store, narrow)
+const { leftOpen, rightOpen, leftWidth, rightWidth, rightSlim, rightFull, rightPanelWidth, limits } = panels
+const {
+  animating: panelAnimating,
+  closeAll: closePanels,
+  openComponents,
+  toggle: togglePanel,
+  resize,
+  startResize,
+} = panels
+const { focusMode, showChrome, toggleFocus } = useFocusMode(store, modifierKey)
+const { open: tourOpen, finish: finishTour, start: startTour } = useFirstRunTour(store)
+const { exportProject, importFromInput } = useProjectFiles(store)
+
 const importInput = ref<HTMLInputElement>()
+const pageTabs = ref<InstanceType<typeof PageTabs>>()
+const paletteOpen = ref(false)
+
+// What the search box and the quick tour can ask of the editor shell.
+const commandHost: CommandHost = {
+  addPage: () => pageTabs.value?.openAdd(),
+  renameCurrentPage: () => pageTabs.value?.openEdit(),
+  importProject: () => importInput.value?.click(),
+  exportProject,
+  startTour,
+  toggleFocus,
+  togglePanel,
+  modifierKey,
+}
+
+// Messages appear in a snackbar; show every one, also one that repeats the previous text.
 const snackbar = ref(false)
 watch(
-  () => store.notice,
-  value => {
-    if (value) snackbar.value = true
+  () => store.noticeSerial,
+  () => {
+    if (store.notice) snackbar.value = true
   },
   { immediate: true },
 )
-watch(
+const undoFromMessage = () => {
+  snackbar.value = false
+  store.undo()
+}
+
+useEditorShortcuts({
+  store,
+  paletteOpen,
+  focusMode,
   narrow,
-  value => {
-    leftOpen.value = !value
-    rightOpen.value = !value
+  toggleFocus,
+  closePanels,
+  flushSave: () => {
+    if (store.saveState === SaveState.Saving) store.saveDocument()
   },
-  { immediate: true },
-)
-const closePanels = () => {
-  leftOpen.value = false
-  rightOpen.value = false
-}
-const openComponents = () => {
-  leftOpen.value = true
-  if (narrow.value) rightOpen.value = false
-}
-const togglePanel = (side: 'left' | 'right') => {
-  if (side === 'left') {
-    leftOpen.value = !leftOpen.value
-    if (narrow.value) rightOpen.value = false
-  } else {
-    rightOpen.value = !rightOpen.value
-    if (narrow.value) leftOpen.value = false
-  }
-}
-const resize = (side: 'left' | 'right', delta: number) => {
-  const width = side === 'left' ? leftWidth : rightWidth
-  width.value = Math.min(480, Math.max(260, width.value + delta))
-}
-let stopResize: (() => void) | undefined
-const startResize = (event: PointerEvent, side: 'left' | 'right') => {
-  event.preventDefault()
-  stopResize?.()
-  let x = event.clientX
-  const move = (e: PointerEvent) => {
-    resize(side, (e.clientX - x) * (side === 'left' ? 1 : -1))
-    x = e.clientX
-  }
-  const stop = () => {
-    window.removeEventListener('pointermove', move)
-    window.removeEventListener('pointerup', stop)
-    window.removeEventListener('pointercancel', stop)
-  }
-  stopResize = stop
-  window.addEventListener('pointermove', move)
-  window.addEventListener('pointerup', stop, { once: true })
-  window.addEventListener('pointercancel', stop, { once: true })
-}
-const exportPage = () => {
-  const url = URL.createObjectURL(new Blob([store.exportDocument()], { type: 'application/json' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'ui-builder-project.json'
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-const importPage = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  try {
-    if (file.size > 5_000_000) throw new Error('Choose a document smaller than 5 MB.')
-    store.importDocument(await file.text())
-  } catch (error) {
-    store.notice = error instanceof Error ? error.message : 'Could not import this document.'
-  }
-  input.value = ''
-}
-const onKey = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
-    if (store.isPreviewMode) store.isPreviewMode = false
-    else if (narrow.value) {
-      leftOpen.value = false
-      rightOpen.value = false
-    }
-    return
-  }
-  if (
-    store.isPreviewMode ||
-    (e.target instanceof HTMLElement &&
-      e.target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'))
-  )
-    return
-  if (e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
-    // Alt+[ and Alt+] switch to the previous and next page.
-    const index = store.pages.findIndex(page => page.id === store.activePage.id)
-    const next = store.pages[index + (e.code === 'BracketLeft' ? -1 : 1)]
-    if (next) store.selectPage(next.id)
-    e.preventDefault()
-    return
-  }
-  const mod = e.ctrlKey || e.metaKey
-  const key = e.key.toLowerCase()
-  if (mod && key === 'z' && !e.shiftKey) {
-    e.preventDefault()
-    store.undo()
-  } else if (mod && ((key === 'z' && e.shiftKey) || key === 'y')) {
-    e.preventDefault()
-    store.redo()
-  }
-}
-const flush = () => {
-  if (store.saveState === 'saving') store.saveDocument()
-}
-onMounted(() => {
-  window.addEventListener('keydown', onKey)
-  window.addEventListener('pagehide', flush)
-  document.addEventListener('visibilitychange', flush)
-})
-onBeforeUnmount(() => {
-  flush()
-  stopResize?.()
-  window.removeEventListener('keydown', onKey)
-  window.removeEventListener('pagehide', flush)
-  document.removeEventListener('visibilitychange', flush)
 })
 </script>
 
 <template>
   <div class="editor-shell">
-    <div v-if="!store.isPreviewMode" class="document-toolbar">
+    <div v-if="showChrome" class="document-toolbar">
       <VBtn
         icon="mdi-view-list-outline"
         size="small"
         variant="text"
         aria-label="Toggle components and layers"
         :aria-expanded="leftOpen"
-        @click="togglePanel('left')"
+        @click="togglePanel(PanelSide.Left)"
       />
       <PagesPanel />
-      <span class="save-status" role="status" :class="{ 'text-error': store.saveState === 'error' }">
-        {{
-          store.saveState === 'saved'
-            ? 'Saved in this browser'
-            : store.saveState === 'saving'
-              ? 'Saving…'
-              : 'Not saved — export a backup'
-        }}
+      <VBtn
+        size="small"
+        variant="text"
+        prepend-icon="mdi-magnify"
+        class="palette-button"
+        :aria-label="`Search commands (${modifierKey} K)`"
+        :title="`Search commands, components, pages and settings (${modifierKey} K)`"
+        @click="paletteOpen = true"
+      >
+        <span class="palette-button__label">Search</span>
+        <kbd class="palette-button__kbd">{{ modifierKey }} K</kbd>
+      </VBtn>
+      <!-- Saving is the normal state, so it stays quiet: a check mark, with words only for progress and problems. -->
+      <span class="save-status" role="status" :class="{ 'text-error': store.saveState === SaveState.Error }">
+        <template v-if="store.saveState === SaveState.Saved">
+          <VIcon icon="mdi-check-circle-outline" size="16" aria-hidden="true" title="Saved in this browser" />
+          <span class="sr-only">Saved in this browser</span>
+        </template>
+        <template v-else-if="store.saveState === SaveState.Saving">Saving…</template>
+        <template v-else>Not saved — use ⋯ → Export to keep a backup</template>
       </span>
       <div class="document-actions">
-        <VBtn size="small" variant="text" prepend-icon="mdi-import" @click="importInput?.click()">Import</VBtn>
-        <VBtn size="small" variant="text" prepend-icon="mdi-export" @click="exportPage">Export</VBtn>
+        <VMenu location="bottom end">
+          <template #activator="{ props: menu }">
+            <VBtn
+              v-bind="menu"
+              icon="mdi-dots-horizontal"
+              size="small"
+              variant="text"
+              aria-label="More actions"
+              title="Import, export and more"
+            />
+          </template>
+          <VList density="compact">
+            <VListItem prepend-icon="mdi-import" title="Import project…" @click="importInput?.click()" />
+            <VListItem prepend-icon="mdi-export" title="Export project" @click="exportProject" />
+            <VDivider />
+            <VListItem
+              prepend-icon="mdi-arrow-expand-all"
+              title="Focus mode"
+              :subtitle="`Only the canvas · ${modifierKey} \\`"
+              @click="toggleFocus"
+            />
+            <VListItem prepend-icon="mdi-compass-outline" title="Quick tour" @click="startTour" />
+          </VList>
+        </VMenu>
         <VBtn
           icon="mdi-tune-variant"
           size="small"
           variant="text"
           aria-label="Toggle properties"
           :aria-expanded="rightOpen"
-          @click="togglePanel('right')"
+          @click="togglePanel(PanelSide.Right)"
         />
       </div>
       <input
@@ -180,89 +153,109 @@ onBeforeUnmount(() => {
         accept="application/json,.json"
         hidden
         aria-label="Import page"
-        @change="importPage"
+        @change="importFromInput"
       />
     </div>
-    <PageTabs v-if="!store.isPreviewMode" />
+    <PageTabs v-if="showChrome" ref="pageTabs" />
+    <button v-if="focusMode && !store.isPreviewMode" class="focus-exit" @click="focusMode = false">
+      <VIcon icon="mdi-arrow-collapse-all" size="16" aria-hidden="true" />
+      Exit focus mode <kbd>Esc</kbd>
+    </button>
+    <CommandPalette v-model="paletteOpen" :host="commandHost" />
+    <OnboardingTour v-if="tourOpen" v-model="tourOpen" :suspended="store.isPreviewMode" @finish="finishTour" />
     <div class="builder-layout" :class="{ 'builder-layout--narrow': narrow }">
       <button
-        v-if="narrow && !store.isPreviewMode && (leftOpen || rightOpen)"
+        v-if="narrow && showChrome && (leftOpen || rightOpen)"
         class="panel-backdrop"
         aria-label="Close panel"
         @click="closePanels"
       />
       <aside
-        v-if="leftOpen && !store.isPreviewMode"
+        v-if="leftOpen && showChrome"
         class="editor-panel editor-panel--left"
         :style="{ width: `${leftWidth}px` }"
         aria-label="Components and layers"
       >
-        <div class="panel-heading">
-          <strong>Components & layers</strong
-          ><VBtn
-            icon="mdi-close"
-            variant="text"
-            size="small"
-            aria-label="Close components panel"
-            @click="leftOpen = false"
-          />
-        </div>
-        <SidebarTree />
+        <SidebarTree @close="leftOpen = false" />
       </aside>
       <div
-        v-if="leftOpen && !narrow && !store.isPreviewMode"
+        v-if="leftOpen && !narrow && showChrome"
         class="panel-resizer"
         role="separator"
         aria-label="Resize components panel"
         aria-orientation="vertical"
         :aria-valuenow="leftWidth"
-        :aria-valuemin="260"
-        :aria-valuemax="480"
+        :aria-valuemin="limits.min"
+        :aria-valuemax="limits.max"
         tabindex="0"
-        @pointerdown="startResize($event, 'left')"
-        @keydown.left.prevent="resize('left', -20)"
-        @keydown.right.prevent="resize('left', 20)"
+        @pointerdown="startResize($event, PanelSide.Left)"
+        @keydown.left.prevent="resize(PanelSide.Left, -20)"
+        @keydown.right.prevent="resize(PanelSide.Left, 20)"
       />
       <main class="canvas-region">
         <MainCanvas @open-components="openComponents" />
       </main>
       <div
-        v-if="rightOpen && !narrow && !store.isPreviewMode"
+        v-if="rightFull && !narrow && showChrome"
         class="panel-resizer"
         role="separator"
         aria-label="Resize properties panel"
         aria-orientation="vertical"
         :aria-valuenow="rightWidth"
-        :aria-valuemin="260"
-        :aria-valuemax="480"
+        :aria-valuemin="limits.min"
+        :aria-valuemax="limits.max"
         tabindex="0"
-        @pointerdown="startResize($event, 'right')"
-        @keydown.left.prevent="resize('right', 20)"
-        @keydown.right.prevent="resize('right', -20)"
+        @pointerdown="startResize($event, PanelSide.Right)"
+        @keydown.left.prevent="resize(PanelSide.Right, 20)"
+        @keydown.right.prevent="resize(PanelSide.Right, -20)"
       />
       <aside
-        v-if="rightOpen && !store.isPreviewMode"
+        v-if="rightOpen && showChrome"
         class="editor-panel editor-panel--right"
-        :style="{ width: `${rightWidth}px` }"
+        :class="{ 'editor-panel--slim': rightSlim, 'editor-panel--animated': panelAnimating }"
+        :style="{ width: rightPanelWidth }"
         aria-label="Properties"
       >
-        <div class="panel-heading">
-          <strong>Properties</strong
-          ><VBtn
-            icon="mdi-close"
-            variant="text"
-            size="small"
-            aria-label="Close properties panel"
-            @click="rightOpen = false"
-          />
-        </div>
-        <PropertyPanel />
+        <button
+          v-if="rightSlim"
+          class="slim-properties"
+          title="Nothing is selected. Select an element, or click here to edit the page itself."
+          aria-label="Properties: nothing selected. Edit page settings"
+          @click="store.selectNode(ROOT_NODE_ID)"
+        >
+          <VIcon icon="mdi-tune-variant" size="20" aria-hidden="true" />
+          <span>Properties</span>
+        </button>
+        <template v-else>
+          <div class="panel-heading">
+            <strong>Properties</strong
+            ><VBtn
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              aria-label="Close properties panel"
+              @click="rightOpen = false"
+            />
+          </div>
+          <PropertyPanel />
+        </template>
       </aside>
     </div>
-    <VSnackbar v-model="snackbar" :timeout="5000"
-      >{{ store.notice
-      }}<template #actions><VBtn variant="text" @click="snackbar = false">Dismiss</VBtn></template></VSnackbar
-    >
+    <VSnackbar v-model="snackbar" :timeout="store.noticeUndo ? 10000 : 5000">
+      {{ store.notice }}
+      <template #actions>
+        <VBtn
+          v-if="store.noticeUndo"
+          variant="text"
+          color="primary-lighten-2"
+          prepend-icon="mdi-undo"
+          @click="undoFromMessage"
+        >
+          Undo
+        </VBtn>
+        <VBtn variant="text" @click="snackbar = false">Dismiss</VBtn>
+      </template>
+    </VSnackbar>
   </div>
 </template>
 
@@ -273,6 +266,30 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
 }
+.focus-exit {
+  position: fixed;
+  z-index: 20;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(var(--v-border-color), 0.2);
+  font-size: 12px;
+}
+.focus-exit kbd {
+  padding: 0 5px;
+  border: 1px solid rgba(var(--v-border-color), 0.3);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  opacity: 0.7;
+}
 .document-toolbar {
   display: flex;
   align-items: center;
@@ -281,7 +298,24 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(var(--v-border-color), 0.15);
   flex-wrap: wrap;
 }
+.palette-button__kbd {
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px solid rgba(var(--v-border-color), 0.3);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  opacity: 0.7;
+}
+@media (max-width: 700px) {
+  .palette-button__label,
+  .palette-button__kbd {
+    display: none;
+  }
+}
 .save-status {
+  display: inline-flex;
+  align-items: center;
   font-size: 12px;
   color: rgb(var(--v-theme-on-surface));
   opacity: 0.75;
@@ -317,6 +351,29 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+.editor-panel--animated {
+  transition: width 0.18s ease;
+}
+.editor-panel--slim {
+  border-left: 1px solid rgba(var(--v-border-color), 0.15);
+}
+.slim-properties {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 12px;
+}
+.slim-properties span {
+  writing-mode: vertical-rl;
+}
+.slim-properties:hover {
+  background: rgba(var(--v-theme-primary), 0.06);
+  color: rgb(var(--v-theme-primary));
 }
 .panel-resizer {
   width: 6px;

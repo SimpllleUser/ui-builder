@@ -1,3 +1,4 @@
+import { SpacingType } from '../../../entities/ui-node/model/enums'
 import { ref, type ComputedRef, type Ref } from 'vue'
 import { readSpacing, writeSpacing } from '../../../entities/ui-node/model/layoutControls'
 import type { UiNode } from '../../../entities/ui-node/model/types'
@@ -24,7 +25,7 @@ export function useSpacingEditor(
   updateClasses: (id: string, classes: string[]) => boolean,
   commit: () => void,
 ) {
-  const activeSpacingType = ref<'m' | 'p'>('m')
+  const activeSpacingType = ref<SpacingType>(SpacingType.Margin)
 
   const commonSpacing = (side: string) => {
     const values = selectedNodeIds.value.map(id => {
@@ -43,12 +44,13 @@ export function useSpacingEditor(
     commit()
   }
 
-  const updateSpacing = (type: 'm' | 'p', side: string, value: number | string | null) => {
+  const updateSpacing = (type: SpacingType, side: string, value: number | string | null) => {
     if (selectedNode.value)
       updateClasses(selectedNode.value.id, writeSpacing(selectedNode.value.classes, type, side, value))
   }
 
-  const getSpacingValue = (type: 'm' | 'p', side: string) => readSpacing(selectedNode.value?.classes ?? [], type, side)
+  const getSpacingValue = (type: SpacingType, side: string) =>
+    readSpacing(selectedNode.value?.classes ?? [], type, side)
 
   return {
     activeSpacingType,
