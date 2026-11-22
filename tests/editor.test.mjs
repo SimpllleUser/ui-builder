@@ -410,6 +410,12 @@ test('runtime resolves bindings, conditions, repeats and masks without evaluatin
   assert.equal(runtime.evaluateCondition('status == paid', scope), true)
   assert.equal(runtime.evaluateCondition('status != "paid"', scope), false)
   assert.equal(runtime.evaluateCondition('alert(1)', scope), true, 'invalid conditions show the element')
+  assert.equal(runtime.evaluateCondition('count >= 3', scope), true)
+  assert.equal(runtime.evaluateCondition('count > 3', scope), false)
+  assert.equal(runtime.evaluateCondition('user.name == Anna', scope), true)
+  const row = { id: 7, step: 2 }
+  assert.equal(runtime.evaluateCondition('row.step >= 2', { row }), true)
+  assert.equal(runtime.evaluateCondition('row.step >= 3', { row }), false)
   assert.deepEqual(runtime.repeatItems('rows', scope), [1, 2])
   assert.equal(runtime.repeatItems('count', scope).length, 3)
   assert.equal(runtime.applyMask('31122026', '##.##.####'), '31.12.2026')
@@ -512,4 +518,60 @@ test('data table cell slots follow its columns and survive export', () => {
     {},
     'content of a removed column is dropped on load',
   )
+})
+
+test('table columns and rows can be edited by the editor and through MCP', async () => {
+  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { id } = executeMcpCommand(store, 'add_component', { type: 'VDataTable' })
+  const added = executeMcpCommand(store, 'add_table_column', {
+    id,
+    key: 'total',
+    title: 'Total',
+    align: 'end',
+    width: 120,
+  })
+  assert.equal(added.columns.at(-1).width, 120)
+  assert.throws(() => executeMcpCommand(store, 'add_table_column', { id, key: 'total' }), /already used/)
+  executeMcpCommand(store, 'add_table_row', { id, values: { id: 1004, customer: 'Petro', total: 25 } })
+  executeMcpCommand(store, 'add_component', { type: 'VBtn', parentId: id, slot: 'item.total', text: 'Pay' })
+  // Renaming a key keeps row data and cell content.
+  executeMcpCommand(store, 'update_table_column', { id, column: 'total', key: 'amount' })
+  const table = executeMcpCommand(store, 'get_table', { id })
+  assert.equal(table.rows.at(-1).amount, 25)
+  assert.equal('total' in table.rows.at(-1), false)
+  assert.equal(table.cellContent.amount.length, 1)
+  executeMcpCommand(store, 'update_table_row', { id, index: 0, values: { customer: 'Maria' } })
+  assert.equal(executeMcpCommand(store, 'get_table', { id }).rows[0].customer, 'Maria')
+  executeMcpCommand(store, 'remove_table_row', { id, index: 0 })
+  executeMcpCommand(store, 'remove_table_column', { id, column: 'amount' })
+  const after = executeMcpCommand(store, 'get_table', { id })
+  assert.equal(
+    after.columns.some(column => column.key === 'amount'),
+    false,
+  )
+  assert.deepEqual(store.findNodeById(id).slots, {})
+  assert.throws(() => executeMcpCommand(store, 'remove_table_row', { id, index: 99 }), /No row/)
+  executeMcpCommand(store, 'update_node', { id, props: { striped: true, headerColor: 'primary', density: 'compact' } })
+  assert.equal(executeMcpCommand(store, 'get_table', { id }).settings.striped, true)
+  // Tables fed from state refuse manual edits instead of overwriting the binding.
+  executeMcpCommand(store, 'update_node', { id, props: { items: '{{orders}}' } })
+  assert.throws(() => executeMcpCommand(store, 'add_table_row', { id }), /state/)
+  assert.ok(
+    executeMcpCommand(store, 'describe_component', { type: 'VDataTable' }).props.some(
+      field => field.prop === 'headerColor',
+    ),
+  )
+  store.undo()
+})
+
+test('a click can store a whole table row and conditions can read its fields', () => {
+  const row = { id: 1002, customer: 'Ivan', step: 1 }
+  const action = runtime.bindAction({ type: 'set', key: 'selected', value: '{{item}}' }, { item: row })
+  assert.deepEqual(action.value, row)
+  assert.notEqual(action.value, row, 'the stored row is a copy')
+  const state = { selected: 'none' }
+  runtime.runAction(action, { state, navigate() {} })
+  assert.equal(state.selected.customer, 'Ivan')
+  const text = runtime.bindAction({ type: 'set', key: 'name', value: '{{item.customer}}' }, { item: row })
+  assert.equal(text.value, 'Ivan')
 })

@@ -4,6 +4,7 @@ import type { TemplateKind } from '../entities/ui-node/model/templateFactory'
 import type { UiNode } from '../entities/ui-node/model/types'
 import { need, ok, summarize, type Args, type McpCommand, type Store } from './mcpCommandUtils'
 import { MCP_PAGE_COMMANDS, pageSummary } from './mcpPageCommands'
+import { MCP_TABLE_COMMANDS } from './mcpTableCommands'
 
 /** Sets the text of a component, adding a text child when it can hold one (e.g. VCol). */
 const setText = (store: Store, node: UiNode, text: string) => {
@@ -32,6 +33,7 @@ const applyStyleAndAttrs = (node: UiNode, a: Args) => {
 }
 export const MCP_COMMANDS: Record<string, McpCommand> = {
   ...MCP_PAGE_COMMANDS,
+  ...MCP_TABLE_COMMANDS,
   get_document: store => ({
     editing: store.editingLayout ? 'layout' : store.activePage.id,
     pages: pageSummary(store),

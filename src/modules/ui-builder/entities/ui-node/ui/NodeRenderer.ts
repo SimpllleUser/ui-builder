@@ -16,7 +16,7 @@ import {
 } from '../model/runtime'
 import type { UiNode } from '../model/types'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
-import { statusChipSlots, tableHeight } from './dataTableRendering'
+import { statusChipSlots, tableHeight, tableStyleClasses } from './dataTableRendering'
 
 export { canvasDragTargetId }
 
@@ -181,6 +181,8 @@ const NodeRenderer = defineComponent({
       if (node.type === 'VDataTable') {
         for (const [name, slot] of Object.entries(statusChipSlots(componentProps.headers))) slots[name] ??= slot
         componentProps.height = tableHeight(componentProps.height)
+        classes.push(...tableStyleClasses(componentProps))
+        for (const prop of ['striped', 'bordered', 'headerColor']) delete componentProps[prop]
       }
 
       const VComponent = resolveDynamicComponent(

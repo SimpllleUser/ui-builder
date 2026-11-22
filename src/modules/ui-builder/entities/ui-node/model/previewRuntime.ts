@@ -1,6 +1,6 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { cloneNode } from './nodeUtils'
-import { runAction } from './runtime'
+import { runAction, type BoundAction } from './runtime'
 import type { Page, Project, UiAction } from './types'
 
 interface PreviewRuntimeSources {
@@ -24,7 +24,7 @@ export function usePreviewRuntime({ project, activePage, isPreviewMode, setNotic
     if (target) pageId.value = target.id
     else setNotice(`No page with path ${wanted || '(empty)'}.`)
   }
-  const dispatch = (action: UiAction | undefined) =>
+  const dispatch = (action: UiAction | BoundAction | undefined) =>
     runAction(action, {
       get state() {
         return state.value

@@ -47,7 +47,7 @@ The previous **Classic** editor is available from the top-right menu. It has a s
 1. `npm run dev` and open http://localhost:3001 (the tab must stay open).
 2. Claude Code picks up `.mcp.json` automatically. For other clients, run `node mcp/server.mjs` over stdio.
 
-Tools: `get_document`, `list_pages`, `add_page`, `set_route`, `select_page`, `delete_page`, `edit_layout`, `set_state`, `set_binding`, `set_event`, `get_node`, `list_components`, `add_component`, `update_node`, `delete_node`, `move_node`, `duplicate_node`, `add_template`, `select_node`, `undo`, `redo`, `export_document`, `import_document`. Every change goes through the editor's store, so it appears live and can be undone. Change the port with `UI_BUILDER_MCP_PORT` (and `VITE_MCP_BRIDGE_URL` for the editor); see `.env.mcp.example`.
+Tools: `get_document`, `list_pages`, `add_page`, `set_route`, `select_page`, `delete_page`, `edit_layout`, `set_state`, `set_binding`, `set_event`, `describe_component`, `get_table`, `add_table_column`, `update_table_column`, `remove_table_column`, `add_table_row`, `update_table_row`, `remove_table_row`, `get_node`, `list_components`, `add_component`, `update_node`, `delete_node`, `move_node`, `duplicate_node`, `add_template`, `select_node`, `undo`, `redo`, `export_document`, `import_document`. Every change goes through the editor's store, so it appears live and can be undone. Change the port with `UI_BUILDER_MCP_PORT` (and `VITE_MCP_BRIDGE_URL` for the editor); see `.env.mcp.example`.
 
 ## Checks
 

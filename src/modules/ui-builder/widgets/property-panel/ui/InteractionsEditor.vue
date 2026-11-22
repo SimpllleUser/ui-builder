@@ -51,7 +51,7 @@ const patchAction = (patch: Partial<UiAction>) => {
     <VTextField
       :model-value="node.vIf"
       label="v-if — show only when"
-      placeholder="isOpen, !loading, status == paid"
+      placeholder="isOpen, !loading, status == paid, step >= 2"
       variant="outlined"
       density="compact"
       hide-details

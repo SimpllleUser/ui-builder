@@ -5,6 +5,7 @@ import { getComponentDef, getNodeSlots } from './componentDefinitions'
 import { HISTORY_COMMIT_DELAY_MS, MAX_CHECKPOINTS, MAX_HISTORY_ENTRIES, TEXT_NODE_TYPE } from './constants'
 import { DOCUMENT_KEY, emptyProject, parseProject, serializeProject } from './document'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
+import * as tableMutations from './tableMutations'
 import { usePreviewRuntime } from './previewRuntime'
 import {
   addPage as addPageMutation,
@@ -376,6 +377,18 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     setStateVariable: (name: string, value: unknown) => setStateVariableMutation(projectContext, name, value),
     removeStateVariable: (name: string) => removeStateVariableMutation(projectContext, name),
     updateNodeLogic,
+    table: {
+      addColumn: (id: string, column?: Partial<tableMutations.TableColumn>) =>
+        tableMutations.addColumn(mutationContext, id, column),
+      updateColumn: (id: string, key: string, patch: Partial<tableMutations.TableColumn>) =>
+        tableMutations.updateColumn(mutationContext, id, key, patch),
+      removeColumn: (id: string, key: string) => tableMutations.removeColumn(mutationContext, id, key),
+      addRow: (id: string, values?: tableMutations.TableRow, index?: number) =>
+        tableMutations.addRow(mutationContext, id, values, index),
+      updateRow: (id: string, index: number, values: tableMutations.TableRow) =>
+        tableMutations.updateRow(mutationContext, id, index, values),
+      removeRow: (id: string, index: number) => tableMutations.removeRow(mutationContext, id, index),
+    },
     runtimeState: preview.state,
     previewPageId: preview.pageId,
     previewPage: preview.page,

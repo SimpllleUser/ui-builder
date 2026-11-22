@@ -56,6 +56,7 @@ const {
 
 const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
 
+const jsonErrors = ref<Record<string, string>>({})
 const activeTab = ref('content')
 const fieldTab = (field: PropField, title: string) => {
   if (field.kind === 'custom-classes') return 'advanced'
@@ -150,7 +151,6 @@ const getNumberProp = (prop: string) => {
   return typeof value === 'number' ? value : 0
 }
 
-const jsonErrors = ref<Record<string, string>>({})
 const getJsonProp = (prop: string) => {
   const value = selectedNode.value?.props[prop]
   return typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value, null, 2)

@@ -172,4 +172,47 @@ tool('set_event', 'Set what a click does in preview, or null to clear.', {
   ]),
 })
 
+const columnKey = z.string().describe('Column key (the field name used in rows)')
+tool(
+  'describe_component',
+  'Describe a component type: its slots, default props and every setting (prop name, kind, allowed options). Use before update_node to customize any component.',
+  { type: z.string() },
+)
+tool(
+  'get_table',
+  'Get a data table: columns, rows, cell content, current settings and the settings you can change with update_node (density, striped, bordered, headerColor, height, …).',
+  { id },
+)
+tool('add_table_column', 'Add a column to a data table (manual data only).', {
+  id,
+  key: z.string().optional().describe('Field name; generated when omitted'),
+  title: z.string().optional(),
+  align: z.enum(['start', 'center', 'end']).optional(),
+  sortable: z.boolean().optional(),
+  chip: z.boolean().optional().describe('Show the value as a colored status chip'),
+  width: z.number().optional().describe('Pixels'),
+})
+tool('update_table_column', 'Change a column. Renaming key moves its row values and cell content too.', {
+  id,
+  column: columnKey,
+  key: z.string().optional(),
+  title: z.string().optional(),
+  align: z.enum(['start', 'center', 'end']).optional(),
+  sortable: z.boolean().optional(),
+  chip: z.boolean().optional(),
+  width: z.number().optional(),
+})
+tool('remove_table_column', 'Remove a column with its row values and cell content.', { id, column: columnKey })
+tool('add_table_row', 'Add a row. values maps column keys to values; index defaults to the end.', {
+  id,
+  values: z.record(z.string(), z.unknown()).optional(),
+  index: z.number().optional(),
+})
+tool('update_table_row', 'Change values of the row at index (0-based).', {
+  id,
+  index: z.number(),
+  values: z.record(z.string(), z.unknown()),
+})
+tool('remove_table_row', 'Remove the row at index (0-based).', { id, index: z.number() })
+
 await server.connect(new StdioServerTransport())

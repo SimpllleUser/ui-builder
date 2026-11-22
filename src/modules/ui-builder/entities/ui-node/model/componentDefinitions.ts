@@ -1157,6 +1157,17 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
       { kind: 'switch', prop: 'showSelect', label: 'Row selection' },
       { kind: 'switch', prop: 'loading', label: 'Loading' },
       { kind: 'switch', prop: 'fixedHeader', label: 'Fixed header' },
+      { kind: 'switch', prop: 'fixedFooter', label: 'Fixed footer' },
+      { kind: 'switch', prop: 'striped', label: 'Striped rows' },
+      { kind: 'switch', prop: 'bordered', label: 'Cell borders' },
+      { kind: 'switch', prop: 'multiSort', label: 'Sort by several columns' },
+      {
+        kind: 'select',
+        prop: 'headerColor',
+        label: 'Header color',
+        options: ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'surface'],
+      },
+      { kind: 'text', prop: 'loadingText', label: 'Loading text', placeholder: 'Loading…' },
       { kind: 'text', prop: 'height', label: 'Height (px, enables scroll)', placeholder: '320' },
       { kind: 'text', prop: 'noDataText', label: 'Empty text', placeholder: 'No data available' },
     ])
