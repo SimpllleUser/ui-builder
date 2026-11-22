@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMediaQuery, useStorage } from '@vueuse/core'
 import MainCanvas from './modules/ui-builder/widgets/main-canvas/ui/MainCanvas.vue'
 import SidebarTree from './modules/ui-builder/widgets/sidebar-tree/ui/SidebarTree.vue'
+import PagesPanel from './modules/ui-builder/widgets/pages-panel/ui/PagesPanel.vue'
 import PropertyPanel from './modules/ui-builder/widgets/property-panel/ui/PropertyPanel.vue'
 import { useUiTreeStore } from './modules/ui-builder/entities/ui-node/model/store'
 
@@ -39,7 +40,7 @@ const startResize = (event: PointerEvent, side: 'left' | 'right') => {
 const exportPage = () => {
   const url = URL.createObjectURL(new Blob([store.exportDocument()], { type: 'application/json' }))
   const a = document.createElement('a')
-  a.href = url; a.download = 'ui-builder-page.json'; a.click()
+  a.href = url; a.download = 'ui-builder-project.json'; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 const importPage = async (event: Event) => {
@@ -73,7 +74,7 @@ onBeforeUnmount(() => { flush(); stopResize?.(); window.removeEventListener('key
   <div class="editor-shell">
     <div v-if="!store.isPreviewMode" class="document-toolbar">
       <VBtn icon="mdi-view-list-outline" size="small" variant="text" aria-label="Toggle components and layers" :aria-expanded="leftOpen" @click="togglePanel('left')" />
-      <span class="document-name">{{ store.rootNode.name }}</span>
+      <PagesPanel />
       <span class="save-status" role="status" :class="{ 'text-error': store.saveState === 'error' }">
         {{ store.saveState === 'saved' ? 'Saved in this browser' : store.saveState === 'saving' ? 'Saving…' : 'Not saved — export a backup' }}
       </span>
@@ -105,7 +106,6 @@ onBeforeUnmount(() => { flush(); stopResize?.(); window.removeEventListener('key
 <style scoped>
 .editor-shell { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .document-toolbar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid rgba(var(--v-border-color), .15); flex-wrap: wrap; }
-.document-name { font-size: 14px; font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .save-status { font-size: 12px; color: rgb(var(--v-theme-on-surface)); opacity: .75; }
 .document-actions { display: flex; align-items: center; margin-left: auto; }
 .builder-layout { display: flex; position: relative; flex: 1; min-height: 0; overflow: hidden; }
@@ -117,5 +117,5 @@ onBeforeUnmount(() => { flush(); stopResize?.(); window.removeEventListener('key
 .builder-layout--narrow .editor-panel { position: absolute; z-index: 5; inset-block: 0; max-width: calc(100% - 32px); box-shadow: 0 8px 24px #0003; }
 .builder-layout--narrow .editor-panel--right { right: 0; }
 .panel-backdrop { position: absolute; inset: 0; z-index: 4; background: #0005; }
-@media (max-width: 600px) { .save-status { order: 3; width: 100%; } .document-toolbar { gap: 4px; } .document-name { max-width: 120px; } }
+@media (max-width: 600px) { .save-status { order: 3; width: 100%; } .document-toolbar { gap: 4px; } }
 </style>

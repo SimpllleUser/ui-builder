@@ -40,6 +40,7 @@ const leaveCanvas = (event: DragEvent) => {
     <div class="canvas-toolbar">
       <div class="canvas-toolbar__title">{{ isPreviewMode ? 'Preview' : selectedNodeIds.length ? `${selectedNodeIds.length} selected` : 'Canvas' }}</div>
       <template v-if="isPreviewMode">
+        <VSelect v-if="store.pages.length > 1" v-model="store.previewPageId" :items="store.pages" item-title="name" item-value="id" label="Page" variant="outlined" density="compact" hide-details class="viewport-select" />
         <VSelect v-model="viewport" :items="devices" label="Viewport" variant="outlined" density="compact" hide-details class="viewport-select" />
         <VSelect v-model="zoom" :items="[50, 75, 100, 125].map(n => ({ title: `${n}%`, value: n }))" label="Zoom" variant="outlined" density="compact" hide-details class="zoom-select" />
       </template>
@@ -58,7 +59,7 @@ const leaveCanvas = (event: DragEvent) => {
         <iframe title="Page preview" :width="viewport" height="800" srcdoc="<!doctype html><html><head><meta name='viewport' content='width=device-width, initial-scale=1'></head><body><div id='preview-root'></div></body></html>" :style="{ transform: `scale(${zoom / 100})` }" @load="loadPreview" />
       </div>
       <Teleport v-if="previewTarget" :to="previewTarget">
-        <div class="v-application preview-app" :class="`v-theme--${theme.global.name.value}`"><NodeRenderer :node="rootNode" /></div>
+        <div class="v-application preview-app" :class="`v-theme--${theme.global.name.value}`"><NodeRenderer :key="store.previewPage.id" :node="store.previewRoot" :in-page="!store.project.layout" /></div>
       </Teleport>
     </div>
     <div v-else ref="canvas" class="main-canvas-wrapper" @click="store.selectNode(null)" @dragleave="leaveCanvas">
@@ -104,5 +105,10 @@ const leaveCanvas = (event: DragEvent) => {
 .v-row.ui-builder-element { min-height: 80px; }
 .v-col.ui-builder-element { min-height: 60px; }
 .ui-builder-element[data-node-id="root-canvas"] { min-height: 1600px; background: rgb(var(--v-theme-background)) !important; }
+.main-canvas-wrapper .v-application__wrap { min-height: 520px; }
+.main-canvas-wrapper .v-layout { position: relative; }
+.overlay-placeholder { padding: 8px; border-radius: 8px; background: rgba(var(--v-theme-primary), .05); }
+.overlay-placeholder__label { font-size: 12px; opacity: .75; margin-bottom: 6px; }
+.outlet-placeholder { display: flex; align-items: center; justify-content: center; min-height: 160px; font-size: 13px; opacity: .75; background: rgba(var(--v-theme-primary), .05); }
 @media (max-width: 600px) { .main-canvas-wrapper, .preview-workspace { padding: 12px; } }
 </style>

@@ -3,7 +3,7 @@ import { computed, ref, watch, nextTick, inject, type Ref } from 'vue'
 import draggable from 'vuedraggable'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { getComponentDef, getComponentSlots, PALETTE_COMPONENTS } from '../../../entities/ui-node/model/componentDefinitions'
+import { getComponentDef, getNodeSlots, PALETTE_COMPONENTS } from '../../../entities/ui-node/model/componentDefinitions'
 import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
 const props = defineProps<{ node: UiNode; depth?: number }>()
 const store = useUiTreeStore()
@@ -17,7 +17,7 @@ const activeTreeId = inject<Ref<string>>('ui-builder-active-tree-id')!
 const setActiveTreeId = inject<(id: string) => void>('ui-builder-set-active-tree-id')!
 const selected = computed(() => store.selectedNodeIds.includes(props.node.id))
 const componentLabel = computed(() => props.node.id === ROOT_NODE_ID ? 'Page canvas' : getComponentDef(props.node.type)?.label ?? props.node.type)
-const slots = computed(() => getComponentSlots(props.node.type).filter(s => s.name !== 'default' && (props.node.id !== ROOT_NODE_ID || props.node.slots[s.name]?.length)))
+const slots = computed(() => getNodeSlots(props.node).filter(s => s.name !== 'default' && (props.node.id !== ROOT_NODE_ID || props.node.slots[s.name]?.length)))
 const visibleSlots = computed(() => slots.value.filter(s => showEmptySlots.value || props.node.slots[s.name]?.length))
 const canMove = (event: { draggedContext: { element: UiNode }; to: HTMLElement }) => {
   const parent = store.findNodeById(event.to.dataset.parentId ?? '')

@@ -1,4 +1,4 @@
-import type { UiNode } from './types'
+import type { UiNode, UiNodeEvents } from './types'
 import type { NodeLocation } from './treeUtils'
 
 export interface NodeMutationContext {
@@ -93,4 +93,26 @@ export function reorderNode(context: NodeMutationContext, id: string, direction:
   const list = context.getNodeList(location)
   list.splice(location.index + direction, 0, list.splice(location.index, 1)[0])
   context.commit()
+}
+
+export interface NodeLogicPatch { model?: string; vIf?: string; vFor?: string; events?: UiNodeEvents }
+
+/** Sets bindings and events. An empty value, or `events` without a click action, removes that setting. */
+export function updateNodeLogic(context: NodeMutationContext, id: string, patch: NodeLogicPatch): boolean {
+  const node = context.findNodeById(id)
+  if (!node) return false
+
+  context.commit()
+  for (const key of ['model', 'vIf', 'vFor'] as const) {
+    if (!(key in patch)) continue
+    const value = patch[key]?.trim()
+    if (value) node[key] = value
+    else delete node[key]
+  }
+  if ('events' in patch) {
+    if (patch.events?.click) node.events = { click: patch.events.click }
+    else delete node.events
+  }
+  context.commit()
+  return true
 }

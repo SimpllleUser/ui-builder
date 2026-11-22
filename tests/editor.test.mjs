@@ -2,12 +2,16 @@ import { test, before, after, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
-let server, useStore, parseDocument, serializeDocument, readSpacing, writeSpacing, readFlex, writeFlex, groupNodes, ungroupNode, clonePaletteItem, parseMoveDestination, canSavePrefabName, store
+let server, useStore, parseProject, serializeProject, runtime, parseDocument, serializeDocument, readSpacing, writeSpacing, readFlex, writeFlex, groupNodes, ungroupNode, clonePaletteItem, parseMoveDestination, canSavePrefabName, store
 const storage = new Map()
 before(async () => {
   server = await createServer({ configFile: false, server: { middlewareMode: true, watch: null, ws: false }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom' })
   ;({ useUiTreeStore: useStore } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/store.ts'))
-  ;({ parseDocument, serializeDocument } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/document.ts'))
+  ;({ parseProject, serializeProject } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/document.ts'))
+  runtime = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/runtime.ts')
+  // Single-page helpers: tests edit one page tree and import it as a v1 document (also exercises migration).
+  parseDocument = text => parseProject(text).pages[0].root
+  serializeDocument = root => JSON.stringify({ version: 1, root })
   ;({ readSpacing, writeSpacing, readFlex, writeFlex } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/layoutControls.ts'))
   ;({ groupNodes, ungroupNode } = await server.ssrLoadModule('/src/features/ui-builder/model/treeOperations.ts'))
   ;({ clonePaletteItem } = await server.ssrLoadModule('/src/features/ui-builder/model/useClone.ts'))
@@ -190,15 +194,15 @@ test('document validation rejects damaged nodes and invalid slot structure', () 
   const valid = JSON.parse(store.exportDocument())
 
   const leafChildren = structuredClone(valid)
-  leafChildren.root.children[0].children = [{ id: 'nested', type: 'TEXT', name: 'Text', props: {}, classes: [], children: [], slots: {} }]
+  leafChildren.pages[0].root.children[0].children = [{ id: 'nested', type: 'TEXT', name: 'Text', props: {}, classes: [], children: [], slots: {} }]
   assert.throws(() => parseDocument(JSON.stringify(leafChildren)), /unsupported children/)
 
   const invalidSlot = structuredClone(valid)
-  invalidSlot.root.slots = { missing: [] }
+  invalidSlot.pages[0].root.slots = { missing: [] }
   assert.throws(() => parseDocument(JSON.stringify(invalidSlot)), /Invalid component slot/)
 
   const duplicateId = structuredClone(valid)
-  duplicateId.root.children[0].id = duplicateId.root.id
+  duplicateId.pages[0].root.children[0].id = duplicateId.pages[0].root.id
   assert.throws(() => parseDocument(JSON.stringify(duplicateId)), /Invalid component data/)
 })
 
@@ -236,4 +240,144 @@ test('MCP commands edit the page through the store', async () => {
   executeMcpCommand(store, 'delete_node', { id })
   assert.equal(store.findNodeById(id), null)
   assert.ok(executeMcpCommand(store, 'get_document').root.id)
+})
+
+test('v1 documents migrate into a single-page project and v2 round-trips', () => {
+  const v1 = JSON.stringify({ version: 1, root: parseDocument(store.exportDocument()) })
+  const project = parseProject(v1)
+  assert.deepEqual(project.pages.map(page => page.path), ['/'])
+  assert.equal(project.layout, null)
+  assert.equal(serializeProject(parseProject(serializeProject(project))), serializeProject(project))
+})
+
+test('pages: add, route validation, switching, delete and undo', () => {
+  const home = store.activePage.id
+  store.addComponent('VBtn')
+  const orders = store.addPage('Orders')
+  assert.equal(orders.path, '/orders')
+  assert.equal(store.activePage.id, orders.id)
+  assert.equal(store.rootNode.children.length, 0, 'new page starts empty')
+  assert.equal(store.addPage('Other', '/orders'), null, 'duplicate route is rejected')
+  assert.equal(store.updatePage(orders.id, { path: 'orders' }), false)
+  assert.equal(store.updatePage(orders.id, { path: '/orders/list' }), true)
+  store.selectPage(home)
+  assert.equal(store.rootNode.children.length, 1)
+  assert.equal(store.deletePage(orders.id), true)
+  assert.equal(store.deletePage(home), false, 'last page stays')
+  store.undo()
+  assert.equal(store.pages.length, 2, 'deleting a page can be undone')
+})
+
+test('shared layout is created with an outlet, edited separately and survives save and reload', () => {
+  store.addComponent('VBtn')
+  store.editLayout(true)
+  assert.equal(store.editingLayout, true)
+  const types = []
+  const walk = node => { types.push(node.type); [...node.children, ...Object.values(node.slots).flat()].forEach(walk) }
+  walk(store.rootNode)
+  for (const type of ['VApp', 'VAppBar', 'VNavigationDrawer', 'VMain', 'PageOutlet']) assert.ok(types.includes(type), type)
+  store.editLayout(false)
+  assert.equal(store.rootNode.children[0].type, 'VBtn')
+  store.saveDocument()
+  const next = useStore(createPinia())
+  assert.ok(next.project.layout)
+  next.$dispose()
+})
+
+test('bindings, events and state are validated and persisted', () => {
+  store.addComponent('VBtn'); const id = store.selectedNodeId
+  store.updateNodeLogic(id, { model: 'open', vIf: '!loading', vFor: 'rows', events: { click: { type: 'toggle', key: 'open' } } })
+  assert.equal(store.setStateVariable('open', false), true)
+  assert.equal(store.setStateVariable('__proto__', 1), false)
+  const reloaded = parseProject(store.exportDocument())
+  const node = reloaded.pages[0].root.children[0]
+  assert.deepEqual([node.model, node.vIf, node.vFor, node.events.click.type], ['open', '!loading', 'rows', 'toggle'])
+  assert.equal(reloaded.state.open, false)
+  store.updateNodeLogic(id, { model: '', events: undefined })
+  assert.equal('model' in store.findNodeById(id), false)
+  assert.equal('events' in store.findNodeById(id), false)
+  const broken = JSON.parse(store.exportDocument())
+  broken.pages[0].root.children[0].events = { click: { type: 'eval', code: 'x' } }
+  assert.throws(() => parseProject(JSON.stringify(broken)), /Invalid event/)
+})
+
+test('runtime resolves bindings, conditions, repeats and masks without evaluating code', () => {
+  const scope = { user: { name: 'Anna' }, rows: [1, 2], count: 3, status: 'paid', open: false }
+  assert.equal(runtime.interpolate('Hi {{ user.name }}!', scope), 'Hi Anna!')
+  assert.deepEqual(runtime.interpolate('{{rows}}', scope), [1, 2])
+  assert.equal(runtime.interpolate('{{constructor}}', scope), undefined)
+  assert.equal(runtime.resolvePath('user.__proto__', scope), undefined)
+  assert.equal(runtime.evaluateCondition('!open', scope), true)
+  assert.equal(runtime.evaluateCondition('status == paid', scope), true)
+  assert.equal(runtime.evaluateCondition('status != "paid"', scope), false)
+  assert.equal(runtime.evaluateCondition('alert(1)', scope), true, 'invalid conditions show the element')
+  assert.deepEqual(runtime.repeatItems('rows', scope), [1, 2])
+  assert.equal(runtime.repeatItems('count', scope).length, 3)
+  assert.equal(runtime.applyMask('31122026', '##.##.####'), '31.12.2026')
+  assert.equal(runtime.applyMask('3112', '##.##.####'), '31.12')
+  assert.equal(runtime.applyMask('12ab', '##-AA'), '12-ab')
+})
+
+test('preview actions change state and navigate between pages', () => {
+  store.addPage('Orders'); store.selectPage(store.pages[0].id)
+  store.setStateVariable('open', false)
+  store.isPreviewMode = true
+  return Promise.resolve().then(() => {
+    assert.equal(store.runtimeState.open, false)
+    store.dispatchAction({ type: 'toggle', key: 'open' })
+    assert.equal(store.runtimeState.open, true)
+    store.dispatchAction({ type: 'set', key: 'count', value: '3' })
+    assert.equal(store.runtimeState.count, 3)
+    store.dispatchAction({ type: 'navigate', to: '/orders' })
+    assert.equal(store.previewPage.path, '/orders')
+    store.dispatchAction({ type: 'navigate', to: '/missing' })
+    assert.match(store.notice, /No page/)
+    assert.equal(store.project.state.open, false, 'preview does not change the saved initial state')
+  })
+})
+
+test('new Vuetify components are registered and survive import', () => {
+  const types = ['VApp', 'VMain', 'VAppBar', 'VNavigationDrawer', 'VDataTable', 'VPagination', 'VDialog', 'VMenu', 'VSnackbar', 'VTooltip',
+    'VDatePicker', 'VBreadcrumbs', 'VStepper', 'VTimeline', 'VBtnToggle', 'VSkeletonLoader']
+  for (const type of types) store.addComponent(type, 'root-canvas')
+  const project = parseProject(store.exportDocument())
+  assert.deepEqual(project.pages[0].root.children.map(node => node.type), types)
+  const table = store.rootNode.children.find(node => node.type === 'VDataTable')
+  assert.ok(Array.isArray(table.props.items) && Array.isArray(table.props.headers))
+  assert.equal(store.rootNode.children.find(node => node.type === 'VTimeline').children.length, 2)
+})
+
+test('MCP page, binding, event and text tools', async () => {
+  const { executeMcpCommand } = await server.ssrLoadModule('/src/modules/ui-builder/model/mcpCommands.ts')
+  const { id: pageId } = executeMcpCommand(store, 'add_page', { name: 'Orders' })
+  executeMcpCommand(store, 'set_route', { id: pageId, path: '/orders-list' })
+  assert.deepEqual(executeMcpCommand(store, 'list_pages').pages.map(page => page.path), ['/', '/orders-list'])
+  executeMcpCommand(store, 'select_page', { id: '/' })
+  assert.equal(store.activePage.path, '/')
+  executeMcpCommand(store, 'set_state', { name: 'query', value: '' })
+  const { id: field } = executeMcpCommand(store, 'add_component', { type: 'VTextField' })
+  executeMcpCommand(store, 'set_binding', { id: field, model: 'query' })
+  const { id: col } = executeMcpCommand(store, 'add_component', { type: 'VCol', text: 'Hello', style: { color: 'red' }, attrs: { 'aria-label': 'x' } })
+  assert.equal(store.findNodeById(col).children[0].name, 'Hello')
+  assert.deepEqual(store.findNodeById(col).props.style, { color: 'red' })
+  executeMcpCommand(store, 'update_node', { id: col, style: { margin: '1px' }, text: 'Bye' })
+  assert.deepEqual(store.findNodeById(col).props.style, { color: 'red', margin: '1px' })
+  assert.equal(store.findNodeById(col).children[0].name, 'Bye')
+  const { id: btn } = executeMcpCommand(store, 'add_component', { type: 'VBtn', text: 'Go' })
+  executeMcpCommand(store, 'set_event', { id: btn, click: { type: 'navigate', to: '/orders-list' } })
+  assert.equal(executeMcpCommand(store, 'get_node', { id: btn }).events.click.to, '/orders-list')
+  executeMcpCommand(store, 'edit_layout', {})
+  assert.equal(executeMcpCommand(store, 'get_document').editing, 'layout')
+  assert.throws(() => executeMcpCommand(store, 'select_page', { id: 'nope' }), /not found/)
+})
+
+test('data table cell slots follow its columns and survive export', () => {
+  store.addComponent('VDataTable'); const id = store.selectedNodeId
+  const table = store.findNodeById(id)
+  assert.equal(store.appendToSlot(id, 'item.status', store.createNode('VBtn')), true)
+  assert.equal(store.appendToSlot(id, 'item.missing', store.createNode('VBtn')), false)
+  const reloaded = parseProject(store.exportDocument()).pages[0].root.children[0]
+  assert.equal(reloaded.slots['item.status'].length, 1)
+  table.props.headers = table.props.headers.filter(header => header.key !== 'status')
+  assert.deepEqual(parseProject(store.exportDocument()).pages[0].root.children[0].slots, {}, 'content of a removed column is dropped on load')
 })

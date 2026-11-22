@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { getComponentDef, type PropField } from '../../../entities/ui-node/model/componentDefinitions'
+import { getComponentDef, getNodeSlots, type PropField } from '../../../entities/ui-node/model/componentDefinitions'
 import { ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node/model/constants'
 import type { UiNode } from '../../../entities/ui-node/model/types'
 import { Icons } from '../../../../../shared/icons'
@@ -13,6 +13,8 @@ import { canSavePrefabName, parseMoveDestination } from '../model/propertyPanelU
 import AdvancedProperties from './AdvancedProperties.vue'
 import MoveNodeDialog from './MoveNodeDialog.vue'
 import SavePrefabDialog from './SavePrefabDialog.vue'
+import TableEditor from './TableEditor.vue'
+import InteractionsEditor from './InteractionsEditor.vue'
 
 const store = useUiTreeStore()
 const { selectedNodeId, selectedNodeIds } = storeToRefs(store)
@@ -42,6 +44,7 @@ const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
 const activeTab = ref('content')
 const fieldTab = (field: PropField, title: string) => {
   if (field.kind === 'custom-classes') return 'advanced'
+  if (field.kind === 'table-editor') return 'content'
   if (['spacing', 'flex-layout', 'row'].includes(field.kind) || ['Layout', 'Grid Column'].includes(title)) return 'layout'
   if (field.kind === 'textarea' || (field.kind === 'text' && ['title', 'subtitle', 'label', 'placeholder', 'hint', 'src', 'alt', 'image', 'value'].includes(field.prop))) return 'content'
   return 'appearance'
@@ -63,7 +66,7 @@ const moveTargets = computed(() => {
     if (node.id === selectedNodeId.value) return
     const names = [...path, node.name]
     if (store.canContain(node)) result.push({ title: names.join(' / '), value: JSON.stringify([node.id, null]) })
-    for (const slot of getComponentDef(node.type)?.slots ?? []) {
+    for (const slot of getNodeSlots(node)) {
       if (node.id !== ROOT_NODE_ID && slot.name !== 'default') result.push({ title: `${names.join(' / ')} / ${slot.label}`, value: JSON.stringify([node.id, slot.name]) })
     }
     for (const child of [...node.children, ...Object.values(node.slots).flat()]) visit(child, names)
@@ -79,6 +82,7 @@ const moveSelected = () => {
   if (store.moveNode(selectedNodeId.value, destination.parentId, destination.slot)) moveDialog.value = false
 }
 watch(selectedNodeId, () => {
+  jsonErrors.value = {}
   activeSpacingType.value = 'm'
   const node = selectedNode.value
   const sections = node ? getComponentDef(node.type)?.propertySections ?? [] : []
@@ -97,6 +101,23 @@ const getNumberProp = (prop: string) => {
   return typeof value === 'number' ? value : 0
 }
 
+const jsonErrors = ref<Record<string, string>>({})
+const getJsonProp = (prop: string) => {
+  const value = selectedNode.value?.props[prop]
+  return typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value, null, 2)
+}
+/** JSON is stored parsed; text such as {{orders}} is kept as a binding to project state. */
+const updateJsonProp = (prop: string, text: string) => {
+  const trimmed = text.trim()
+  if (!trimmed) { jsonErrors.value = { ...jsonErrors.value, [prop]: '' }; return updateProp(prop, undefined) }
+  if (trimmed.startsWith('{{')) { jsonErrors.value = { ...jsonErrors.value, [prop]: '' }; return updateProp(prop, trimmed) }
+  try {
+    updateProp(prop, JSON.parse(trimmed))
+    jsonErrors.value = { ...jsonErrors.value, [prop]: '' }
+  } catch {
+    jsonErrors.value = { ...jsonErrors.value, [prop]: 'Invalid JSON — the last valid value is kept.' }
+  }
+}
 const getBooleanProp = (prop: string) => selectedNode.value?.props[prop] === true
 const updateProp = (prop: string, value: unknown) => {
   if (selectedNode.value) store.updateNodeProp(selectedNode.value.id, prop, value)
@@ -196,6 +217,23 @@ const fieldKey = (field: PropField) =>
                 density="compact"
                 class="mb-3"
                 hide-details
+              />
+
+              <TableEditor v-else-if="field.kind === 'table-editor'" :node="selectedNode" />
+
+              <VTextarea
+                v-else-if="field.kind === 'json'"
+                :model-value="getJsonProp(field.prop)"
+                @update:model-value="value => updateJsonProp(field.prop, value)"
+                :label="field.label"
+                :error-messages="jsonErrors[field.prop]"
+                variant="outlined"
+                density="compact"
+                auto-grow
+                rows="3"
+                class="mb-3 json-field"
+                hide-details="auto"
+                spellcheck="false"
               />
 
               <VSwitch
@@ -379,6 +417,7 @@ const fieldKey = (field: PropField) =>
         @toggle-class="toggleClass"
         @add-custom-class="addCustomClass"
       />
+      <InteractionsEditor v-if="activeTab === 'advanced' && selectedNode.type !== TEXT_NODE_TYPE" :node="selectedNode" />
     </div>
 
     <div v-else class="pa-10 text-center text-medium-emphasis mt-10">

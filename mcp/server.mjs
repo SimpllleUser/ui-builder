@@ -76,11 +76,15 @@ tool('add_component', 'Add a component to a container. Returns the new node id.'
   name: z.string().optional(),
   props: z.record(z.string(), z.unknown()).optional(),
   classes: z.array(z.string()).optional(),
-  text: z.string().optional().describe('Text content for components with a text child (buttons, headings)'),
+  text: z.string().optional().describe('Text content for buttons, headings, columns, …'),
+  style: z.union([z.string(), z.record(z.string(), z.string())]).optional().describe('Inline style: CSS string or object'),
+  attrs: z.record(z.string(), z.unknown()).optional().describe('Extra attributes/props merged into props'),
 })
 tool('update_node', 'Change a node. props are merged; a null prop value removes it; classes replaces all classes.', {
   id, name: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(),
-  classes: z.array(z.string()).optional(), text: z.string().optional(),
+  classes: z.array(z.string()).optional(), text: z.string().optional().describe('Text content; added as a text child when the component has none (e.g. VCol)'),
+  style: z.union([z.string(), z.record(z.string(), z.string()), z.null()]).optional().describe('Inline style: CSS string, or object merged into the current style (null removes it)'),
+  attrs: z.record(z.string(), z.unknown()).optional().describe('Extra attributes/props merged into props (null removes one), e.g. { "aria-label": "Close" }'),
 })
 tool('delete_node', 'Delete a node and its subtree.', { id })
 tool('move_node', 'Move a node into another container.', { id, parentId: z.string(), slot })
@@ -91,5 +95,25 @@ tool('undo', 'Undo the last change.', {})
 tool('redo', 'Redo the last undone change.', {})
 tool('export_document', 'Export the page as JSON text.', {})
 tool('import_document', 'Replace the page with exported JSON (undoable).', { json: z.string() })
+
+const pageRef = z.string().describe('Page id or path')
+tool('list_pages', 'List pages (id, name, path), whether a shared layout exists and what is being edited.', {})
+tool('add_page', 'Add a page and switch the editor to it. Path defaults to a slug of the name.', { name: z.string(), path: z.string().optional().describe('Route such as /orders') })
+tool('set_route', 'Rename a page or change its route.', { id: pageRef, name: z.string().optional(), path: z.string().optional() })
+tool('select_page', 'Switch the editor to a page; later add_component calls edit that page.', { id: pageRef })
+tool('delete_page', 'Delete a page (the last page cannot be deleted).', { id: pageRef })
+tool('edit_layout', 'Edit the shared layout (created on first use: app bar, navigation drawer, main with the Page content outlet) or return to the active page.', { enabled: z.boolean().optional().describe('true (default) edits the layout, false goes back to the page') })
+tool('set_state', 'Define or change a state variable used by bindings and events. A null value removes it.', { name: z.string(), value: z.unknown() })
+tool('set_binding', 'Set bindings on a node: model (state key for v-model), vIf (key, !key, key == value), vFor (state key of an array or number; use {{item.field}} and {{index}} inside). Empty string clears one.', {
+  id, model: z.string().optional(), vIf: z.string().optional(), vFor: z.string().optional(),
+})
+tool('set_event', 'Set what a click does in preview, or null to clear.', {
+  id, click: z.union([
+    z.object({ type: z.literal('navigate'), to: z.string().describe('Page path') }),
+    z.object({ type: z.literal('set'), key: z.string(), value: z.string().describe('JSON or text') }),
+    z.object({ type: z.literal('toggle'), key: z.string() }),
+    z.null(),
+  ]),
+})
 
 await server.connect(new StdioServerTransport())
