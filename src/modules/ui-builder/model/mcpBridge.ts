@@ -9,8 +9,11 @@ export function connectMcpBridge(store: ReturnType<typeof useUiTreeStore>) {
   source.onmessage = async event => {
     const { id, command, args } = JSON.parse(event.data)
     let body: Record<string, unknown>
-    try { body = { id, result: executeMcpCommand(store, command, args) ?? null } }
-    catch (error) { body = { id, error: error instanceof Error ? error.message : String(error) } }
+    try {
+      body = { id, result: executeMcpCommand(store, command, args) ?? null }
+    } catch (error) {
+      body = { id, error: error instanceof Error ? error.message : String(error) }
+    }
     await fetch(`${MCP_BRIDGE_URL}/result`, { method: 'POST', body: JSON.stringify(body) }).catch(() => {})
   }
   return () => source.close()

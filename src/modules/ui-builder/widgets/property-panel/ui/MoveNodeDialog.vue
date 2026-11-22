@@ -19,11 +19,7 @@ const updateTarget = (value: unknown) => {
 </script>
 
 <template>
-  <VDialog
-    :model-value="modelValue"
-    max-width="520"
-    @update:model-value="emit('update:modelValue', $event)"
-  >
+  <VDialog :model-value="modelValue" max-width="520" @update:model-value="emit('update:modelValue', $event)">
     <VCard title="Move element">
       <VCardText>
         <VSelect

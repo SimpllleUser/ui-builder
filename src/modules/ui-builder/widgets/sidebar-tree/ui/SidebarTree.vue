@@ -2,7 +2,10 @@
 import { computed, ref, provide, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { WRAP_CONTAINER_TYPES as WRAP_ALLOWED_TYPES, getComponentDef } from '../../../entities/ui-node/model/componentDefinitions'
+import {
+  WRAP_CONTAINER_TYPES as WRAP_ALLOWED_TYPES,
+  getComponentDef,
+} from '../../../entities/ui-node/model/componentDefinitions'
 import { ROOT_NODE_ID } from '../../../entities/ui-node/model/constants'
 import SidebarTreeNode from './SidebarTreeNode.vue'
 import ComponentsPalette from '../../components-palette/ui/ComponentsPalette.vue'
@@ -19,34 +22,44 @@ const activityViews: Array<{ id: SidebarView; icon: string; label: string }> = [
 ]
 const activeView = ref<SidebarView>('layers')
 const deletingPrefab = ref<string | null>(null)
+const confirmDeletePrefab = () => {
+  if (deletingPrefab.value) store.deletePrefab(deletingPrefab.value)
+  deletingPrefab.value = null
+}
 const checkpointDialog = ref(false)
 const checkpointName = ref('')
 const checkpointDateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })
 const activeTreeId = ref(rootNode.value.id)
 
 provide('ui-builder-active-tree-id', activeTreeId)
-provide('ui-builder-set-active-tree-id', (id: string) => { activeTreeId.value = id })
-watch(selectedNodeIds, ids => {
-  if (ids[0]) activeTreeId.value = ids[0]
-}, { immediate: true })
-
-const canWrap = computed(() =>
-  selectedNodeIds.value.length >= 2 && store.areNodesSiblings(selectedNodeIds.value)
+provide('ui-builder-set-active-tree-id', (id: string) => {
+  activeTreeId.value = id
+})
+watch(
+  selectedNodeIds,
+  ids => {
+    if (ids[0]) activeTreeId.value = ids[0]
+  },
+  { immediate: true },
 )
+
+const canWrap = computed(() => selectedNodeIds.value.length >= 2 && store.areNodesSiblings(selectedNodeIds.value))
 
 const canUnwrap = computed(() => {
   if (selectedNodeIds.value.length !== 1) return false
   const id = selectedNodeIds.value[0]
   if (id === ROOT_NODE_ID) return false
   const node = store.findNodeById(id)
-  return !!node && (node.children?.length > 0) && !!getComponentDef(node.type)?.isWrapContainer
+  return !!node && node.children?.length > 0 && !!getComponentDef(node.type)?.isWrapContainer
 })
 
 const onInsertPrefab = (prefabId: string) => {
   store.insertPrefab(prefabId)
 }
 const viewTitle = computed(() => activityViews.find(view => view.id === activeView.value)?.label ?? 'Layers')
-const selectView = (view: SidebarView) => { activeView.value = view }
+const selectView = (view: SidebarView) => {
+  activeView.value = view
+}
 const openCheckpointDialog = () => {
   checkpointName.value = `Checkpoint ${checkpoints.value.length + 1}`
   checkpointDialog.value = true
@@ -61,10 +74,17 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
 <template>
   <div class="sidebar-drawer">
     <div class="d-flex flex-column h-100">
-
       <div class="sidebar-layout">
         <nav class="activity-bar" aria-label="Builder views">
-          <button v-for="view in activityViews" :key="view.id" class="activity-button" :class="{ 'activity-button--active': activeView === view.id }" :aria-pressed="activeView === view.id" :title="view.label" @click="selectView(view.id)">
+          <button
+            v-for="view in activityViews"
+            :key="view.id"
+            class="activity-button"
+            :class="{ 'activity-button--active': activeView === view.id }"
+            :aria-pressed="activeView === view.id"
+            :title="view.label"
+            @click="selectView(view.id)"
+          >
             <VIcon :icon="view.icon" size="21" aria-hidden="true" />
             <span class="sr-only">{{ view.label }}</span>
           </button>
@@ -79,8 +99,16 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
           <ComponentsPalette v-if="activeView === 'components'" />
 
           <div v-else-if="activeView === 'layers'" class="sidebar-view__scroll">
-            <p id="layers-help" class="text-caption px-2 my-2">Use ↑ ↓ to move, ← → to collapse or expand, Enter to select. Shift-click selects several elements.</p>
-            <div role="tree" aria-label="Page layers" aria-describedby="layers-help" aria-multiselectable="true" class="pa-2">
+            <p id="layers-help" class="text-caption px-2 my-2">
+              Use ↑ ↓ to move, ← → to collapse or expand, Enter to select. Shift-click selects several elements.
+            </p>
+            <div
+              role="tree"
+              aria-label="Page layers"
+              aria-describedby="layers-help"
+              aria-multiselectable="true"
+              class="pa-2"
+            >
               <SidebarTreeNode :node="rootNode" :depth="0" />
             </div>
           </div>
@@ -89,32 +117,73 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
             <div v-if="prefabs.length === 0" class="text-center pa-8">
               <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
               <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
-              <div class="text-caption text-medium-emphasis mt-1 opacity-70">Select a node and click <VIcon icon="mdi-content-save-outline" size="12" /> in the property panel</div>
+              <div class="text-caption text-medium-emphasis mt-1 opacity-70">
+                Select a node and click <VIcon icon="mdi-content-save-outline" size="12" /> in the property panel
+              </div>
             </div>
             <div v-else class="prefabs-list">
               <div v-for="prefab in prefabs" :key="prefab.prefabId" class="prefab-row">
-                <VIcon :icon="getComponentDef(prefab.node.type)?.treeIcon ?? 'mdi-puzzle-outline'" size="15" class="prefab-icon" />
+                <VIcon
+                  :icon="getComponentDef(prefab.node.type)?.treeIcon ?? 'mdi-puzzle-outline'"
+                  size="15"
+                  class="prefab-icon"
+                />
                 <span class="prefab-name">{{ prefab.name }}</span>
                 <div class="prefab-actions">
-                  <VBtn icon="mdi-plus" :aria-label="`Insert ${prefab.name}`" variant="text" size="x-small" @click="onInsertPrefab(prefab.prefabId)" />
-                  <VBtn icon="mdi-trash-can-outline" :aria-label="`Delete saved component ${prefab.name}`" variant="text" size="x-small" color="error" @click="deletingPrefab = prefab.prefabId" />
+                  <VBtn
+                    icon="mdi-plus"
+                    :aria-label="`Insert ${prefab.name}`"
+                    variant="text"
+                    size="x-small"
+                    @click="onInsertPrefab(prefab.prefabId)"
+                  />
+                  <VBtn
+                    icon="mdi-trash-can-outline"
+                    :aria-label="`Delete saved component ${prefab.name}`"
+                    variant="text"
+                    size="x-small"
+                    color="error"
+                    @click="deletingPrefab = prefab.prefabId"
+                  />
                 </div>
               </div>
             </div>
           </div>
 
           <div v-else class="sidebar-view__scroll history-list" aria-label="Document history">
-            <p class="history-help">Select a version to restore it. <span v-if="historyPending">Unsaved changes will be saved first.</span><span v-else>Older versions remain available until the history limit is reached.</span></p>
-            <VBtn block size="small" color="primary" variant="tonal" prepend-icon="mdi-bookmark-plus-outline" class="history-save" @click="openCheckpointDialog">Save checkpoint</VBtn>
+            <p class="history-help">
+              Select a version to restore it. <span v-if="historyPending">Unsaved changes will be saved first.</span
+              ><span v-else>Older versions remain available until the history limit is reached.</span>
+            </p>
+            <VBtn
+              block
+              size="small"
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-bookmark-plus-outline"
+              class="history-save"
+              @click="openCheckpointDialog"
+              >Save checkpoint</VBtn
+            >
 
             <div v-if="checkpoints.length" class="history-section">
               <h3 class="history-section__title">Checkpoints</h3>
               <div v-for="checkpoint in checkpoints" :key="checkpoint.checkpointId" class="checkpoint-item">
                 <button class="checkpoint-restore" @click="store.restoreCheckpoint(checkpoint.checkpointId)">
                   <VIcon icon="mdi-bookmark-outline" size="16" aria-hidden="true" />
-                  <span><strong>{{ checkpoint.name }}</strong><small>{{ formatCheckpointDate(checkpoint.createdAt) }}</small></span>
+                  <span
+                    ><strong>{{ checkpoint.name }}</strong
+                    ><small>{{ formatCheckpointDate(checkpoint.createdAt) }}</small></span
+                  >
                 </button>
-                <VBtn icon="mdi-delete-outline" variant="text" size="x-small" color="error" :aria-label="`Delete ${checkpoint.name}`" @click="store.deleteCheckpoint(checkpoint.checkpointId)" />
+                <VBtn
+                  icon="mdi-delete-outline"
+                  variant="text"
+                  size="x-small"
+                  color="error"
+                  :aria-label="`Delete ${checkpoint.name}`"
+                  @click="store.deleteCheckpoint(checkpoint.checkpointId)"
+                />
               </div>
             </div>
 
@@ -154,7 +223,9 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
 
           <template v-else-if="canUnwrap">
             <span class="wrap-label">Unwrap:</span>
-            <p v-if="store.unwrapReason(selectedNodeIds[0])" class="text-caption">{{ store.unwrapReason(selectedNodeIds[0]) }}</p>
+            <p v-if="store.unwrapReason(selectedNodeIds[0])" class="text-caption">
+              {{ store.unwrapReason(selectedNodeIds[0]) }}
+            </p>
             <div class="wrap-chips">
               <button
                 class="wrap-chip wrap-chip--unwrap"
@@ -169,14 +240,26 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
         </div>
       </VSlideYReverseTransition>
       <VDialog :model-value="!!deletingPrefab" max-width="400" @update:model-value="deletingPrefab = null">
-        <VCard title="Delete saved component?" text="Existing copies on your page will remain. This removes the component from your library.">
-          <VCardActions><VSpacer /><VBtn @click="deletingPrefab = null">Cancel</VBtn><VBtn color="error" @click="store.deletePrefab(deletingPrefab!); deletingPrefab = null">Delete</VBtn></VCardActions>
+        <VCard
+          title="Delete saved component?"
+          text="Existing copies on your page will remain. This removes the component from your library."
+        >
+          <VCardActions
+            ><VSpacer /><VBtn @click="deletingPrefab = null">Cancel</VBtn
+            ><VBtn color="error" @click="confirmDeletePrefab">Delete</VBtn></VCardActions
+          >
         </VCard>
       </VDialog>
       <VDialog v-model="checkpointDialog" max-width="400">
         <VCard title="Save checkpoint">
           <VCardText>
-            <VTextField v-model="checkpointName" label="Checkpoint name" autofocus hide-details @keyup.enter="saveCheckpoint" />
+            <VTextField
+              v-model="checkpointName"
+              label="Checkpoint name"
+              autofocus
+              hide-details
+              @keyup.enter="saveCheckpoint"
+            />
           </VCardText>
           <VCardActions>
             <VSpacer />
@@ -185,7 +268,6 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
           </VCardActions>
         </VCard>
       </VDialog>
-
     </div>
   </div>
 </template>
@@ -215,7 +297,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   align-items: center;
   gap: 4px;
   padding: 8px 4px;
-  border-right: 1px solid rgba(var(--v-border-color), .15);
+  border-right: 1px solid rgba(var(--v-border-color), 0.15);
   background: rgb(var(--v-theme-surface-light));
 }
 
@@ -227,7 +309,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   place-items: center;
   border-radius: 5px;
   color: rgb(var(--v-theme-on-surface));
-  opacity: .65;
+  opacity: 0.65;
 }
 
 .activity-button:hover,
@@ -235,7 +317,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
 .activity-button--active {
   color: rgb(var(--v-theme-primary));
   opacity: 1;
-  background: rgba(var(--v-theme-primary), .1);
+  background: rgba(var(--v-theme-primary), 0.1);
 }
 
 .activity-button--active::before {
@@ -283,7 +365,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   margin: 4px 4px 10px;
   color: rgb(var(--v-theme-on-surface));
   font-size: 12px;
-  opacity: .7;
+  opacity: 0.7;
 }
 
 .history-save {
@@ -299,9 +381,9 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   color: rgb(var(--v-theme-on-surface));
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: .65;
+  opacity: 0.65;
 }
 
 .checkpoint-item {
@@ -314,7 +396,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
 
 .checkpoint-item:hover,
 .checkpoint-item:focus-within {
-  background: rgba(var(--v-theme-on-surface), .06);
+  background: rgba(var(--v-theme-on-surface), 0.06);
 }
 
 .checkpoint-restore {
@@ -343,7 +425,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
 
 .checkpoint-restore small {
   font-size: 10px;
-  opacity: .6;
+  opacity: 0.6;
 }
 
 .history-item {
@@ -362,7 +444,7 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
 .history-item:hover,
 .history-item:focus-visible,
 .history-item--current {
-  background: rgba(var(--v-theme-primary), .1);
+  background: rgba(var(--v-theme-primary), 0.1);
 }
 
 .history-current {
@@ -379,14 +461,14 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   color: rgb(var(--v-theme-on-surface));
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .explorer-heading__hint {
   margin-left: auto;
   font-size: 9px;
-  opacity: .5;
+  opacity: 0.5;
 }
 
 .sidebar-section-heading--layers {
@@ -420,7 +502,8 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 
-.prefab-row:hover .prefab-actions, .prefab-row:focus-within .prefab-actions {
+.prefab-row:hover .prefab-actions,
+.prefab-row:focus-within .prefab-actions {
   opacity: 1;
 }
 
@@ -479,7 +562,9 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   background: rgba(var(--v-theme-surface), 0.9);
   color: rgb(var(--v-theme-on-surface));
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .wrap-chip:hover {
@@ -493,5 +578,8 @@ const formatCheckpointDate = (createdAt: number) => checkpointDateFormatter.form
   border-color: rgb(var(--v-theme-warning));
   color: rgb(var(--v-theme-warning));
 }
-.wrap-chip:disabled { opacity: .6; cursor: not-allowed; }
+.wrap-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>

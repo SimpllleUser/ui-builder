@@ -68,7 +68,8 @@ export function moveNode(
   const node = context.findNodeById(id)
   const location = context.findParentAndIndex(id)
   const parent = context.findNodeById(parentId)
-  if (!node || !location || !parent || !context.canContain(parent, slotName) || context.findNodeById(parentId, node)) return false
+  if (!node || !location || !parent || !context.canContain(parent, slotName) || context.findNodeById(parentId, node))
+    return false
 
   context.commit()
   context.getNodeList(location).splice(location.index, 1)
@@ -82,7 +83,9 @@ export function moveNode(
 
 export function canReorder(context: NodeMutationContext, id: string, direction: number): boolean {
   const location = context.findParentAndIndex(id)
-  return !!location && location.index + direction >= 0 && location.index + direction < context.getNodeList(location).length
+  return (
+    !!location && location.index + direction >= 0 && location.index + direction < context.getNodeList(location).length
+  )
 }
 
 export function reorderNode(context: NodeMutationContext, id: string, direction: number): void {
@@ -95,7 +98,12 @@ export function reorderNode(context: NodeMutationContext, id: string, direction:
   context.commit()
 }
 
-export interface NodeLogicPatch { model?: string; vIf?: string; vFor?: string; events?: UiNodeEvents }
+export interface NodeLogicPatch {
+  model?: string
+  vIf?: string
+  vFor?: string
+  events?: UiNodeEvents
+}
 
 /** Sets bindings and events. An empty value, or `events` without a click action, removes that setting. */
 export function updateNodeLogic(context: NodeMutationContext, id: string, patch: NodeLogicPatch): boolean {

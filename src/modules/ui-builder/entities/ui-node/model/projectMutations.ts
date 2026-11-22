@@ -18,7 +18,12 @@ export interface ProjectMutationContext {
   createNode(type: string, name?: string): UiNode
 }
 
-const slugify = (name: string) => `/${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`
+const slugify = (name: string) =>
+  `/${name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')}`
 
 const isPathTaken = (project: Project, path: string, exceptPageId?: string) =>
   project.pages.some(page => page.path === path && page.id !== exceptPageId)
@@ -52,8 +57,14 @@ export function addPage(context: ProjectMutationContext, name: string, path?: st
 
   const explicitPath = path?.trim()
   const wanted = explicitPath || slugify(trimmedName)
-  if (!isValidPagePath(wanted)) { context.setNotice(INVALID_PATH_MESSAGE); return null }
-  if (explicitPath && isPathTaken(project, wanted)) { context.setNotice(`A page already uses ${wanted}.`); return null }
+  if (!isValidPagePath(wanted)) {
+    context.setNotice(INVALID_PATH_MESSAGE)
+    return null
+  }
+  if (explicitPath && isPathTaken(project, wanted)) {
+    context.setNotice(`A page already uses ${wanted}.`)
+    return null
+  }
 
   const page = emptyPage(trimmedName, uniquePath(project, wanted === '/' ? '/page' : wanted))
   undoable(context, () => project.pages.push(page))
@@ -61,7 +72,11 @@ export function addPage(context: ProjectMutationContext, name: string, path?: st
   return page
 }
 
-export function updatePage(context: ProjectMutationContext, id: string, patch: { name?: string; path?: string }): boolean {
+export function updatePage(
+  context: ProjectMutationContext,
+  id: string,
+  patch: { name?: string; path?: string },
+): boolean {
   const { project } = context
   const page = project.pages.find(item => item.id === id)
   if (!page) return false
@@ -112,10 +127,14 @@ export function setStateVariable(context: ProjectMutationContext, name: string, 
     context.setNotice('State names use letters, digits and _, and cannot start with a digit.')
     return false
   }
-  undoable(context, () => { context.project.state[name] = value })
+  undoable(context, () => {
+    context.project.state[name] = value
+  })
   return true
 }
 
 export function removeStateVariable(context: ProjectMutationContext, name: string) {
-  undoable(context, () => { delete context.project.state[name] })
+  undoable(context, () => {
+    delete context.project.state[name]
+  })
 }

@@ -7,15 +7,46 @@ import { DOCUMENT_KEY, emptyProject, parseProject, serializeProject } from './do
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import { usePreviewRuntime } from './previewRuntime'
 import {
-  addPage as addPageMutation, deletePage as deletePageMutation, editLayout as editLayoutMutation, removeLayout as removeLayoutMutation,
-  removeStateVariable as removeStateVariableMutation, selectPage as selectPageMutation, setStateVariable as setStateVariableMutation,
-  updatePage as updatePageMutation, type ProjectMutationContext,
+  addPage as addPageMutation,
+  deletePage as deletePageMutation,
+  editLayout as editLayoutMutation,
+  removeLayout as removeLayoutMutation,
+  removeStateVariable as removeStateVariableMutation,
+  selectPage as selectPageMutation,
+  setStateVariable as setStateVariableMutation,
+  updatePage as updatePageMutation,
+  type ProjectMutationContext,
 } from './projectMutations'
-import { findNodeById as findNodeByIdInTree, findParentAndIndex as findParentAndIndexInTree, getNodeList, type NodeLocation } from './treeUtils'
+import {
+  findNodeById as findNodeByIdInTree,
+  findParentAndIndex as findParentAndIndexInTree,
+  getNodeList,
+  type NodeLocation,
+} from './treeUtils'
 import { createHistory } from './history'
-import { appendNode, updateNodeLogic as updateNodeLogicMutation, type NodeLogicPatch, canReorder as canReorderNode, deleteNode as deleteNodeMutation, duplicateNode as duplicateNodeMutation, moveNode as moveNodeMutation, reorderNode as reorderNodeMutation } from './nodeMutations'
-import { areNodesSiblings as areNodesSiblingsMutation, getUnwrapReason, unwrapNode as unwrapNodeMutation, wrapNodes as wrapNodesMutation, type ContainerMutationContext } from './containerMutations'
-import { deletePrefab as deletePrefabMutation, insertPrefab as insertPrefabMutation, savePrefab as savePrefabMutation, type PrefabMutationContext } from './prefabMutations'
+import {
+  appendNode,
+  updateNodeLogic as updateNodeLogicMutation,
+  type NodeLogicPatch,
+  canReorder as canReorderNode,
+  deleteNode as deleteNodeMutation,
+  duplicateNode as duplicateNodeMutation,
+  moveNode as moveNodeMutation,
+  reorderNode as reorderNodeMutation,
+} from './nodeMutations'
+import {
+  areNodesSiblings as areNodesSiblingsMutation,
+  getUnwrapReason,
+  unwrapNode as unwrapNodeMutation,
+  wrapNodes as wrapNodesMutation,
+  type ContainerMutationContext,
+} from './containerMutations'
+import {
+  deletePrefab as deletePrefabMutation,
+  insertPrefab as insertPrefabMutation,
+  savePrefab as savePrefabMutation,
+  type PrefabMutationContext,
+} from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateKind } from './templateFactory'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
@@ -35,9 +66,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const project = ref<Project>(initial)
   const activePageId = ref(initial.pages[0].id)
   const editingLayout = ref(false)
-  const activePage = computed(() => project.value.pages.find(page => page.id === activePageId.value) ?? project.value.pages[0])
+  const activePage = computed(
+    () => project.value.pages.find(page => page.id === activePageId.value) ?? project.value.pages[0],
+  )
   /** The tree being edited: the shared layout or the active page. Every editing command works on it. */
-  const setNotice = (message: string) => { notice.value = message }
+  const setNotice = (message: string) => {
+    notice.value = message
+  }
   const rootNode = computed<UiNode>({
     get: () => (editingLayout.value && project.value.layout) || activePage.value.root,
     set: value => {
@@ -64,8 +99,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       notice.value = 'Could not save in this browser. Export your page to keep a backup.'
     }
   }
-  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null =>
-    findNodeByIdInTree(id, node)
+  const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => findNodeByIdInTree(id, node)
 
   const history = createHistory(
     () => JSON.stringify(project.value),
@@ -128,31 +162,43 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     checkpoints.value = checkpoints.value.filter(item => item.checkpointId !== checkpointId)
   }
 
-  watch(project, () => {
-    saveState.value = 'saving'
+  watch(
+    project,
+    () => {
+      saveState.value = 'saving'
+      clearTimeout(saveTimer)
+      saveTimer = setTimeout(saveDocument, 250)
+      if (!history.isRestoring.value) {
+        clearTimeout(historyTimer)
+        historyTimer = setTimeout(commit, HISTORY_COMMIT_DELAY_MS)
+      }
+    },
+    { deep: true, flush: 'sync' },
+  )
+  onScopeDispose(() => {
+    clearTimeout(historyTimer)
     clearTimeout(saveTimer)
-    saveTimer = setTimeout(saveDocument, 250)
-    if (!history.isRestoring.value) {
-      clearTimeout(historyTimer)
-      historyTimer = setTimeout(commit, HISTORY_COMMIT_DELAY_MS)
-    }
-  }, { deep: true, flush: 'sync' })
-  onScopeDispose(() => { clearTimeout(historyTimer); clearTimeout(saveTimer) })
+  })
 
   const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): NodeLocation | null =>
     findParentAndIndexInTree(id, parent)
   const canContain = (node: UiNode, slotName: string | null = null) => {
     const def = getComponentDef(node.type)
-    return !!def && (slotName
-      ? slotName !== 'default' && getNodeSlots(node).some(s => s.name === slotName)
-      : !def.isLeaf && def.slots.some(s => s.name === 'default'))
+    return (
+      !!def &&
+      (slotName
+        ? slotName !== 'default' && getNodeSlots(node).some(s => s.name === slotName)
+        : !def.isLeaf && def.slots.some(s => s.name === 'default'))
+    )
   }
   const insertionTarget = computed(() => {
     let node = selectedNodeId.value ? findNodeById(selectedNodeId.value) : rootNode.value
     while (node && !canContain(node)) node = findParentAndIndex(node.id)?.parent ?? null
     return node ?? rootNode.value
   })
-  const selectNode = (id: string | null) => { selectedNodeIds.value = id && findNodeById(id) ? [id] : [] }
+  const selectNode = (id: string | null) => {
+    selectedNodeIds.value = id && findNodeById(id) ? [id] : []
+  }
   const renameNode = (id: string, name: string) => {
     const node = findNodeById(id)
     const trimmedName = name.trim()
@@ -200,9 +246,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     },
     createNode: (type, name) => createNode(type, name),
     getComponentDef,
-    setSelectedNodeIds: ids => { selectedNodeIds.value = ids },
+    setSelectedNodeIds: ids => {
+      selectedNodeIds.value = ids
+    },
     getPrefabs: () => prefabs.value,
-    setPrefabs: value => { prefabs.value = value },
+    setPrefabs: value => {
+      prefabs.value = value
+    },
     getInsertionTargetId: () => insertionTarget.value.id,
     appendNode: (parentId, node, slotName) => appendNode(mutationContext, parentId, node, slotName),
   }
@@ -211,18 +261,23 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (!def) throw new Error('Unknown component type')
     const id = createNodeId()
     return {
-      id, type, name: name ?? def.label, props: { ...def.defaultProps }, classes: [...def.defaultClasses], slots: {},
+      id,
+      type,
+      name: name ?? def.label,
+      props: { ...def.defaultProps },
+      classes: [...def.defaultClasses],
+      slots: {},
       children: def.defaultTextChild
         ? [{ id: `${id}_text`, type: TEXT_NODE_TYPE, name: def.label, props: {}, classes: [], children: [], slots: {} }]
         : (def.defaultChildren ?? []).map(child => {
-          if (typeof child === 'string') return createNode(child)
-          const childNode = createNode(child.type, child.name)
-          Object.assign(childNode.props, child.props)
-          if (child.name && childNode.children[0]?.type === TEXT_NODE_TYPE) {
-            childNode.children[0].name = child.name
-          }
-          return childNode
-        }),
+            if (typeof child === 'string') return createNode(child)
+            const childNode = createNode(child.type, child.name)
+            Object.assign(childNode.props, child.props)
+            if (child.name && childNode.children[0]?.type === TEXT_NODE_TYPE) {
+              childNode.children[0].name = child.name
+            }
+            return childNode
+          }),
     }
   }
   const append = (parentId: string, node: UiNode, slotName: string | null = null) =>
@@ -262,11 +317,19 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   // ─── Pages, shared layout and project state ──────────────────────────────
   const pages = computed(() => project.value.pages)
   const projectContext: ProjectMutationContext = {
-    get project() { return project.value },
+    get project() {
+      return project.value
+    },
     getActivePageId: () => activePageId.value,
-    setActivePageId: id => { activePageId.value = id },
-    setEditingLayout: editing => { editingLayout.value = editing },
-    clearSelection: () => { selectedNodeIds.value = [] },
+    setActivePageId: id => {
+      activePageId.value = id
+    },
+    setEditingLayout: editing => {
+      editingLayout.value = editing
+    },
+    clearSelection: () => {
+      selectedNodeIds.value = []
+    },
     commit,
     setNotice,
     createNode: (type, name) => createNode(type, name),
@@ -277,9 +340,32 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const addTemplate = (kind: TemplateKind) => addTemplateMutation(mutationContext, kind)
 
   return {
-    project, pages, activePage, activePageId, editingLayout, rootNode, selectedNodeIds, selectedNodeId, isPreviewMode, prefabs, notice, saveState,
-    canUndo, canRedo, historyVersions, historyPending: history.pending, checkpoints, undo, redo, restoreHistoryVersion,
-    createCheckpoint, restoreCheckpoint, deleteCheckpoint, commit, saveDocument, importDocument,
+    project,
+    pages,
+    activePage,
+    activePageId,
+    editingLayout,
+    rootNode,
+    selectedNodeIds,
+    selectedNodeId,
+    isPreviewMode,
+    prefabs,
+    notice,
+    saveState,
+    canUndo,
+    canRedo,
+    historyVersions,
+    historyPending: history.pending,
+    checkpoints,
+    undo,
+    redo,
+    restoreHistoryVersion,
+    createCheckpoint,
+    restoreCheckpoint,
+    deleteCheckpoint,
+    commit,
+    saveDocument,
+    importDocument,
     exportDocument: () => serializeProject(project.value),
     selectPage: (id: string) => selectPageMutation(projectContext, id),
     addPage: (name: string, path?: string) => addPageMutation(projectContext, name, path),
@@ -290,17 +376,44 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     setStateVariable: (name: string, value: unknown) => setStateVariableMutation(projectContext, name, value),
     removeStateVariable: (name: string) => removeStateVariableMutation(projectContext, name),
     updateNodeLogic,
-    runtimeState: preview.state, previewPageId: preview.pageId, previewPage: preview.page, previewRoot: preview.root,
-    navigate: preview.navigate, dispatchAction: preview.dispatch,
-    findNodeById, findParentAndIndex, pathTo, createNode, canContain, insertionTarget,
-    addComponent, addTemplate, duplicateNode, deleteNode, savePrefab, insertPrefab,
+    runtimeState: preview.state,
+    previewPageId: preview.pageId,
+    previewPage: preview.page,
+    previewRoot: preview.root,
+    navigate: preview.navigate,
+    dispatchAction: preview.dispatch,
+    findNodeById,
+    findParentAndIndex,
+    pathTo,
+    createNode,
+    canContain,
+    insertionTarget,
+    addComponent,
+    addTemplate,
+    duplicateNode,
+    deleteNode,
+    savePrefab,
+    insertPrefab,
     deletePrefab: (id: string) => deletePrefabMutation(mutationContext, id),
-    selectNode, renameNode, updateSlotChildren, updateNodeClasses, updateNodeName, updateNodeProp,
+    selectNode,
+    renameNode,
+    updateSlotChildren,
+    updateNodeClasses,
+    updateNodeName,
+    updateNodeProp,
     toggleMultiSelect: (id: string) => {
       if (!findNodeById(id)) return
-      selectedNodeIds.value = selectedNodeIds.value.includes(id) ? selectedNodeIds.value.filter(i => i !== id) : [...selectedNodeIds.value, id]
+      selectedNodeIds.value = selectedNodeIds.value.includes(id)
+        ? selectedNodeIds.value.filter(i => i !== id)
+        : [...selectedNodeIds.value, id]
     },
-    areNodesSiblings, wrapNodes, unwrapReason, unwrapNode, moveNode, reorderNode, canReorder,
+    areNodesSiblings,
+    wrapNodes,
+    unwrapReason,
+    unwrapNode,
+    moveNode,
+    reorderNode,
+    canReorder,
     appendChild: (id: string, node: UiNode) => append(id, node),
     appendToSlot: (id: string, slot: string, node: UiNode) => append(id, node, slot),
   }

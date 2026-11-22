@@ -1,9 +1,13 @@
 import type { UiAction } from '../entities/ui-node/model/types'
 import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
-export const pageSummary = (store: Store) => store.pages.map(page => ({
-  id: page.id, name: page.name, path: page.path, active: page.id === store.activePage.id && !store.editingLayout,
-}))
+export const pageSummary = (store: Store) =>
+  store.pages.map(page => ({
+    id: page.id,
+    name: page.name,
+    path: page.path,
+    active: page.id === store.activePage.id && !store.editingLayout,
+  }))
 const needPage = (store: Store, id: unknown) => {
   const page = store.pages.find(item => item.id === id || item.path === id)
   if (!page) throw new Error(`Page not found: ${String(id)}`)
@@ -11,7 +15,11 @@ const needPage = (store: Store, id: unknown) => {
 }
 
 export const MCP_PAGE_COMMANDS: Record<string, McpCommand> = {
-  list_pages: store => ({ pages: pageSummary(store), hasLayout: !!store.project.layout, editingLayout: store.editingLayout }),
+  list_pages: store => ({
+    pages: pageSummary(store),
+    hasLayout: !!store.project.layout,
+    editingLayout: store.editingLayout,
+  }),
   add_page(store, a) {
     const page = store.addPage(a.name, a.path)
     if (!page) throw new Error(store.notice || 'Could not add page')
@@ -31,7 +39,10 @@ export const MCP_PAGE_COMMANDS: Record<string, McpCommand> = {
     ok(store.deletePage(needPage(store, a.id).id), 'Cannot delete the last page')
     return { pages: pageSummary(store) }
   },
-  edit_layout: (store, a) => { store.editLayout(a.enabled !== false); return { editingLayout: store.editingLayout } },
+  edit_layout: (store, a) => {
+    store.editLayout(a.enabled !== false)
+    return { editingLayout: store.editingLayout }
+  },
   set_state(store, a) {
     if (a.value === null) store.removeStateVariable(a.name)
     else ok(store.setStateVariable(a.name, a.value), store.notice || 'Invalid state name')

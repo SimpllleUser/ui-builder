@@ -36,7 +36,11 @@ export function interpolateProps(props: Record<string, unknown>, scope: Scope): 
 
 export function parseLiteral(text: string): unknown {
   const trimmed = text.trim()
-  try { return JSON.parse(trimmed) } catch { /* plain text */ }
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    /* plain text */
+  }
   return trimmed.replace(/^(['"])(.*)\1$/, '$2')
 }
 
@@ -59,7 +63,8 @@ export function repeatItems(source: string | undefined, scope: Scope): unknown[]
   if (!source?.trim()) return null
   const value = resolvePath(source.trim(), scope)
   if (Array.isArray(value)) return value
-  if (typeof value === 'number' && Number.isFinite(value)) return Array.from({ length: Math.min(Math.max(0, Math.floor(value)), 500) }, (_, i) => i + 1)
+  if (typeof value === 'number' && Number.isFinite(value))
+    return Array.from({ length: Math.min(Math.max(0, Math.floor(value)), 500) }, (_, i) => i + 1)
   return []
 }
 

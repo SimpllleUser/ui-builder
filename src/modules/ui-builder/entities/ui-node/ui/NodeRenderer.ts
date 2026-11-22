@@ -5,7 +5,15 @@ import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../model/store'
 import { getComponentDef } from '../model/componentDefinitions'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from '../model/constants'
-import { applyMask, bindAction, evaluateCondition, interpolate, interpolateProps, repeatItems, type Scope } from '../model/runtime'
+import {
+  applyMask,
+  bindAction,
+  evaluateCondition,
+  interpolate,
+  interpolateProps,
+  repeatItems,
+  type Scope,
+} from '../model/runtime'
 import type { UiNode } from '../model/types'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
 import { statusChipSlots, tableHeight } from './dataTableRendering'
@@ -44,42 +52,76 @@ const NodeRenderer = defineComponent({
         const items = preview ? repeatItems(child.vFor, { ...bindingScope, ...base }) : null
         if (!items) return [h(NodeRenderer, { key: child.id, node: child, scope: base, inPage: props.inPage })]
         return items.map((item, index) =>
-          h(NodeRenderer, { key: `${child.id}:${index}`, node: child, scope: { ...base, item, index }, inPage: props.inPage }))
+          h(NodeRenderer, {
+            key: `${child.id}:${index}`,
+            node: child,
+            scope: { ...base, item, index },
+            inPage: props.inPage,
+          }),
+        )
       })
 
-    const renderText = (node: UiNode, preview: boolean, scope: Scope) => h('span', {
-      style: 'display: inline-block; min-width: 8px;',
-      'data-node-id': node.id,
-      onClick: preview ? undefined : (e: MouseEvent) => select(e, node.id),
-      class: [
-        ...node.classes,
-        { 'ui-builder-element': !preview },
-        { 'is-selected': !preview && selectedNodeIds.value.includes(node.id) },
-      ],
-    }, preview || props.scope.item !== undefined ? String(interpolate(node.name, scope) ?? '') : node.name)
+    const renderText = (node: UiNode, preview: boolean, scope: Scope) =>
+      h(
+        'span',
+        {
+          style: 'display: inline-block; min-width: 8px;',
+          'data-node-id': node.id,
+          onClick: preview ? undefined : (e: MouseEvent) => select(e, node.id),
+          class: [
+            ...node.classes,
+            { 'ui-builder-element': !preview },
+            { 'is-selected': !preview && selectedNodeIds.value.includes(node.id) },
+          ],
+        },
+        preview || props.scope.item !== undefined ? String(interpolate(node.name, scope) ?? '') : node.name,
+      )
 
     const renderOutlet = (node: UiNode, preview: boolean) => {
-      if (preview) return props.inPage ? null : h(NodeRenderer, { node: store.previewPage.root, inPage: true, key: store.previewPage.id })
-      return h('div', {
-        'data-node-id': node.id,
-        class: ['ui-builder-element', 'outlet-placeholder', { 'is-selected': selectedNodeIds.value.includes(node.id) }],
-        onClick: (e: MouseEvent) => select(e, node.id),
-      }, 'Page content appears here')
+      if (preview)
+        return props.inPage
+          ? null
+          : h(NodeRenderer, { node: store.previewPage.root, inPage: true, key: store.previewPage.id })
+      return h(
+        'div',
+        {
+          'data-node-id': node.id,
+          class: [
+            'ui-builder-element',
+            'outlet-placeholder',
+            { 'is-selected': selectedNodeIds.value.includes(node.id) },
+          ],
+          onClick: (e: MouseEvent) => select(e, node.id),
+        },
+        'Page content appears here',
+      )
     }
 
     const renderOverlayPlaceholder = (node: UiNode, classes: unknown[], render: (nodes: UiNode[]) => VNode[]) => {
-      const label = h('div', { class: 'overlay-placeholder__label' },
-        `${getComponentDef(node.type)?.label ?? node.type} — ${node.type === 'VTooltip' ? String(node.props.text ?? '') : 'opens in preview'}`)
+      const label = h(
+        'div',
+        { class: 'overlay-placeholder__label' },
+        `${getComponentDef(node.type)?.label ?? node.type} — ${node.type === 'VTooltip' ? String(node.props.text ?? '') : 'opens in preview'}`,
+      )
       const isLeaf = !!getComponentDef(node.type)?.isLeaf
-      return h('div', {
-        'data-node-id': node.id,
-        class: ['ui-builder-element', 'overlay-placeholder', ...classes, {
-          'is-selected': selectedNodeIds.value.includes(node.id),
-          'is-drag-over': !isLeaf && canvasDragTargetId.value === node.id,
-        }],
-        onClick: (e: MouseEvent) => select(e, node.id),
-        ...(isLeaf ? {} : createDropHandlers(store, node)),
-      }, [label, ...render(node.children), ...Object.values(node.slots).flatMap(render)])
+      return h(
+        'div',
+        {
+          'data-node-id': node.id,
+          class: [
+            'ui-builder-element',
+            'overlay-placeholder',
+            ...classes,
+            {
+              'is-selected': selectedNodeIds.value.includes(node.id),
+              'is-drag-over': !isLeaf && canvasDragTargetId.value === node.id,
+            },
+          ],
+          onClick: (e: MouseEvent) => select(e, node.id),
+          ...(isLeaf ? {} : createDropHandlers(store, node)),
+        },
+        [label, ...render(node.children), ...Object.values(node.slots).flatMap(render)],
+      )
     }
 
     /** Default and named slots. A data table's cell slots receive the row (`item`), cell `value` and `index`. */
@@ -88,10 +130,11 @@ const NodeRenderer = defineComponent({
       if (!getComponentDef(node.type)?.isLeaf) slots.default = () => render(node.children)
       for (const [slotName, slotChildren] of Object.entries(node.slots)) {
         if (!slotChildren.length) continue
-        slots[slotName] = node.type === 'VDataTable'
-          ? ({ item, value, index }: { item: unknown; value: unknown; index: number }) =>
-            render(slotChildren, { ...props.scope, item, value, index })
-          : () => render(slotChildren)
+        slots[slotName] =
+          node.type === 'VDataTable'
+            ? ({ item, value, index }: { item: unknown; value: unknown; index: number }) =>
+                render(slotChildren, { ...props.scope, item, value, index })
+            : () => render(slotChildren)
       }
       return slots
     }
@@ -103,16 +146,21 @@ const NodeRenderer = defineComponent({
         const key = node.model
         bindings.modelValue = store.runtimeState[key]
         bindings['onUpdate:modelValue'] = (value: unknown) => {
-          store.runtimeState[key] = typeof value === 'string' && typeof mask === 'string' && mask ? applyMask(value, mask) : value
+          store.runtimeState[key] =
+            typeof value === 'string' && typeof mask === 'string' && mask ? applyMask(value, mask) : value
         }
       }
       const click = node.events?.click
       if (click) {
         if (node.type === 'VDataTable') {
-          bindings['onClick:row'] = (_: Event, row: { item: unknown }) => store.dispatchAction(bindAction(click, { ...scope, item: row.item }))
+          bindings['onClick:row'] = (_: Event, row: { item: unknown }) =>
+            store.dispatchAction(bindAction(click, { ...scope, item: row.item }))
         } else {
           // Stop here so a button inside a table cell does not also trigger the row click.
-          bindings.onClick = (e: Event) => { e.stopPropagation(); store.dispatchAction(bindAction(click, scope)) }
+          bindings.onClick = (e: Event) => {
+            e.stopPropagation()
+            store.dispatchAction(bindAction(click, scope))
+          }
         }
       }
       return bindings
@@ -139,21 +187,30 @@ const NodeRenderer = defineComponent({
         node.type in Components ? Components[node.type as keyof typeof Components] : node.type,
       ) as Component | string
 
-      if (preview) return h(VComponent, { ...componentProps, ...extraProps, ...previewBindings(node, mask, scope), class: classes }, slots)
+      if (preview)
+        return h(
+          VComponent,
+          { ...componentProps, ...extraProps, ...previewBindings(node, mask, scope), class: classes },
+          slots,
+        )
 
-      return h(VComponent, {
-        ...componentProps,
-        ...extraProps,
-        'data-node-id': node.id,
-        class: [
-          ...classes,
-          'ui-builder-element',
-          { 'is-selected': selectedNodeIds.value.includes(node.id) },
-          { 'is-drag-over': !isLeaf && canvasDragTargetId.value === node.id },
-        ],
-        onClick: (e: MouseEvent) => select(e, node.id),
-        ...(store.canContain(node) ? createDropHandlers(store, node) : {}),
-      }, slots)
+      return h(
+        VComponent,
+        {
+          ...componentProps,
+          ...extraProps,
+          'data-node-id': node.id,
+          class: [
+            ...classes,
+            'ui-builder-element',
+            { 'is-selected': selectedNodeIds.value.includes(node.id) },
+            { 'is-drag-over': !isLeaf && canvasDragTargetId.value === node.id },
+          ],
+          onClick: (e: MouseEvent) => select(e, node.id),
+          ...(store.canContain(node) ? createDropHandlers(store, node) : {}),
+        },
+        slots,
+      )
     }
 
     return (): VNode | null => {

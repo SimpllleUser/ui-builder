@@ -5,12 +5,21 @@ import type { Page, Project, UiNode } from './types'
 
 export const DOCUMENT_KEY = 'ui-builder:document:v1'
 export const emptyDocument = (name = 'Untitled page'): UiNode => ({
-  id: ROOT_NODE_ID, type: 'VCard', name,
+  id: ROOT_NODE_ID,
+  type: 'VCard',
+  name,
   props: { variant: 'flat', color: 'transparent' },
-  classes: ['w-100', 'pa-4'], children: [], slots: {},
+  classes: ['w-100', 'pa-4'],
+  children: [],
+  slots: {},
 })
 
-export const emptyPage = (name = 'Home', path = '/'): Page => ({ id: createNodeId('page'), name, path, root: emptyDocument(name) })
+export const emptyPage = (name = 'Home', path = '/'): Page => ({
+  id: createNodeId('page'),
+  name,
+  path,
+  root: emptyDocument(name),
+})
 export const emptyProject = (): Project => ({ pages: [emptyPage()], layout: null, state: {} })
 
 /** Layout with a top bar, a navigation drawer and the place where the current page is rendered. */
@@ -28,5 +37,4 @@ export function parseProject(text: string): Project {
   return validateProject(JSON.parse(text) as unknown)
 }
 
-export const serializeProject = (project: Project) =>
-  JSON.stringify({ version: DOCUMENT_VERSION, ...project }, null, 2)
+export const serializeProject = (project: Project) => JSON.stringify({ version: DOCUMENT_VERSION, ...project }, null, 2)

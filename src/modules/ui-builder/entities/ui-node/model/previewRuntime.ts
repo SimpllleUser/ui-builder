@@ -24,7 +24,13 @@ export function usePreviewRuntime({ project, activePage, isPreviewMode, setNotic
     if (target) pageId.value = target.id
     else setNotice(`No page with path ${wanted || '(empty)'}.`)
   }
-  const dispatch = (action: UiAction | undefined) => runAction(action, { get state() { return state.value }, navigate })
+  const dispatch = (action: UiAction | undefined) =>
+    runAction(action, {
+      get state() {
+        return state.value
+      },
+      navigate,
+    })
 
   watch(isPreviewMode, on => {
     if (!on) return

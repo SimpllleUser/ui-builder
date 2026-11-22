@@ -4,5 +4,5 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [vue({ template: { transformAssetUrls } }), vuetify({ autoImport: true })],
-  server: { port: 3001 }
+  server: { port: 3001 },
 })

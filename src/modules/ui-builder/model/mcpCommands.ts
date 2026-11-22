@@ -21,7 +21,7 @@ const applyStyleAndAttrs = (node: UiNode, a: Args) => {
     else if (typeof a.style === 'string') node.props.style = a.style
     else {
       const current = node.props.style
-      const base = current && typeof current === 'object' ? current as Record<string, unknown> : {}
+      const base = current && typeof current === 'object' ? (current as Record<string, unknown>) : {}
       node.props.style = { ...base, ...a.style }
     }
   }
@@ -34,13 +34,21 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
   ...MCP_PAGE_COMMANDS,
   get_document: store => ({
     editing: store.editingLayout ? 'layout' : store.activePage.id,
-    pages: pageSummary(store), hasLayout: !!store.project.layout, state: store.project.state,
-    root: summarize(store.rootNode), selected: store.selectedNodeIds,
+    pages: pageSummary(store),
+    hasLayout: !!store.project.layout,
+    state: store.project.state,
+    root: summarize(store.rootNode),
+    selected: store.selectedNodeIds,
   }),
   get_node: (store, a) => summarize(need(store, a.id)),
-  list_components: () => Object.values(COMPONENT_DEFS).map(d => ({
-    type: d.type, label: d.label, isLeaf: !!d.isLeaf, slots: d.slots.map(s => s.name), defaultProps: d.defaultProps,
-  })),
+  list_components: () =>
+    Object.values(COMPONENT_DEFS).map(d => ({
+      type: d.type,
+      label: d.label,
+      isLeaf: !!d.isLeaf,
+      slots: d.slots.map(s => s.name),
+      defaultProps: d.defaultProps,
+    })),
   add_component(store, a) {
     const parent = need(store, a.parentId ?? store.rootNode.id)
     const node = store.createNode(a.type)
@@ -49,7 +57,10 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     if (a.classes) node.classes = a.classes
     if (a.text !== undefined) setText(store, node, a.text)
     applyStyleAndAttrs(node, a)
-    ok(a.slot ? store.appendToSlot(parent.id, a.slot, node) : store.appendChild(parent.id, node), `${parent.name} cannot contain ${a.type}${a.slot ? ` in slot ${a.slot}` : ''}`)
+    ok(
+      a.slot ? store.appendToSlot(parent.id, a.slot, node) : store.appendChild(parent.id, node),
+      `${parent.name} cannot contain ${a.type}${a.slot ? ` in slot ${a.slot}` : ''}`,
+    )
     return { id: node.id }
   },
   update_node(store, a) {
@@ -72,7 +83,8 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     return { deleted: a.id }
   },
   move_node(store, a) {
-    need(store, a.id); need(store, a.parentId)
+    need(store, a.id)
+    need(store, a.parentId)
     ok(store.moveNode(a.id, a.parentId, a.slot ?? null), 'Cannot move node there')
     return { moved: a.id }
   },
@@ -81,11 +93,23 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     store.addTemplate(a.kind as TemplateKind)
     return { notice: store.notice }
   },
-  select_node: (store, a) => { store.selectNode(a.id ?? null); return { selected: store.selectedNodeIds } },
-  undo: store => { store.undo(); return { canUndo: store.canUndo, canRedo: store.canRedo } },
-  redo: store => { store.redo(); return { canUndo: store.canUndo, canRedo: store.canRedo } },
+  select_node: (store, a) => {
+    store.selectNode(a.id ?? null)
+    return { selected: store.selectedNodeIds }
+  },
+  undo: store => {
+    store.undo()
+    return { canUndo: store.canUndo, canRedo: store.canRedo }
+  },
+  redo: store => {
+    store.redo()
+    return { canUndo: store.canUndo, canRedo: store.canRedo }
+  },
   export_document: store => store.exportDocument(),
-  import_document: (store, a) => { store.importDocument(a.json); return { notice: store.notice } },
+  import_document: (store, a) => {
+    store.importDocument(a.json)
+    return { notice: store.notice }
+  },
 }
 
 export function executeMcpCommand(store: Store, command: string, args: Args = {}) {

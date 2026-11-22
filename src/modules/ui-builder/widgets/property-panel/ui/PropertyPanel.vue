@@ -23,21 +23,36 @@ const selectedNode = computed(() => {
   if (!selectedNodeId.value || selectedNodeIds.value.length !== 1) return null
   return store.findNodeById(selectedNodeId.value)
 })
-const { classSearch, filteredGroups, toggleClass, addCustomClass } = useClassEditor(
-  selectedNode,
-  (id, classes) => store.updateNodeClasses(id, classes),
+const { classSearch, filteredGroups, toggleClass, addCustomClass } = useClassEditor(selectedNode, (id, classes) =>
+  store.updateNodeClasses(id, classes),
 )
-const { activeSpacingType, spacingSides, spacingSizes, commonSpacing, updateCommonSpacing, updateSpacing, getSpacingValue } = useSpacingEditor(
+const {
+  activeSpacingType,
+  spacingSides,
+  spacingSizes,
+  commonSpacing,
+  updateCommonSpacing,
+  updateSpacing,
+  getSpacingValue,
+} = useSpacingEditor(
   selectedNode,
   selectedNodeIds,
   id => store.findNodeById(id),
   (id, classes) => store.updateNodeClasses(id, classes),
   () => store.commit(),
 )
-const { flexOptions, fontWeights, getFlexValue, setFlexValue, getJustifyValue, setJustifyValue, getFontWeight, setFontWeight, getTextAlign, setTextAlign } = useStyleEditor(
-  selectedNode,
-  (id, classes) => store.updateNodeClasses(id, classes),
-)
+const {
+  flexOptions,
+  fontWeights,
+  getFlexValue,
+  setFlexValue,
+  getJustifyValue,
+  setJustifyValue,
+  getFontWeight,
+  setFontWeight,
+  getTextAlign,
+  setTextAlign,
+} = useStyleEditor(selectedNode, (id, classes) => store.updateNodeClasses(id, classes))
 
 const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
 
@@ -45,19 +60,40 @@ const activeTab = ref('content')
 const fieldTab = (field: PropField, title: string) => {
   if (field.kind === 'custom-classes') return 'advanced'
   if (field.kind === 'table-editor') return 'content'
-  if (['spacing', 'flex-layout', 'row'].includes(field.kind) || ['Layout', 'Grid Column'].includes(title)) return 'layout'
-  if (field.kind === 'textarea' || (field.kind === 'text' && ['title', 'subtitle', 'label', 'placeholder', 'hint', 'src', 'alt', 'image', 'value'].includes(field.prop))) return 'content'
+  if (['spacing', 'flex-layout', 'row'].includes(field.kind) || ['Layout', 'Grid Column'].includes(title))
+    return 'layout'
+  if (
+    field.kind === 'textarea' ||
+    (field.kind === 'text' &&
+      ['title', 'subtitle', 'label', 'placeholder', 'hint', 'src', 'alt', 'image', 'value'].includes(field.prop))
+  )
+    return 'content'
   return 'appearance'
 }
-const activeSections = computed(() => (selectedNode.value ? getComponentDef(selectedNode.value.type)?.propertySections ?? [] : [])
-  .map(section => ({ ...section, fields: section.fields.filter(field => field.kind !== 'custom-classes' && fieldTab(field, section.title ?? '') === activeTab.value) }))
-  .filter(section => section.fields.length))
+const activeSections = computed(() =>
+  (selectedNode.value ? (getComponentDef(selectedNode.value.type)?.propertySections ?? []) : [])
+    .map(section => ({
+      ...section,
+      fields: section.fields.filter(
+        field => field.kind !== 'custom-classes' && fieldTab(field, section.title ?? '') === activeTab.value,
+      ),
+    }))
+    .filter(section => section.fields.length),
+)
 const textChild = computed(() => selectedNode.value?.children.find(node => node.type === TEXT_NODE_TYPE))
-const breadcrumb = computed(() => selectedNode.value ? store.pathTo(selectedNode.value.id) : [])
+const breadcrumb = computed(() => (selectedNode.value ? store.pathTo(selectedNode.value.id) : []))
 const saveDialog = ref(false)
 const prefabName = ref('')
-const onSavePrefab = () => { prefabName.value = selectedNode.value?.name ?? ''; saveDialog.value = true }
-const savePrefab = () => { if (selectedNode.value && canSavePrefabName(prefabName.value)) { store.savePrefab(selectedNode.value.id, prefabName.value); saveDialog.value = false } }
+const onSavePrefab = () => {
+  prefabName.value = selectedNode.value?.name ?? ''
+  saveDialog.value = true
+}
+const savePrefab = () => {
+  if (selectedNode.value && canSavePrefabName(prefabName.value)) {
+    store.savePrefab(selectedNode.value.id, prefabName.value)
+    saveDialog.value = false
+  }
+}
 const moveDialog = ref(false)
 const moveTarget = ref('')
 const moveTargets = computed(() => {
@@ -67,7 +103,8 @@ const moveTargets = computed(() => {
     const names = [...path, node.name]
     if (store.canContain(node)) result.push({ title: names.join(' / '), value: JSON.stringify([node.id, null]) })
     for (const slot of getNodeSlots(node)) {
-      if (node.id !== ROOT_NODE_ID && slot.name !== 'default') result.push({ title: `${names.join(' / ')} / ${slot.label}`, value: JSON.stringify([node.id, slot.name]) })
+      if (node.id !== ROOT_NODE_ID && slot.name !== 'default')
+        result.push({ title: `${names.join(' / ')} / ${slot.label}`, value: JSON.stringify([node.id, slot.name]) })
     }
     for (const child of [...node.children, ...Object.values(node.slots).flat()]) visit(child, names)
   }
@@ -75,21 +112,33 @@ const moveTargets = computed(() => {
   return result
 })
 
+const openMoveDialog = () => {
+  moveTarget.value = ''
+  moveDialog.value = true
+}
 const moveSelected = () => {
   if (!selectedNodeId.value || !moveTarget.value) return
   const destination = parseMoveDestination(moveTarget.value)
   if (!destination) return
   if (store.moveNode(selectedNodeId.value, destination.parentId, destination.slot)) moveDialog.value = false
 }
-watch(selectedNodeId, () => {
-  jsonErrors.value = {}
-  activeSpacingType.value = 'm'
-  const node = selectedNode.value
-  const sections = node ? getComponentDef(node.type)?.propertySections ?? [] : []
-  if (node?.children.some(child => child.type === TEXT_NODE_TYPE) || sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'content'))) activeTab.value = 'content'
-  else if (sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'layout'))) activeTab.value = 'layout'
-  else activeTab.value = 'appearance'
-}, { immediate: true })
+watch(
+  selectedNodeId,
+  () => {
+    jsonErrors.value = {}
+    activeSpacingType.value = 'm'
+    const node = selectedNode.value
+    const sections = node ? (getComponentDef(node.type)?.propertySections ?? []) : []
+    if (
+      node?.children.some(child => child.type === TEXT_NODE_TYPE) ||
+      sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'content'))
+    )
+      activeTab.value = 'content'
+    else if (sections.some(s => s.fields.some(f => fieldTab(f, s.title ?? '') === 'layout'))) activeTab.value = 'layout'
+    else activeTab.value = 'appearance'
+  },
+  { immediate: true },
+)
 
 const getStringProp = (prop: string) => {
   const value = selectedNode.value?.props[prop]
@@ -109,8 +158,14 @@ const getJsonProp = (prop: string) => {
 /** JSON is stored parsed; text such as {{orders}} is kept as a binding to project state. */
 const updateJsonProp = (prop: string, text: string) => {
   const trimmed = text.trim()
-  if (!trimmed) { jsonErrors.value = { ...jsonErrors.value, [prop]: '' }; return updateProp(prop, undefined) }
-  if (trimmed.startsWith('{{')) { jsonErrors.value = { ...jsonErrors.value, [prop]: '' }; return updateProp(prop, trimmed) }
+  if (!trimmed) {
+    jsonErrors.value = { ...jsonErrors.value, [prop]: '' }
+    return updateProp(prop, undefined)
+  }
+  if (trimmed.startsWith('{{')) {
+    jsonErrors.value = { ...jsonErrors.value, [prop]: '' }
+    return updateProp(prop, trimmed)
+  }
   try {
     updateProp(prop, JSON.parse(trimmed))
     jsonErrors.value = { ...jsonErrors.value, [prop]: '' }
@@ -131,34 +186,56 @@ const updateTextChild = (value: string) => {
 
 const allIcons = Object.entries(Icons).map(([name, value]) => ({ name, value }))
 
-const fieldKey = (field: PropField) =>
-  field.kind + ('prop' in field ? field.prop : '')
-
+const fieldKey = (field: PropField) => field.kind + ('prop' in field ? field.prop : '')
 </script>
 
 <template>
   <div class="property-panel">
     <section v-if="selectedNodeIds.length > 1" class="pa-4">
       <h2 class="text-subtitle-1 font-weight-bold">{{ selectedNodeIds.length }} elements selected</h2>
-      <p class="text-body-2 my-3">Shared spacing applies to every selected element. Select one layer to edit its content and appearance.</p>
-      <VBtnToggle v-model="activeSpacingType" mandatory density="compact" color="primary" variant="outlined" class="mb-4"><VBtn value="m">Margin</VBtn><VBtn value="p">Padding</VBtn></VBtnToggle>
-      <VSelect v-for="side in spacingSides" :key="side.value" :label="side.label" :items="spacingSizes" :model-value="commonSpacing(side.value)" variant="outlined" density="compact" hide-details class="mb-3" @update:model-value="value => updateCommonSpacing(side.value, value)" />
+      <p class="text-body-2 my-3">
+        Shared spacing applies to every selected element. Select one layer to edit its content and appearance.
+      </p>
+      <VBtnToggle
+        v-model="activeSpacingType"
+        mandatory
+        density="compact"
+        color="primary"
+        variant="outlined"
+        class="mb-4"
+        ><VBtn value="m">Margin</VBtn><VBtn value="p">Padding</VBtn></VBtnToggle
+      >
+      <VSelect
+        v-for="side in spacingSides"
+        :key="side.value"
+        :label="side.label"
+        :items="spacingSizes"
+        :model-value="commonSpacing(side.value)"
+        variant="outlined"
+        density="compact"
+        hide-details
+        class="mb-3"
+        @update:model-value="value => updateCommonSpacing(side.value, value)"
+      />
     </section>
     <div v-else-if="selectedNode" :key="selectedNode.id" class="pa-4">
-
       <div class="d-flex align-center justify-space-between mb-1">
-        <div class="text-subtitle-1 font-weight-bold">{{ getComponentDef(selectedNode.type)?.label ?? selectedNode.type }}</div>
+        <div class="text-subtitle-1 font-weight-bold">
+          {{ getComponentDef(selectedNode.type)?.label ?? selectedNode.type }}
+        </div>
         <div v-if="!isRoot" class="d-flex align-center">
           <VBtn
             icon="mdi-content-save-outline"
-            aria-label="Save to My components" title="Save to My components"
+            aria-label="Save to My components"
+            title="Save to My components"
             variant="text"
             size="small"
             @click="onSavePrefab"
           />
           <VBtn
             :icon="Icons.DeleteOutline"
-            aria-label="Delete element" title="Delete element"
+            aria-label="Delete element"
+            title="Delete element"
             variant="text"
             color="error"
             size="small"
@@ -166,22 +243,60 @@ const fieldKey = (field: PropField) =>
           />
         </div>
       </div>
-      <nav aria-label="Element path" class="element-path"><button v-for="node in breadcrumb" :key="node.id" @click="store.selectNode(node.id)">{{ node.name }}</button></nav>
-      <VTextField v-if="selectedNode.type !== TEXT_NODE_TYPE" :model-value="selectedNode.name" @update:model-value="updateSelectedName" label="Element name" variant="outlined" density="compact" hide-details class="my-3" @blur="store.commit()" />
-      <VBtn v-if="!isRoot" variant="text" size="small" prepend-icon="mdi-folder-move-outline" class="mb-2" @click="moveTarget = ''; moveDialog = true">Move to…</VBtn>
-      <VTabs v-model="activeTab" density="compact" class="property-tabs"><VTab value="content">Content</VTab><VTab value="layout">Layout</VTab><VTab value="appearance">Style</VTab><VTab value="advanced">Advanced</VTab></VTabs>
+      <nav aria-label="Element path" class="element-path">
+        <button v-for="node in breadcrumb" :key="node.id" @click="store.selectNode(node.id)">{{ node.name }}</button>
+      </nav>
+      <VTextField
+        v-if="selectedNode.type !== TEXT_NODE_TYPE"
+        :model-value="selectedNode.name"
+        @update:model-value="updateSelectedName"
+        label="Element name"
+        variant="outlined"
+        density="compact"
+        hide-details
+        class="my-3"
+        @blur="store.commit()"
+      />
+      <VBtn
+        v-if="!isRoot"
+        variant="text"
+        size="small"
+        prepend-icon="mdi-folder-move-outline"
+        class="mb-2"
+        @click="openMoveDialog"
+        >Move to…</VBtn
+      >
+      <VTabs v-model="activeTab" density="compact" class="property-tabs"
+        ><VTab value="content">Content</VTab><VTab value="layout">Layout</VTab><VTab value="appearance">Style</VTab
+        ><VTab value="advanced">Advanced</VTab></VTabs
+      >
 
       <VDivider class="mb-4" />
 
       <div class="pt-4">
-        <VTextarea v-if="activeTab === 'content' && textChild" :model-value="textChild.name" @update:model-value="updateTextChild" label="Text content" variant="outlined" density="compact" auto-grow rows="2" class="mb-4" hide-details />
-        <p v-if="activeTab !== 'advanced' && !activeSections.length && !(activeTab === 'content' && textChild)" class="text-body-2 text-medium-emphasis">No {{ activeTab }} settings for this element.</p>
+        <VTextarea
+          v-if="activeTab === 'content' && textChild"
+          :model-value="textChild.name"
+          @update:model-value="updateTextChild"
+          label="Text content"
+          variant="outlined"
+          density="compact"
+          auto-grow
+          rows="2"
+          class="mb-4"
+          hide-details
+        />
+        <p
+          v-if="activeTab !== 'advanced' && !activeSections.length && !(activeTab === 'content' && textChild)"
+          class="text-body-2 text-medium-emphasis"
+        >
+          No {{ activeTab }} settings for this element.
+        </p>
         <template v-for="section in activeSections" :key="section.title">
           <div class="mb-6">
             <div v-if="section.title" class="text-overline mb-2 text-primary font-weight-bold">{{ section.title }}</div>
 
             <template v-for="field in section.fields" :key="fieldKey(field)">
-
               <VTextField
                 v-if="field.kind === 'text'"
                 :model-value="getStringProp(field.prop)"
@@ -372,15 +487,31 @@ const fieldKey = (field: PropField) =>
                   :model-value="getTextAlign()"
                   @update:model-value="setTextAlign"
                 >
-                  <VBtn :value="'text-left'"   :icon="Icons.FormatAlignLeft" aria-label="Align text left"   size="small" />
-                  <VBtn :value="'text-center'"  :icon="Icons.FormatAlignCenter" aria-label="Align text center" size="small" />
-                  <VBtn :value="'text-right'"   :icon="Icons.FormatAlignRight" aria-label="Align text right"  size="small" />
+                  <VBtn :value="'text-left'" :icon="Icons.FormatAlignLeft" aria-label="Align text left" size="small" />
+                  <VBtn
+                    :value="'text-center'"
+                    :icon="Icons.FormatAlignCenter"
+                    aria-label="Align text center"
+                    size="small"
+                  />
+                  <VBtn
+                    :value="'text-right'"
+                    :icon="Icons.FormatAlignRight"
+                    aria-label="Align text right"
+                    size="small"
+                  />
                 </VBtnToggle>
               </template>
 
               <template v-else-if="field.kind === 'spacing'">
                 <div class="d-flex justify-center mb-4">
-                  <VBtnToggle v-model="activeSpacingType" mandatory density="compact" color="primary" variant="outlined">
+                  <VBtnToggle
+                    v-model="activeSpacingType"
+                    mandatory
+                    density="compact"
+                    color="primary"
+                    variant="outlined"
+                  >
                     <VBtn value="m" size="small" class="px-4">Margin</VBtn>
                     <VBtn v-if="field.withPadding" value="p" size="small" class="px-4">Padding</VBtn>
                   </VBtnToggle>
@@ -402,7 +533,6 @@ const fieldKey = (field: PropField) =>
 
               <!-- custom-classes rendered globally below all sections -->
               <template v-else-if="field.kind === 'custom-classes'" />
-
             </template>
           </div>
         </template>
@@ -417,19 +547,17 @@ const fieldKey = (field: PropField) =>
         @toggle-class="toggleClass"
         @add-custom-class="addCustomClass"
       />
-      <InteractionsEditor v-if="activeTab === 'advanced' && selectedNode.type !== TEXT_NODE_TYPE" :node="selectedNode" />
+      <InteractionsEditor
+        v-if="activeTab === 'advanced' && selectedNode.type !== TEXT_NODE_TYPE"
+        :node="selectedNode"
+      />
     </div>
 
     <div v-else class="pa-10 text-center text-medium-emphasis mt-10">
       <VIcon :icon="Icons.CursorClick" size="x-large" class="mb-4 opacity-20" />
       <div class="text-body-2">Select an element to edit properties</div>
     </div>
-    <SavePrefabDialog
-      v-model="saveDialog"
-      :name="prefabName"
-      @update:name="prefabName = $event"
-      @save="savePrefab"
-    />
+    <SavePrefabDialog v-model="saveDialog" :name="prefabName" @update:name="prefabName = $event" @save="savePrefab" />
     <MoveNodeDialog
       v-model="moveDialog"
       :target="moveTarget"
@@ -441,9 +569,32 @@ const fieldKey = (field: PropField) =>
 </template>
 
 <style scoped>
-.property-panel { flex: 1; min-height: 0; overflow-y: auto; }
-.element-path { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 8px; }
-.element-path button { font-size: 12px; min-height: 28px; color: rgb(var(--v-theme-primary)); overflow-wrap: anywhere; text-align: left; }
-.element-path button + button::before { content: '/'; padding-right: 4px; }
-.property-tabs :deep(.v-tab) { min-width: 0; padding-inline: 10px; font-size: 12px; text-transform: none; }
+.property-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.element-path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block: 8px;
+}
+.element-path button {
+  font-size: 12px;
+  min-height: 28px;
+  color: rgb(var(--v-theme-primary));
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.element-path button + button::before {
+  content: '/';
+  padding-right: 4px;
+}
+.property-tabs :deep(.v-tab) {
+  min-width: 0;
+  padding-inline: 10px;
+  font-size: 12px;
+  text-transform: none;
+}
 </style>

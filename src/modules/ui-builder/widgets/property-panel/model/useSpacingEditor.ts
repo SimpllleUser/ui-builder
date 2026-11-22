@@ -3,9 +3,12 @@ import { readSpacing, writeSpacing } from '../../../entities/ui-node/model/layou
 import type { UiNode } from '../../../entities/ui-node/model/types'
 
 const SPACING_SIDES = [
-  { label: 'All', value: 'a' }, { label: 'Top', value: 't' },
-  { label: 'Bottom', value: 'b' }, { label: 'Left', value: 'l' },
-  { label: 'Right', value: 'r' }, { label: 'X (Horiz)', value: 'x' },
+  { label: 'All', value: 'a' },
+  { label: 'Top', value: 't' },
+  { label: 'Bottom', value: 'b' },
+  { label: 'Left', value: 'l' },
+  { label: 'Right', value: 'r' },
+  { label: 'X (Horiz)', value: 'x' },
   { label: 'Y (Vert)', value: 'y' },
 ]
 
@@ -41,11 +44,19 @@ export function useSpacingEditor(
   }
 
   const updateSpacing = (type: 'm' | 'p', side: string, value: number | string | null) => {
-    if (selectedNode.value) updateClasses(selectedNode.value.id, writeSpacing(selectedNode.value.classes, type, side, value))
+    if (selectedNode.value)
+      updateClasses(selectedNode.value.id, writeSpacing(selectedNode.value.classes, type, side, value))
   }
 
-  const getSpacingValue = (type: 'm' | 'p', side: string) =>
-    readSpacing(selectedNode.value?.classes ?? [], type, side)
+  const getSpacingValue = (type: 'm' | 'p', side: string) => readSpacing(selectedNode.value?.classes ?? [], type, side)
 
-  return { activeSpacingType, spacingSides: SPACING_SIDES, spacingSizes: SPACING_SIZES, commonSpacing, updateCommonSpacing, updateSpacing, getSpacingValue }
+  return {
+    activeSpacingType,
+    spacingSides: SPACING_SIDES,
+    spacingSizes: SPACING_SIZES,
+    commonSpacing,
+    updateCommonSpacing,
+    updateSpacing,
+    getSpacingValue,
+  }
 }

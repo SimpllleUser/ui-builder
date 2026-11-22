@@ -16,7 +16,8 @@ export function createDropHandlers(store: ReturnType<typeof useUiTreeStore>, nod
     },
     onDragleave: (e: DragEvent) => {
       const element = e.currentTarget as Element
-      if (!element?.contains(e.relatedTarget as Node) && canvasDragTargetId.value === node.id) canvasDragTargetId.value = null
+      if (!element?.contains(e.relatedTarget as Node) && canvasDragTargetId.value === node.id)
+        canvasDragTargetId.value = null
     },
     onDragover: (e: DragEvent) => {
       e.preventDefault()
@@ -29,6 +30,8 @@ export function createDropHandlers(store: ReturnType<typeof useUiTreeStore>, nod
       const type = e.dataTransfer?.getData('componenttype')
       if (type && getComponentDef(type)) store.addComponent(type, node.id)
     },
-    onDragend: () => { canvasDragTargetId.value = null },
+    onDragend: () => {
+      canvasDragTargetId.value = null
+    },
   }
 }

@@ -1,14 +1,24 @@
 export type ComponentType =
-  | 'VBtn' | 'VTextField' | 'VCard' | 'VCardTitle' | 'VCardText'
-  | 'VList' | 'VListItem' | 'VRow' | 'VCol' | 'div' | 'VIcon' | 'VImg'
+  | 'VBtn'
+  | 'VTextField'
+  | 'VCard'
+  | 'VCardTitle'
+  | 'VCardText'
+  | 'VList'
+  | 'VListItem'
+  | 'VRow'
+  | 'VCol'
+  | 'div'
+  | 'VIcon'
+  | 'VImg'
 
 /** What happens when an element is clicked in preview. `set` values are parsed as JSON, falling back to text. */
 export type UiAction =
-  | { type: 'navigate'; to: string }
-  | { type: 'set'; key: string; value: string }
-  | { type: 'toggle'; key: string }
+  { type: 'navigate'; to: string } | { type: 'set'; key: string; value: string } | { type: 'toggle'; key: string }
 
-export interface UiNodeEvents { click?: UiAction }
+export interface UiNodeEvents {
+  click?: UiAction
+}
 
 export interface UiNode {
   id: string

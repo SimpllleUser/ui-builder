@@ -25,7 +25,9 @@ const changeType = (type: string) => {
   else if (type === 'toggle') setClick({ type, key: stateKeys.value[0] ?? '' })
   else setClick(undefined)
 }
-const patchAction = (patch: Partial<UiAction>) => { if (action.value) setClick({ ...action.value, ...patch } as UiAction) }
+const patchAction = (patch: Partial<UiAction>) => {
+  if (action.value) setClick({ ...action.value, ...patch } as UiAction)
+}
 </script>
 
 <template>
@@ -35,17 +37,87 @@ const patchAction = (patch: Partial<UiAction>) => { if (action.value) setClick({
       Use state variables from <strong>Pages & state</strong>. Text and props can use <code v-pre>{{ name }}</code>.
     </p>
 
-    <VCombobox :model-value="node.model" :items="stateKeys" label="v-model — bind to state" variant="outlined" density="compact" hide-details clearable class="mb-3" @update:model-value="value => setLogic({ model: value ?? '' })" />
-    <VTextField :model-value="node.vIf" label="v-if — show only when" placeholder="isOpen, !loading, status == paid" variant="outlined" density="compact" hide-details clearable class="mb-3" @update:model-value="value => setLogic({ vIf: value ?? '' })" />
-    <VCombobox :model-value="node.vFor" :items="stateKeys" label="v-for — repeat for each item of" hint="Inside use {{ item.title }} and {{ index }}" persistent-hint variant="outlined" density="compact" clearable class="mb-3" @update:model-value="value => setLogic({ vFor: value ?? '' })" />
+    <VCombobox
+      :model-value="node.model"
+      :items="stateKeys"
+      label="v-model — bind to state"
+      variant="outlined"
+      density="compact"
+      hide-details
+      clearable
+      class="mb-3"
+      @update:model-value="value => setLogic({ model: value ?? '' })"
+    />
+    <VTextField
+      :model-value="node.vIf"
+      label="v-if — show only when"
+      placeholder="isOpen, !loading, status == paid"
+      variant="outlined"
+      density="compact"
+      hide-details
+      clearable
+      class="mb-3"
+      @update:model-value="value => setLogic({ vIf: value ?? '' })"
+    />
+    <VCombobox
+      :model-value="node.vFor"
+      :items="stateKeys"
+      label="v-for — repeat for each item of"
+      hint="Inside use {{ item.title }} and {{ index }}"
+      persistent-hint
+      variant="outlined"
+      density="compact"
+      clearable
+      class="mb-3"
+      @update:model-value="value => setLogic({ vFor: value ?? '' })"
+    />
 
-    <VSelect :model-value="actionType" :items="actionTypes" :label="node.type === 'VDataTable' ? 'On row click (use {{ item.id }} in values)' : 'On click'" variant="outlined" density="compact" hide-details class="mb-3" @update:model-value="changeType" />
+    <VSelect
+      :model-value="actionType"
+      :items="actionTypes"
+      :label="node.type === 'VDataTable' ? 'On row click (use {{ item.id }} in values)' : 'On click'"
+      variant="outlined"
+      density="compact"
+      hide-details
+      class="mb-3"
+      @update:model-value="changeType"
+    />
     <template v-if="action?.type === 'navigate'">
-      <VCombobox :model-value="action.to" :items="pageItems" item-title="title" item-value="value" :return-object="false" label="Path" variant="outlined" density="compact" hide-details class="mb-3" @update:model-value="value => patchAction({ to: String(value ?? '') })" />
+      <VCombobox
+        :model-value="action.to"
+        :items="pageItems"
+        item-title="title"
+        item-value="value"
+        :return-object="false"
+        label="Path"
+        variant="outlined"
+        density="compact"
+        hide-details
+        class="mb-3"
+        @update:model-value="value => patchAction({ to: String(value ?? '') })"
+      />
     </template>
     <template v-else-if="action">
-      <VCombobox :model-value="action.key" :items="stateKeys" label="State name" variant="outlined" density="compact" hide-details class="mb-3" @update:model-value="value => patchAction({ key: String(value ?? '') })" />
-      <VTextField v-if="action.type === 'set'" :model-value="action.value" label="Value (true, 3, text, JSON)" variant="outlined" density="compact" hide-details class="mb-3" @update:model-value="value => patchAction({ value: value ?? '' })" />
+      <VCombobox
+        :model-value="action.key"
+        :items="stateKeys"
+        label="State name"
+        variant="outlined"
+        density="compact"
+        hide-details
+        class="mb-3"
+        @update:model-value="value => patchAction({ key: String(value ?? '') })"
+      />
+      <VTextField
+        v-if="action.type === 'set'"
+        :model-value="action.value"
+        label="Value (true, 3, text, JSON)"
+        variant="outlined"
+        density="compact"
+        hide-details
+        class="mb-3"
+        @update:model-value="value => patchAction({ value: value ?? '' })"
+      />
     </template>
   </section>
 </template>
