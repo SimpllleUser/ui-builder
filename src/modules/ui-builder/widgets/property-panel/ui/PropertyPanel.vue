@@ -36,7 +36,6 @@ const breadcrumb = computed(() => (selectedNode.value ? store.pathTo(selectedNod
 const activeTab = ref<InspectorTab>(InspectorTab.Content)
 const designTabEnabled = useDesignTabPreference()
 const visibleTabs = computed(() => inspectorTabsFor(selectedNode.value, designTabEnabled.value))
-const showDesignTab = computed(() => visibleTabs.value.some(tab => tab.id === InspectorTab.Design))
 // When the open tab disappears (the Design tab is switched off, or a text element is selected), the usual first tab opens.
 watch(visibleTabs, tabs => {
   if (!tabs.some(tab => tab.id === activeTab.value))
