@@ -1,3 +1,4 @@
+import type { ColumnAlign } from './enums'
 import { cellSlotName } from './componentDefinitions'
 import type { NodeMutationContext } from './nodeMutations'
 import type { UiNode } from './types'
@@ -5,7 +6,7 @@ import type { UiNode } from './types'
 export interface TableColumn {
   title: string
   key: string
-  align?: 'start' | 'center' | 'end'
+  align?: ColumnAlign
   sortable?: boolean
   /** Show the cell as a colored status chip. */
   chip?: boolean
@@ -17,6 +18,14 @@ export type TableRow = Record<string, unknown>
 export type TableMutationContext = Pick<NodeMutationContext, 'findNodeById' | 'commit' | 'setNotice'>
 
 const COLUMN_KEY = /^[A-Za-z0-9_$-]+$/
+
+/** Why `key` cannot name a column, or null when it can. `own` is the key the column already has. */
+export function columnKeyError(columns: TableColumn[], key: string, own?: string): string | null {
+  if (!key) return 'Enter a key.'
+  if (!COLUMN_KEY.test(key)) return 'Use letters, digits, - and _.'
+  if (key !== own && columns.some(column => column.key === key)) return 'Another column already uses this key.'
+  return null
+}
 
 interface EditableTable {
   node: UiNode
@@ -64,8 +73,9 @@ export function addColumn(
   const table = editableTable(context, id)
   if (!table) return null
   const key = column.key ?? uniqueKey(table.columns)
-  if (!COLUMN_KEY.test(key) || table.columns.some(existing => existing.key === key)) {
-    context.setNotice(`Column key "${key}" is empty, invalid or already used.`)
+  const keyError = columnKeyError(table.columns, key)
+  if (keyError) {
+    context.setNotice(`Column key “${key}”: ${keyError}`)
     return null
   }
   const created: TableColumn = { ...column, key, title: column.title ?? key }
@@ -89,8 +99,9 @@ export function updateColumn(
     return false
   }
   const newKey = patch.key ?? key
-  if (newKey !== key && (!COLUMN_KEY.test(newKey) || table.columns.some(column => column.key === newKey))) {
-    context.setNotice(`Column key "${newKey}" is empty, invalid or already used.`)
+  const keyError = newKey === key ? null : columnKeyError(table.columns, newKey)
+  if (keyError) {
+    context.setNotice(`Column key “${newKey}”: ${keyError}`)
     return false
   }
 

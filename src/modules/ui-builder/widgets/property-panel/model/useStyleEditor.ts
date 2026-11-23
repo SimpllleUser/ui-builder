@@ -1,6 +1,5 @@
 import type { ComputedRef } from 'vue'
-import { readFlex, writeFlex } from '../../../entities/ui-node/model/layoutControls'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import { readFlex, writeFlex, type UiNode } from '../../../entities/ui-node'
 
 export function useStyleEditor(
   selectedNode: ComputedRef<UiNode | null>,

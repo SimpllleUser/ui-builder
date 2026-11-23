@@ -1,3 +1,5 @@
+import type { StepDirection } from './enums'
+import { TEXT_NODE_TYPE } from './constants'
 import type { UiNode, UiNodeEvents } from './types'
 import type { NodeLocation } from './treeUtils'
 
@@ -11,6 +13,8 @@ export interface NodeMutationContext {
   selectNode(id: string | null): void
   setNotice(message: string): void
   clearDeletedSelection(): void
+  /** Returns a name that no other element in the page uses. */
+  uniqueName(name: string): string
 }
 
 export function appendNode(
@@ -18,6 +22,7 @@ export function appendNode(
   parentId: string,
   node: UiNode,
   slotName: string | null = null,
+  prepare?: () => void,
 ): boolean {
   const parent = context.findNodeById(parentId)
   if (!parent || !context.canContain(parent, slotName)) {
@@ -26,6 +31,8 @@ export function appendNode(
   }
 
   context.commit()
+  prepare?.()
+  if (node.type !== TEXT_NODE_TYPE) node.name = context.uniqueName(node.name)
   if (slotName) (parent.slots[slotName] ??= []).push(node)
   else parent.children.push(node)
   context.selectNode(node.id)
@@ -55,7 +62,6 @@ export function deleteNode(context: NodeMutationContext, id: string): boolean {
   context.getNodeList(location).splice(location.index, 1)
   context.clearDeletedSelection()
   context.commit()
-  context.setNotice('Element deleted. Use Undo to restore it.')
   return true
 }
 
@@ -81,14 +87,14 @@ export function moveNode(
   return true
 }
 
-export function canReorder(context: NodeMutationContext, id: string, direction: number): boolean {
+export function canReorder(context: NodeMutationContext, id: string, direction: StepDirection): boolean {
   const location = context.findParentAndIndex(id)
   return (
     !!location && location.index + direction >= 0 && location.index + direction < context.getNodeList(location).length
   )
 }
 
-export function reorderNode(context: NodeMutationContext, id: string, direction: number): void {
+export function reorderNode(context: NodeMutationContext, id: string, direction: StepDirection): void {
   if (!canReorder(context, id, direction)) return
 
   context.commit()

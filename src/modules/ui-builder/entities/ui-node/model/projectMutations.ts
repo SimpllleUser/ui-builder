@@ -1,11 +1,27 @@
+import type { StepDirection } from './enums'
 import { MAX_PAGES } from './constants'
 import { defaultLayout, emptyPage } from './document'
 import { isValidPagePath } from './documentValidator'
+import { cloneNodeWithNewIds } from './nodeUtils'
 import type { Page, Project, UiNode } from './types'
 
-const INVALID_PATH_MESSAGE = 'Use a path like /orders (letters, digits, - and _).'
 const STATE_NAME = /^[A-Za-z_$][\w$]*$/
 const RESERVED_STATE_NAMES = ['__proto__', 'constructor', 'prototype']
+
+/** Why `path` cannot be a page's route, or null when it can. `own` is the page that already has it. */
+export function pagePathError(pages: Page[], path: string, ownPageId?: string): string | null {
+  if (!isValidPagePath(path)) return 'Use a route like /orders (letters, digits, - and _).'
+  if (pages.some(page => page.path === path && page.id !== ownPageId)) return 'Another page already uses this route.'
+  return null
+}
+
+/** Why `name` cannot name a variable, or null when it can. */
+export function variableNameError(name: string): string | null {
+  if (!name) return 'Enter a name.'
+  if (RESERVED_STATE_NAMES.includes(name)) return 'This name is reserved. Choose another.'
+  if (!STATE_NAME.test(name)) return 'Use letters, digits and _, and do not start with a digit.'
+  return null
+}
 
 export interface ProjectMutationContext {
   project: Project
@@ -57,12 +73,14 @@ export function addPage(context: ProjectMutationContext, name: string, path?: st
 
   const explicitPath = path?.trim()
   const wanted = explicitPath || slugify(trimmedName)
-  if (!isValidPagePath(wanted)) {
-    context.setNotice(INVALID_PATH_MESSAGE)
-    return null
-  }
-  if (explicitPath && isPathTaken(project, wanted)) {
-    context.setNotice(`A page already uses ${wanted}.`)
+  // A route made from the name is adjusted to be free; one the person typed must be right as it is.
+  const pathError = explicitPath
+    ? pagePathError(project.pages, wanted)
+    : isValidPagePath(wanted)
+      ? null
+      : pagePathError([], wanted)
+  if (pathError) {
+    context.setNotice(`Route ${wanted}: ${pathError}`)
     return null
   }
 
@@ -83,14 +101,46 @@ export function updatePage(
 
   const name = patch.name?.trim()
   const path = patch.path?.trim()
-  if (path !== undefined && (!isValidPagePath(path) || isPathTaken(project, path, id))) {
-    context.setNotice(isValidPagePath(path) ? `A page already uses ${path}.` : INVALID_PATH_MESSAGE)
+  const pathError = path === undefined ? null : pagePathError(project.pages, path, id)
+  if (pathError) {
+    context.setNotice(`Route ${path}: ${pathError}`)
     return false
   }
   undoable(context, () => {
-    if (name) page.name = name
+    if (name) {
+      page.name = name
+      page.root.name = name
+    }
     if (path !== undefined) page.path = path
   })
+  return true
+}
+
+/** A copy of a page with its own element ids, placed right after the original. */
+export function duplicatePage(context: ProjectMutationContext, id: string): Page | null {
+  const { project } = context
+  const index = project.pages.findIndex(page => page.id === id)
+  if (index < 0 || project.pages.length >= MAX_PAGES) return null
+
+  const source = project.pages[index]
+  const name = `${source.name} copy`
+  const copy: Page = {
+    ...emptyPage(name, uniquePath(project, `${source.path === '/' ? '/page' : source.path}-copy`)),
+    // The root keeps its fixed id; everything inside gets new ids.
+    root: { ...cloneNodeWithNewIds(source.root), id: source.root.id, name },
+  }
+  undoable(context, () => project.pages.splice(index + 1, 0, copy))
+  selectPage(context, copy.id)
+  return copy
+}
+
+/** Moves a page one place left (-1) or right (1) in the tab order. */
+export function movePage(context: ProjectMutationContext, id: string, direction: StepDirection): boolean {
+  const { pages } = context.project
+  const from = pages.findIndex(page => page.id === id)
+  const to = from + direction
+  if (from < 0 || to < 0 || to >= pages.length) return false
+  undoable(context, () => pages.splice(to, 0, ...pages.splice(from, 1)))
   return true
 }
 
@@ -123,8 +173,9 @@ export function removeLayout(context: ProjectMutationContext) {
 }
 
 export function setStateVariable(context: ProjectMutationContext, name: string, value: unknown): boolean {
-  if (!STATE_NAME.test(name) || RESERVED_STATE_NAMES.includes(name)) {
-    context.setNotice('State names use letters, digits and _, and cannot start with a digit.')
+  const nameError = variableNameError(name)
+  if (nameError) {
+    context.setNotice(`Variable name: ${nameError}`)
     return false
   }
   undoable(context, () => {

@@ -1,23 +1,25 @@
-import type { ComponentType } from './types'
+import { ComponentCategory, FieldKind } from './enums'
 
 export type PropField =
-  | { kind: 'text'; prop: string; label: string; placeholder?: string; clearable?: boolean }
-  | { kind: 'textarea'; label: string }
-  | { kind: 'select'; prop: string; label: string; options: string[] }
-  | { kind: 'switch'; prop: string; label: string }
-  | { kind: 'icon-picker'; prop: string; label: string }
-  | { kind: 'table-editor' }
-  | { kind: 'json'; prop: string; label: string }
-  | { kind: 'slider'; prop: string; label: string; min: number; max: number; step?: number }
-  | { kind: 'row'; fields: Array<{ prop: string; label: string; placeholder?: string }> }
-  | { kind: 'icon-slots'; slots: Array<{ prop: string; label: string }> }
-  | { kind: 'spacing'; withPadding?: boolean }
-  | { kind: 'flex-layout' }
-  | { kind: 'typography' }
-  | { kind: 'custom-classes' }
+  | { kind: FieldKind.Text; prop: string; label: string; placeholder?: string; clearable?: boolean }
+  | { kind: FieldKind.Textarea; label: string }
+  | { kind: FieldKind.Select; prop: string; label: string; options: string[] }
+  | { kind: FieldKind.Switch; prop: string; label: string }
+  | { kind: FieldKind.IconPicker; prop: string; label: string }
+  | { kind: FieldKind.TableEditor }
+  | { kind: FieldKind.Json; prop: string; label: string }
+  | { kind: FieldKind.Slider; prop: string; label: string; min: number; max: number; step?: number }
+  | { kind: FieldKind.Row; fields: Array<{ prop: string; label: string; placeholder?: string }> }
+  | { kind: FieldKind.IconSlots; slots: Array<{ prop: string; label: string }> }
+  | { kind: FieldKind.Spacing; withPadding?: boolean }
+  | { kind: FieldKind.FlexLayout }
+  | { kind: FieldKind.Typography }
+  | { kind: FieldKind.CustomClasses }
 
 export interface PropertySection {
   title?: string
+  /** Rarely needed groups start collapsed in the inspector. */
+  collapsed?: boolean
   fields: PropField[]
 }
 
@@ -42,96 +44,85 @@ export interface ComponentDef {
   propertySections: PropertySection[]
 }
 
-export const COMPONENT_CATEGORY_ORDER = [
-  'Layout',
-  'Content',
-  'Actions',
-  'Forms',
-  'Navigation',
-  'Lists & data',
-  'Feedback',
-  'Media',
-  'Utility',
-  'Other',
-] as const
-export type ComponentCategory = (typeof COMPONENT_CATEGORY_ORDER)[number]
+export const COMPONENT_CATEGORY_ORDER = Object.values(ComponentCategory)
 
 const CATEGORY_BY_TYPE: Record<string, ComponentCategory> = {
-  div: 'Layout',
-  VRow: 'Layout',
-  VCol: 'Layout',
-  VContainer: 'Layout',
-  VSheet: 'Layout',
-  VSpacer: 'Layout',
-  VBtnGroup: 'Layout',
-  VCard: 'Content',
-  VCardTitle: 'Content',
-  VCardText: 'Content',
-  VToolbar: 'Content',
-  VBtn: 'Actions',
-  VForm: 'Forms',
-  VTextField: 'Forms',
-  VTextarea: 'Forms',
-  VAutocomplete: 'Forms',
-  VFileInput: 'Forms',
-  VCheckbox: 'Forms',
-  VSwitch: 'Forms',
-  VSelect: 'Forms',
-  VSlider: 'Forms',
-  VRadioGroup: 'Forms',
-  VTabs: 'Navigation',
-  VExpansionPanels: 'Navigation',
-  VAlert: 'Feedback',
-  VChip: 'Feedback',
-  VAvatar: 'Feedback',
-  VBadge: 'Feedback',
-  VProgressCircular: 'Feedback',
-  VProgressLinear: 'Feedback',
-  VIcon: 'Media',
-  VImg: 'Media',
-  VList: 'Lists & data',
-  VListItem: 'Lists & data',
-  VDivider: 'Utility',
-  VApp: 'Layout',
-  VMain: 'Layout',
-  VAppBar: 'Layout',
-  VNavigationDrawer: 'Layout',
-  PageOutlet: 'Layout',
-  VDataTable: 'Lists & data',
-  VPagination: 'Lists & data',
-  VTimeline: 'Lists & data',
-  VTimelineItem: 'Lists & data',
-  VDialog: 'Feedback',
-  VMenu: 'Feedback',
-  VSnackbar: 'Feedback',
-  VTooltip: 'Feedback',
-  VSkeletonLoader: 'Feedback',
-  VDatePicker: 'Forms',
-  VBtnToggle: 'Actions',
-  VBreadcrumbs: 'Navigation',
-  VStepper: 'Navigation',
+  div: ComponentCategory.Layout,
+  VRow: ComponentCategory.Layout,
+  VCol: ComponentCategory.Layout,
+  VContainer: ComponentCategory.Layout,
+  VSheet: ComponentCategory.Layout,
+  VSpacer: ComponentCategory.Layout,
+  VBtnGroup: ComponentCategory.Layout,
+  VCard: ComponentCategory.Content,
+  VCardTitle: ComponentCategory.Content,
+  VCardText: ComponentCategory.Content,
+  VToolbar: ComponentCategory.Content,
+  VBtn: ComponentCategory.Actions,
+  VForm: ComponentCategory.Forms,
+  VTextField: ComponentCategory.Forms,
+  VTextarea: ComponentCategory.Forms,
+  VAutocomplete: ComponentCategory.Forms,
+  VFileInput: ComponentCategory.Forms,
+  VCheckbox: ComponentCategory.Forms,
+  VSwitch: ComponentCategory.Forms,
+  VSelect: ComponentCategory.Forms,
+  VSlider: ComponentCategory.Forms,
+  VRadioGroup: ComponentCategory.Forms,
+  VTabs: ComponentCategory.Navigation,
+  VExpansionPanels: ComponentCategory.Navigation,
+  VAlert: ComponentCategory.Feedback,
+  VChip: ComponentCategory.Feedback,
+  VAvatar: ComponentCategory.Feedback,
+  VBadge: ComponentCategory.Feedback,
+  VProgressCircular: ComponentCategory.Feedback,
+  VProgressLinear: ComponentCategory.Feedback,
+  VIcon: ComponentCategory.Media,
+  VImg: ComponentCategory.Media,
+  VList: ComponentCategory.ListsAndData,
+  VListItem: ComponentCategory.ListsAndData,
+  VDivider: ComponentCategory.Utility,
+  VApp: ComponentCategory.Layout,
+  VMain: ComponentCategory.Layout,
+  VAppBar: ComponentCategory.Layout,
+  VNavigationDrawer: ComponentCategory.Layout,
+  PageOutlet: ComponentCategory.Layout,
+  VDataTable: ComponentCategory.ListsAndData,
+  VPagination: ComponentCategory.ListsAndData,
+  VTimeline: ComponentCategory.ListsAndData,
+  VTimelineItem: ComponentCategory.ListsAndData,
+  VDialog: ComponentCategory.Feedback,
+  VMenu: ComponentCategory.Feedback,
+  VSnackbar: ComponentCategory.Feedback,
+  VTooltip: ComponentCategory.Feedback,
+  VSkeletonLoader: ComponentCategory.Feedback,
+  VDatePicker: ComponentCategory.Forms,
+  VBtnToggle: ComponentCategory.Actions,
+  VBreadcrumbs: ComponentCategory.Navigation,
+  VStepper: ComponentCategory.Navigation,
 }
 
-export const getComponentCategory = (type: string): ComponentCategory => CATEGORY_BY_TYPE[type] ?? 'Other'
+export const getComponentCategory = (type: string): ComponentCategory =>
+  CATEGORY_BY_TYPE[type] ?? ComponentCategory.Other
 
 function def(config: Omit<ComponentDef, 'propertySections'>) {
   const sections: PropertySection[] = []
 
   const builder = {
-    section(title: string, fields: PropField[]) {
-      sections.push({ title, fields })
+    section(title: string, fields: PropField[], options: { collapsed?: boolean } = {}) {
+      sections.push({ title, fields, ...options })
       return builder
     },
     spacing(withPadding = false) {
-      sections.push({ title: 'Spacing', fields: [{ kind: 'spacing', withPadding }] })
+      sections.push({ title: 'Spacing', fields: [{ kind: FieldKind.Spacing, withPadding }] })
       return builder
     },
     typography() {
-      sections.push({ title: 'Typography', fields: [{ kind: 'typography' }] })
+      sections.push({ title: 'Typography', fields: [{ kind: FieldKind.Typography }] })
       return builder
     },
     classes() {
-      sections.push({ title: 'Custom Classes', fields: [{ kind: 'custom-classes' }] })
+      sections.push({ title: 'Custom Classes', fields: [{ kind: FieldKind.CustomClasses }] })
       return builder
     },
     build(): ComponentDef {
@@ -169,7 +160,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     defaultClasses: ['d-block'],
     showInPalette: true,
   })
-    .section('Display & Layout', [{ kind: 'flex-layout' }])
+    .section('Display & Layout', [{ kind: FieldKind.FlexLayout }])
     .spacing()
     .classes()
     .build(),
@@ -193,9 +184,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'hover', label: 'Hover effect' },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'hover', label: 'Hover effect' },
     ])
     .spacing(true)
     .classes()
@@ -246,17 +237,17 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'size', label: 'Size', options: ICON_SIZES },
-      { kind: 'switch', prop: 'block', label: 'Block (full width)' },
-      { kind: 'switch', prop: 'rounded', label: 'Rounded' },
-      { kind: 'switch', prop: 'icon', label: 'Icon Button' },
-      { kind: 'text', prop: 'value', label: 'Value (for button toggle)' },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'size', label: 'Size', options: ICON_SIZES },
+      { kind: FieldKind.Switch, prop: 'block', label: 'Block (full width)' },
+      { kind: FieldKind.Switch, prop: 'rounded', label: 'Rounded' },
+      { kind: FieldKind.Switch, prop: 'icon', label: 'Icon Button' },
+      { kind: FieldKind.Text, prop: 'value', label: 'Value (for button toggle)' },
     ])
     .section('Icons', [
       {
-        kind: 'icon-slots',
+        kind: FieldKind.IconSlots,
         slots: [
           { prop: 'prependIcon', label: 'Prepend Icon' },
           { prop: 'appendIcon', label: 'Append Icon' },
@@ -283,24 +274,29 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Field label' },
-      { kind: 'text', prop: 'placeholder', label: 'Placeholder' },
-      { kind: 'text', prop: 'hint', label: 'Hint text' },
-      { kind: 'select', prop: 'type', label: 'Type', options: ['text', 'password', 'number', 'email', 'tel', 'url'] },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Field label' },
+      { kind: FieldKind.Text, prop: 'placeholder', label: 'Placeholder' },
+      { kind: FieldKind.Text, prop: 'hint', label: 'Hint text' },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
+        prop: 'type',
+        label: 'Type',
+        options: ['text', 'password', 'number', 'email', 'tel', 'url'],
+      },
+      {
+        kind: FieldKind.Select,
         prop: 'variant',
         label: 'Variant',
         options: ['underlined', 'outlined', 'filled', 'solo', 'plain'],
       },
-      { kind: 'text', prop: 'mask', label: 'Mask', placeholder: '##.##.#### ( # digit, A letter )' },
-      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
-      { kind: 'switch', prop: 'readonly', label: 'Readonly' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Text, prop: 'mask', label: 'Mask', placeholder: '##.##.#### ( # digit, A letter )' },
+      { kind: FieldKind.Switch, prop: 'clearable', label: 'Clearable' },
+      { kind: FieldKind.Switch, prop: 'readonly', label: 'Readonly' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .section('Icons', [
       {
-        kind: 'icon-slots',
+        kind: FieldKind.IconSlots,
         slots: [
           { prop: 'prependIcon', label: 'Prepend Icon' },
           { prop: 'appendIcon', label: 'Append Icon' },
@@ -328,7 +324,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     ],
     showInPalette: true,
   })
-    .section('Form', [{ kind: 'switch', prop: 'disabled', label: 'Disabled' }])
+    .section('Form', [{ kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' }])
     .spacing()
     .classes()
     .build(),
@@ -344,17 +340,17 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Field label' },
-      { kind: 'text', prop: 'placeholder', label: 'Placeholder' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Field label' },
+      { kind: FieldKind.Text, prop: 'placeholder', label: 'Placeholder' },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'variant',
         label: 'Variant',
         options: ['underlined', 'outlined', 'filled', 'solo', 'plain'],
       },
-      { kind: 'slider', prop: 'rows', label: 'Rows', min: 1, max: 10, step: 1 },
-      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Slider, prop: 'rows', label: 'Rows', min: 1, max: 10, step: 1 },
+      { kind: FieldKind.Switch, prop: 'clearable', label: 'Clearable' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -371,10 +367,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Checkbox label' },
-      { kind: 'switch', prop: 'modelValue', label: 'Checked' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Checkbox label' },
+      { kind: FieldKind.Switch, prop: 'modelValue', label: 'Checked' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -391,11 +387,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Switch label' },
-      { kind: 'switch', prop: 'modelValue', label: 'On' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'inset', label: 'Inset' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Switch label' },
+      { kind: FieldKind.Switch, prop: 'modelValue', label: 'On' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'inset', label: 'Inset' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -412,16 +408,16 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Select label' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Select label' },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'variant',
         label: 'Variant',
         options: ['underlined', 'outlined', 'filled', 'solo', 'plain'],
       },
-      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
-      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Switch, prop: 'clearable', label: 'Clearable' },
+      { kind: FieldKind.Switch, prop: 'multiple', label: 'Multiple' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -438,17 +434,17 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Search label' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Search label' },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'variant',
         label: 'Variant',
         options: ['underlined', 'outlined', 'filled', 'solo', 'plain'],
       },
-      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
-      { kind: 'switch', prop: 'chips', label: 'Show chips' },
-      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Switch, prop: 'clearable', label: 'Clearable' },
+      { kind: FieldKind.Switch, prop: 'chips', label: 'Show chips' },
+      { kind: FieldKind.Switch, prop: 'multiple', label: 'Multiple' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -465,18 +461,18 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Field', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Upload label' },
-      { kind: 'text', prop: 'accept', label: 'Accepted types', placeholder: 'image/*,.pdf' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Upload label' },
+      { kind: FieldKind.Text, prop: 'accept', label: 'Accepted types', placeholder: 'image/*,.pdf' },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'variant',
         label: 'Variant',
         options: ['underlined', 'outlined', 'filled', 'solo', 'plain'],
       },
-      { kind: 'switch', prop: 'showSize', label: 'Show file size' },
-      { kind: 'switch', prop: 'multiple', label: 'Multiple files' },
-      { kind: 'switch', prop: 'clearable', label: 'Clearable' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Switch, prop: 'showSize', label: 'Show file size' },
+      { kind: FieldKind.Switch, prop: 'multiple', label: 'Multiple files' },
+      { kind: FieldKind.Switch, prop: 'clearable', label: 'Clearable' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -493,12 +489,12 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Slider', [
-      { kind: 'slider', prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
-      { kind: 'slider', prop: 'min', label: 'Minimum', min: 0, max: 100, step: 1 },
-      { kind: 'slider', prop: 'max', label: 'Maximum', min: 1, max: 200, step: 1 },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'thumbLabel', label: 'Show value' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Slider, prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
+      { kind: FieldKind.Slider, prop: 'min', label: 'Minimum', min: 0, max: 100, step: 1 },
+      { kind: FieldKind.Slider, prop: 'max', label: 'Maximum', min: 1, max: 200, step: 1 },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'thumbLabel', label: 'Show value' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -519,10 +515,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Group', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Choose one' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'inline', label: 'Inline options' },
-      { kind: 'switch', prop: 'disabled', label: 'Disabled' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Choose one' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'inline', label: 'Inline options' },
+      { kind: FieldKind.Switch, prop: 'disabled', label: 'Disabled' },
     ])
     .spacing()
     .classes()
@@ -539,8 +535,8 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: false,
   })
     .section('Option', [
-      { kind: 'text', prop: 'label', label: 'Label', placeholder: 'Option' },
-      { kind: 'text', prop: 'value', label: 'Value', placeholder: 'option' },
+      { kind: FieldKind.Text, prop: 'label', label: 'Label', placeholder: 'Option' },
+      { kind: FieldKind.Text, prop: 'value', label: 'Value', placeholder: 'option' },
     ])
     .classes()
     .build(),
@@ -555,7 +551,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     defaultClasses: [],
     showInPalette: true,
   })
-    .section('Layout', [{ kind: 'switch', prop: 'fluid', label: 'Fluid width' }])
+    .section('Layout', [{ kind: FieldKind.Switch, prop: 'fluid', label: 'Fluid width' }])
     .spacing()
     .classes()
     .build(),
@@ -571,9 +567,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'rounded', label: 'Rounded', options: ['0', 'sm', 'md', 'lg', 'xl', 'pill'] },
-      { kind: 'slider', prop: 'elevation', label: 'Elevation', min: 0, max: 24, step: 1 },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'rounded', label: 'Rounded', options: ['0', 'sm', 'md', 'lg', 'xl', 'pill'] },
+      { kind: FieldKind.Slider, prop: 'elevation', label: 'Elevation', min: 0, max: 24, step: 1 },
     ])
     .spacing()
     .classes()
@@ -595,10 +591,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Toolbar', [
-      { kind: 'text', prop: 'title', label: 'Title', placeholder: 'Toolbar title' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
-      { kind: 'switch', prop: 'flat', label: 'Flat' },
+      { kind: FieldKind.Text, prop: 'title', label: 'Title', placeholder: 'Toolbar title' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
+      { kind: FieldKind.Switch, prop: 'flat', label: 'Flat' },
     ])
     .spacing()
     .classes()
@@ -620,9 +616,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'lines', label: 'Multi-line', options: ['one', 'two', 'three'] },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'lines', label: 'Multi-line', options: ['one', 'two', 'three'] },
     ])
     .spacing(true)
     .classes()
@@ -645,14 +641,14 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'text', prop: 'title', label: 'Title' },
-      { kind: 'text', prop: 'subtitle', label: 'Subtitle' },
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Text, prop: 'title', label: 'Title' },
+      { kind: FieldKind.Text, prop: 'subtitle', label: 'Subtitle' },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
     ])
     .section('Icons', [
       {
-        kind: 'icon-slots',
+        kind: FieldKind.IconSlots,
         slots: [
           { prop: 'prependIcon', label: 'Prepend Icon' },
           { prop: 'appendIcon', label: 'Append Icon' },
@@ -676,14 +672,19 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
   })
     .section('Layout', [
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'justify',
         label: 'Justify',
         options: ['start', 'center', 'end', 'space-around', 'space-between'],
       },
-      { kind: 'select', prop: 'align', label: 'Align', options: ['start', 'center', 'end', 'stretch', 'baseline'] },
-      { kind: 'switch', prop: 'noGutters', label: 'No Gutters' },
-      { kind: 'switch', prop: 'dense', label: 'Dense' },
+      {
+        kind: FieldKind.Select,
+        prop: 'align',
+        label: 'Align',
+        options: ['start', 'center', 'end', 'stretch', 'baseline'],
+      },
+      { kind: FieldKind.Switch, prop: 'noGutters', label: 'No Gutters' },
+      { kind: FieldKind.Switch, prop: 'dense', label: 'Dense' },
     ])
     .spacing()
     .classes()
@@ -700,10 +701,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Grid Column', [
-      { kind: 'slider', prop: 'cols', label: 'Width (cols)', min: 1, max: 12, step: 1 },
-      { kind: 'slider', prop: 'sm', label: 'Width SM', min: 1, max: 12, step: 1 },
-      { kind: 'slider', prop: 'md', label: 'Width MD', min: 1, max: 12, step: 1 },
-      { kind: 'slider', prop: 'lg', label: 'Width LG', min: 1, max: 12, step: 1 },
+      { kind: FieldKind.Slider, prop: 'cols', label: 'Width (cols)', min: 1, max: 12, step: 1 },
+      { kind: FieldKind.Slider, prop: 'sm', label: 'Width SM', min: 1, max: 12, step: 1 },
+      { kind: FieldKind.Slider, prop: 'md', label: 'Width MD', min: 1, max: 12, step: 1 },
+      { kind: FieldKind.Slider, prop: 'lg', label: 'Width LG', min: 1, max: 12, step: 1 },
     ])
     .spacing(true)
     .classes()
@@ -720,9 +721,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Icon', [
-      { kind: 'icon-picker', prop: 'icon', label: 'Icon' },
-      { kind: 'select', prop: 'size', label: 'Size', options: ICON_SIZES },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.IconPicker, prop: 'icon', label: 'Icon' },
+      { kind: FieldKind.Select, prop: 'size', label: 'Size', options: ICON_SIZES },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
     ])
     .spacing()
     .classes()
@@ -742,17 +743,17 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Image', [
-      { kind: 'text', prop: 'src', label: 'Source URL', placeholder: 'https://...', clearable: true },
-      { kind: 'text', prop: 'alt', label: 'Alt text' },
+      { kind: FieldKind.Text, prop: 'src', label: 'Source URL', placeholder: 'https://...', clearable: true },
+      { kind: FieldKind.Text, prop: 'alt', label: 'Alt text' },
       {
-        kind: 'row',
+        kind: FieldKind.Row,
         fields: [
           { prop: 'width', label: 'Width', placeholder: '100%' },
           { prop: 'height', label: 'Height', placeholder: '200' },
         ],
       },
-      { kind: 'switch', prop: 'cover', label: 'Cover (object-fit)' },
-      { kind: 'switch', prop: 'rounded', label: 'Rounded' },
+      { kind: FieldKind.Switch, prop: 'cover', label: 'Cover (object-fit)' },
+      { kind: FieldKind.Switch, prop: 'rounded', label: 'Rounded' },
     ])
     .spacing()
     .classes()
@@ -769,10 +770,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Divider', [
-      { kind: 'slider', prop: 'thickness', label: 'Thickness', min: 1, max: 8, step: 1 },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'vertical', label: 'Vertical' },
-      { kind: 'switch', prop: 'inset', label: 'Inset' },
+      { kind: FieldKind.Slider, prop: 'thickness', label: 'Thickness', min: 1, max: 8, step: 1 },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'vertical', label: 'Vertical' },
+      { kind: FieldKind.Switch, prop: 'inset', label: 'Inset' },
     ])
     .spacing()
     .classes()
@@ -794,11 +795,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Alert Properties', [
-      { kind: 'select', prop: 'type', label: 'Type', options: ALERT_TYPES },
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'text', prop: 'title', label: 'Title', placeholder: 'Alert title' },
-      { kind: 'switch', prop: 'closable', label: 'Closable' },
-      { kind: 'switch', prop: 'prominent', label: 'Prominent' },
+      { kind: FieldKind.Select, prop: 'type', label: 'Type', options: ALERT_TYPES },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Text, prop: 'title', label: 'Title', placeholder: 'Alert title' },
+      { kind: FieldKind.Switch, prop: 'closable', label: 'Closable' },
+      { kind: FieldKind.Switch, prop: 'prominent', label: 'Prominent' },
     ])
     .typography()
     .spacing()
@@ -820,15 +821,15 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'size', label: 'Size', options: ICON_SIZES },
-      { kind: 'switch', prop: 'closable', label: 'Closable' },
-      { kind: 'switch', prop: 'pill', label: 'Pill' },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'size', label: 'Size', options: ICON_SIZES },
+      { kind: FieldKind.Switch, prop: 'closable', label: 'Closable' },
+      { kind: FieldKind.Switch, prop: 'pill', label: 'Pill' },
     ])
     .section('Icons', [
       {
-        kind: 'icon-slots',
+        kind: FieldKind.IconSlots,
         slots: [
           { prop: 'prependIcon', label: 'Prepend Icon' },
           { prop: 'appendIcon', label: 'Append Icon' },
@@ -850,13 +851,13 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'text', prop: 'image', label: 'Image URL', placeholder: 'https://...' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'size', label: 'Size', options: ICON_SIZES },
-      { kind: 'switch', prop: 'rounded', label: 'Rounded' },
+      { kind: FieldKind.Text, prop: 'image', label: 'Image URL', placeholder: 'https://...' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'size', label: 'Size', options: ICON_SIZES },
+      { kind: FieldKind.Switch, prop: 'rounded', label: 'Rounded' },
     ])
-    .section('Icon', [{ kind: 'icon-picker', prop: 'icon', label: 'Fallback Icon' }])
+    .section('Icon', [{ kind: FieldKind.IconPicker, prop: 'icon', label: 'Fallback Icon' }])
     .spacing()
     .classes()
     .build(),
@@ -871,11 +872,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Progress', [
-      { kind: 'switch', prop: 'indeterminate', label: 'Indeterminate' },
-      { kind: 'slider', prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'size', label: 'Size', options: ICON_SIZES },
-      { kind: 'slider', prop: 'width', label: 'Width', min: 1, max: 20, step: 1 },
+      { kind: FieldKind.Switch, prop: 'indeterminate', label: 'Indeterminate' },
+      { kind: FieldKind.Slider, prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'size', label: 'Size', options: ICON_SIZES },
+      { kind: FieldKind.Slider, prop: 'width', label: 'Width', min: 1, max: 20, step: 1 },
     ])
     .spacing()
     .classes()
@@ -892,11 +893,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Progress', [
-      { kind: 'switch', prop: 'indeterminate', label: 'Indeterminate' },
-      { kind: 'slider', prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'slider', prop: 'height', label: 'Height', min: 1, max: 24, step: 1 },
-      { kind: 'switch', prop: 'rounded', label: 'Rounded' },
+      { kind: FieldKind.Switch, prop: 'indeterminate', label: 'Indeterminate' },
+      { kind: FieldKind.Slider, prop: 'modelValue', label: 'Value', min: 0, max: 100, step: 1 },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Slider, prop: 'height', label: 'Height', min: 1, max: 24, step: 1 },
+      { kind: FieldKind.Switch, prop: 'rounded', label: 'Rounded' },
     ])
     .spacing()
     .classes()
@@ -917,10 +918,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Badge', [
-      { kind: 'text', prop: 'content', label: 'Content', placeholder: 'New' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'dot', label: 'Dot' },
-      { kind: 'switch', prop: 'inline', label: 'Inline' },
+      { kind: FieldKind.Text, prop: 'content', label: 'Content', placeholder: 'New' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'dot', label: 'Dot' },
+      { kind: FieldKind.Switch, prop: 'inline', label: 'Inline' },
     ])
     .spacing()
     .classes()
@@ -938,9 +939,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'switch', prop: 'divided', label: 'Divided' },
-      { kind: 'select', prop: 'direction', label: 'Direction', options: ['horizontal', 'vertical'] },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Switch, prop: 'divided', label: 'Divided' },
+      { kind: FieldKind.Select, prop: 'direction', label: 'Direction', options: ['horizontal', 'vertical'] },
     ])
     .spacing()
     .classes()
@@ -958,10 +959,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Tabs', [
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'grow', label: 'Grow tabs' },
-      { kind: 'switch', prop: 'centered', label: 'Centered' },
-      { kind: 'switch', prop: 'fixedTabs', label: 'Fixed tabs' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'grow', label: 'Grow tabs' },
+      { kind: FieldKind.Switch, prop: 'centered', label: 'Centered' },
+      { kind: FieldKind.Switch, prop: 'fixedTabs', label: 'Fixed tabs' },
     ])
     .spacing()
     .classes()
@@ -978,8 +979,8 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: false,
   })
     .section('Tab', [
-      { kind: 'text', prop: 'value', label: 'Value' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Text, prop: 'value', label: 'Value' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
     ])
     .classes()
     .build(),
@@ -1007,9 +1008,14 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Appearance', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: ['default', 'accordion', 'inset', 'popout'] },
-      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
-      { kind: 'switch', prop: 'flat', label: 'Flat' },
+      {
+        kind: FieldKind.Select,
+        prop: 'variant',
+        label: 'Variant',
+        options: ['default', 'accordion', 'inset', 'popout'],
+      },
+      { kind: FieldKind.Switch, prop: 'multiple', label: 'Multiple' },
+      { kind: FieldKind.Switch, prop: 'flat', label: 'Flat' },
     ])
     .spacing()
     .classes()
@@ -1030,9 +1036,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: false,
   })
     .section('Panel', [
-      { kind: 'text', prop: 'title', label: 'Title', placeholder: 'Panel title' },
-      { kind: 'text', prop: 'value', label: 'Value' },
-      { kind: 'switch', prop: 'eager', label: 'Eager render' },
+      { kind: FieldKind.Text, prop: 'title', label: 'Title', placeholder: 'Panel title' },
+      { kind: FieldKind.Text, prop: 'value', label: 'Value' },
+      { kind: FieldKind.Switch, prop: 'eager', label: 'Eager render' },
     ])
     .spacing()
     .classes()
@@ -1083,16 +1089,16 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('App bar', [
-      { kind: 'text', prop: 'title', label: 'Title' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Text, prop: 'title', label: 'Title' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'density',
         label: 'Density',
         options: ['default', 'comfortable', 'compact', 'prominent'],
       },
-      { kind: 'switch', prop: 'flat', label: 'Flat' },
-      { kind: 'switch', prop: 'absolute', label: 'Absolute position' },
+      { kind: FieldKind.Switch, prop: 'flat', label: 'Flat' },
+      { kind: FieldKind.Switch, prop: 'absolute', label: 'Absolute position' },
     ])
     .classes()
     .build(),
@@ -1113,11 +1119,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Drawer', [
-      { kind: 'select', prop: 'location', label: 'Location', options: ['left', 'right', 'top', 'bottom'] },
-      { kind: 'slider', prop: 'width', label: 'Width', min: 160, max: 400, step: 10 },
-      { kind: 'switch', prop: 'rail', label: 'Rail (icons only)' },
-      { kind: 'switch', prop: 'permanent', label: 'Always visible' },
-      { kind: 'switch', prop: 'absolute', label: 'Absolute position' },
+      { kind: FieldKind.Select, prop: 'location', label: 'Location', options: ['left', 'right', 'top', 'bottom'] },
+      { kind: FieldKind.Slider, prop: 'width', label: 'Width', min: 160, max: 400, step: 10 },
+      { kind: FieldKind.Switch, prop: 'rail', label: 'Rail (icons only)' },
+      { kind: FieldKind.Switch, prop: 'permanent', label: 'Always visible' },
+      { kind: FieldKind.Switch, prop: 'absolute', label: 'Absolute position' },
     ])
     .classes()
     .build(),
@@ -1146,31 +1152,50 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Data', [
-      { kind: 'table-editor' },
-      { kind: 'text', prop: 'search', label: 'Search text', placeholder: '{{query}}' },
-      { kind: 'slider', prop: 'itemsPerPage', label: 'Rows per page', min: 1, max: 50, step: 1 },
+      { kind: FieldKind.TableEditor },
+      { kind: FieldKind.Text, prop: 'search', label: 'Search text', placeholder: '{{query}}' },
+      { kind: FieldKind.Slider, prop: 'itemsPerPage', label: 'Rows per page', min: 1, max: 50, step: 1 },
     ])
-    .section('Appearance', [
-      { kind: 'select', prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
-      { kind: 'switch', prop: 'hover', label: 'Hover rows' },
-      { kind: 'switch', prop: 'hideDefaultFooter', label: 'Hide footer' },
-      { kind: 'switch', prop: 'showSelect', label: 'Row selection' },
-      { kind: 'switch', prop: 'loading', label: 'Loading' },
-      { kind: 'switch', prop: 'fixedHeader', label: 'Fixed header' },
-      { kind: 'switch', prop: 'fixedFooter', label: 'Fixed footer' },
-      { kind: 'switch', prop: 'striped', label: 'Striped rows' },
-      { kind: 'switch', prop: 'bordered', label: 'Cell borders' },
-      { kind: 'switch', prop: 'multiSort', label: 'Sort by several columns' },
+    // Most used first; the rest sits in groups that start collapsed.
+    .section('Look', [
+      { kind: FieldKind.Select, prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
+      { kind: FieldKind.Switch, prop: 'striped', label: 'Striped rows' },
+      { kind: FieldKind.Switch, prop: 'hover', label: 'Hover rows' },
+      { kind: FieldKind.Switch, prop: 'bordered', label: 'Cell borders' },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'headerColor',
         label: 'Header color',
         options: ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'surface'],
       },
-      { kind: 'text', prop: 'loadingText', label: 'Loading text', placeholder: 'Loading…' },
-      { kind: 'text', prop: 'height', label: 'Height (px, enables scroll)', placeholder: '320' },
-      { kind: 'text', prop: 'noDataText', label: 'Empty text', placeholder: 'No data available' },
     ])
+    .section(
+      'Behavior',
+      [
+        { kind: FieldKind.Switch, prop: 'showSelect', label: 'Row selection' },
+        { kind: FieldKind.Switch, prop: 'multiSort', label: 'Sort by several columns' },
+        { kind: FieldKind.Switch, prop: 'loading', label: 'Loading' },
+        { kind: FieldKind.Switch, prop: 'hideDefaultFooter', label: 'Hide footer' },
+      ],
+      { collapsed: true },
+    )
+    .section(
+      'Size & scrolling',
+      [
+        { kind: FieldKind.Text, prop: 'height', label: 'Height (px, enables scroll)', placeholder: '320' },
+        { kind: FieldKind.Switch, prop: 'fixedHeader', label: 'Fixed header' },
+        { kind: FieldKind.Switch, prop: 'fixedFooter', label: 'Fixed footer' },
+      ],
+      { collapsed: true },
+    )
+    .section(
+      'Texts',
+      [
+        { kind: FieldKind.Text, prop: 'noDataText', label: 'Empty text', placeholder: 'No data available' },
+        { kind: FieldKind.Text, prop: 'loadingText', label: 'Loading text', placeholder: 'Loading…' },
+      ],
+      { collapsed: true },
+    )
     .spacing()
     .classes()
     .build(),
@@ -1186,11 +1211,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Pagination', [
-      { kind: 'slider', prop: 'length', label: 'Pages', min: 1, max: 50, step: 1 },
-      { kind: 'slider', prop: 'totalVisible', label: 'Visible', min: 1, max: 10, step: 1 },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
+      { kind: FieldKind.Slider, prop: 'length', label: 'Pages', min: 1, max: 50, step: 1 },
+      { kind: FieldKind.Slider, prop: 'totalVisible', label: 'Visible', min: 1, max: 10, step: 1 },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
     ])
     .spacing()
     .classes()
@@ -1212,9 +1237,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Dialog', [
-      { kind: 'slider', prop: 'maxWidth', label: 'Max width', min: 240, max: 1000, step: 10 },
-      { kind: 'switch', prop: 'persistent', label: 'Persistent' },
-      { kind: 'switch', prop: 'fullscreen', label: 'Fullscreen' },
+      { kind: FieldKind.Slider, prop: 'maxWidth', label: 'Max width', min: 240, max: 1000, step: 10 },
+      { kind: FieldKind.Switch, prop: 'persistent', label: 'Persistent' },
+      { kind: FieldKind.Switch, prop: 'fullscreen', label: 'Fullscreen' },
     ])
     .classes()
     .build(),
@@ -1234,9 +1259,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Menu', [
-      { kind: 'select', prop: 'location', label: 'Location', options: ['bottom', 'top', 'start', 'end'] },
-      { kind: 'switch', prop: 'openOnHover', label: 'Open on hover' },
-      { kind: 'switch', prop: 'closeOnContentClick', label: 'Close on content click' },
+      { kind: FieldKind.Select, prop: 'location', label: 'Location', options: ['bottom', 'top', 'start', 'end'] },
+      { kind: FieldKind.Switch, prop: 'openOnHover', label: 'Open on hover' },
+      { kind: FieldKind.Switch, prop: 'closeOnContentClick', label: 'Close on content click' },
     ])
     .classes()
     .build(),
@@ -1256,14 +1281,14 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Snackbar', [
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'location',
         label: 'Location',
         options: ['bottom', 'top', 'bottom start', 'bottom end', 'top start', 'top end'],
       },
-      { kind: 'slider', prop: 'timeout', label: 'Timeout (ms)', min: 1000, max: 10000, step: 500 },
+      { kind: FieldKind.Slider, prop: 'timeout', label: 'Timeout (ms)', min: 1000, max: 10000, step: 500 },
     ])
     .classes()
     .build(),
@@ -1279,8 +1304,8 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Tooltip', [
-      { kind: 'text', prop: 'text', label: 'Text', placeholder: 'Tooltip' },
-      { kind: 'select', prop: 'location', label: 'Location', options: ['top', 'bottom', 'start', 'end'] },
+      { kind: FieldKind.Text, prop: 'text', label: 'Text', placeholder: 'Tooltip' },
+      { kind: FieldKind.Select, prop: 'location', label: 'Location', options: ['top', 'bottom', 'start', 'end'] },
     ])
     .build(),
 
@@ -1296,11 +1321,11 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Date picker', [
-      { kind: 'text', prop: 'title', label: 'Title' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'switch', prop: 'multiple', label: 'Multiple dates' },
-      { kind: 'switch', prop: 'hideHeader', label: 'Hide header' },
-      { kind: 'switch', prop: 'showAdjacentMonths', label: 'Show adjacent months' },
+      { kind: FieldKind.Text, prop: 'title', label: 'Title' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Switch, prop: 'multiple', label: 'Multiple dates' },
+      { kind: FieldKind.Switch, prop: 'hideHeader', label: 'Hide header' },
+      { kind: FieldKind.Switch, prop: 'showAdjacentMonths', label: 'Show adjacent months' },
     ])
     .spacing()
     .classes()
@@ -1325,9 +1350,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Breadcrumbs', [
-      { kind: 'json', prop: 'items', label: 'Items (JSON or {{state}})' },
-      { kind: 'text', prop: 'divider', label: 'Divider' },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Json, prop: 'items', label: 'Items (JSON or {{state}})' },
+      { kind: FieldKind.Text, prop: 'divider', label: 'Divider' },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
     ])
     .spacing()
     .classes()
@@ -1344,10 +1369,10 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Stepper', [
-      { kind: 'json', prop: 'items', label: 'Steps (JSON or {{state}})' },
-      { kind: 'slider', prop: 'modelValue', label: 'Current step', min: 1, max: 10, step: 1 },
-      { kind: 'switch', prop: 'altLabels', label: 'Labels below icons' },
-      { kind: 'switch', prop: 'flat', label: 'Flat' },
+      { kind: FieldKind.Json, prop: 'items', label: 'Steps (JSON or {{state}})' },
+      { kind: FieldKind.Slider, prop: 'modelValue', label: 'Current step', min: 1, max: 10, step: 1 },
+      { kind: FieldKind.Switch, prop: 'altLabels', label: 'Labels below icons' },
+      { kind: FieldKind.Switch, prop: 'flat', label: 'Flat' },
     ])
     .spacing()
     .classes()
@@ -1365,9 +1390,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Timeline', [
-      { kind: 'select', prop: 'side', label: 'Side', options: ['start', 'end'] },
-      { kind: 'select', prop: 'direction', label: 'Direction', options: ['vertical', 'horizontal'] },
-      { kind: 'select', prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
+      { kind: FieldKind.Select, prop: 'side', label: 'Side', options: ['start', 'end'] },
+      { kind: FieldKind.Select, prop: 'direction', label: 'Direction', options: ['vertical', 'horizontal'] },
+      { kind: FieldKind.Select, prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
     ])
     .spacing()
     .classes()
@@ -1389,9 +1414,9 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: false,
   })
     .section('Item', [
-      { kind: 'select', prop: 'dotColor', label: 'Dot color', options: COLORS },
-      { kind: 'select', prop: 'size', label: 'Size', options: ICON_SIZES },
-      { kind: 'icon-picker', prop: 'icon', label: 'Icon' },
+      { kind: FieldKind.Select, prop: 'dotColor', label: 'Dot color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'size', label: 'Size', options: ICON_SIZES },
+      { kind: FieldKind.IconPicker, prop: 'icon', label: 'Icon' },
     ])
     .classes()
     .build(),
@@ -1412,12 +1437,12 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     showInPalette: true,
   })
     .section('Toggle', [
-      { kind: 'select', prop: 'variant', label: 'Variant', options: VARIANTS },
-      { kind: 'select', prop: 'color', label: 'Color', options: COLORS },
-      { kind: 'select', prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
-      { kind: 'switch', prop: 'mandatory', label: 'Always one selected' },
-      { kind: 'switch', prop: 'multiple', label: 'Multiple' },
-      { kind: 'switch', prop: 'divided', label: 'Divided' },
+      { kind: FieldKind.Select, prop: 'variant', label: 'Variant', options: VARIANTS },
+      { kind: FieldKind.Select, prop: 'color', label: 'Color', options: COLORS },
+      { kind: FieldKind.Select, prop: 'density', label: 'Density', options: ['default', 'comfortable', 'compact'] },
+      { kind: FieldKind.Switch, prop: 'mandatory', label: 'Always one selected' },
+      { kind: FieldKind.Switch, prop: 'multiple', label: 'Multiple' },
+      { kind: FieldKind.Switch, prop: 'divided', label: 'Divided' },
     ])
     .spacing()
     .classes()
@@ -1435,7 +1460,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
   })
     .section('Skeleton', [
       {
-        kind: 'select',
+        kind: FieldKind.Select,
         prop: 'type',
         label: 'Type',
         options: [
@@ -1453,7 +1478,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
           'table',
         ],
       },
-      { kind: 'switch', prop: 'boilerplate', label: 'No animation' },
+      { kind: FieldKind.Switch, prop: 'boilerplate', label: 'No animation' },
     ])
     .spacing()
     .classes()
@@ -1480,7 +1505,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     defaultClasses: [],
     showInPalette: false,
   })
-    .section('Text Content', [{ kind: 'textarea', label: 'Text Content' }])
+    .section('Text Content', [{ kind: FieldKind.Textarea, label: 'Text Content' }])
     .build(),
 }
 
@@ -1490,7 +1515,7 @@ export const PALETTE_COMPONENTS = Object.values(COMPONENT_DEFS).filter(d => d.sh
 
 export const WRAP_CONTAINER_TYPES = Object.values(COMPONENT_DEFS)
   .filter(d => d.isWrapContainer)
-  .map(d => ({ type: d.type as ComponentType, label: d.label, icon: d.treeIcon }))
+  .map(d => ({ type: d.type, label: d.label, icon: d.treeIcon }))
 
 /** Cell slots of a data table are named after their column key. */
 export const CELL_SLOT_PREFIX = 'item.'

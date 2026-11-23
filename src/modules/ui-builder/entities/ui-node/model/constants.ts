@@ -8,4 +8,5 @@ export const MAX_DOCUMENT_DEPTH = 60
 export const MAX_PAGES = 50
 export const MAX_HISTORY_ENTRIES = 50
 export const MAX_CHECKPOINTS = 30
+export const MAX_RECENT_COMPONENTS = 6
 export const HISTORY_COMMIT_DELAY_MS = 600

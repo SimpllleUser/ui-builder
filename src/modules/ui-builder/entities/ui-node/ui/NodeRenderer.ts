@@ -1,5 +1,5 @@
 // src/modules/ui-builder/entities/ui-node/ui/NodeRenderer.ts
-import { defineComponent, h, type Component, type PropType, resolveDynamicComponent, type VNode } from 'vue'
+import { defineComponent, h, type Component, type PropType, resolveDynamicComponent, type Slot, type VNode } from 'vue'
 import * as Components from 'vuetify/components'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../model/store'
@@ -16,6 +16,7 @@ import {
 } from '../model/runtime'
 import type { UiNode } from '../model/types'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
+import { resolveTableData } from '../model/tableBindings'
 import { statusChipSlots, tableHeight, tableStyleClasses } from './dataTableRendering'
 
 export { canvasDragTargetId }
@@ -25,8 +26,6 @@ const NO_IMAGE_PLACEHOLDER =
 
 /** Overlays are drawn inline in the editor so their content can be edited; they are real overlays in preview. */
 const OVERLAY_TYPES = new Set(['VDialog', 'VMenu', 'VSnackbar', 'VTooltip'])
-
-type Slots = Record<string, (...args: any[]) => VNode | VNode[]>
 
 const NodeRenderer = defineComponent({
   name: 'NodeRenderer',
@@ -125,8 +124,8 @@ const NodeRenderer = defineComponent({
     }
 
     /** Default and named slots. A data table's cell slots receive the row (`item`), cell `value` and `index`. */
-    const buildSlots = (node: UiNode, render: (nodes: UiNode[], base?: Scope) => VNode[]): Slots => {
-      const slots: Slots = {}
+    const buildSlots = (node: UiNode, render: (nodes: UiNode[], base?: Scope) => VNode[]): Record<string, Slot> => {
+      const slots: Record<string, Slot> = {}
       if (!getComponentDef(node.type)?.isLeaf) slots.default = () => render(node.children)
       for (const [slotName, slotChildren] of Object.entries(node.slots)) {
         if (!slotChildren.length) continue
@@ -179,6 +178,8 @@ const NodeRenderer = defineComponent({
       if (propStyle !== undefined) extraProps.style = propStyle
       if (node.type === 'VImg' && !componentProps.src) extraProps.src = NO_IMAGE_PLACEHOLDER
       if (node.type === 'VDataTable') {
+        // In the editor a binding shows the variable's starting value, so the canvas always has real data to draw.
+        Object.assign(componentProps, resolveTableData(componentProps, preview ? scope : store.project.state))
         for (const [name, slot] of Object.entries(statusChipSlots(componentProps.headers))) slots[name] ??= slot
         componentProps.height = tableHeight(componentProps.height)
         classes.push(...tableStyleClasses(componentProps))

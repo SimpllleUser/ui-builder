@@ -1,3 +1,4 @@
+import type { SpacingType } from './enums'
 const sides: Record<string, string[]> = {
   a: ['t', 'r', 'b', 'l'],
   x: ['l', 'r'],
@@ -7,7 +8,7 @@ const sides: Record<string, string[]> = {
   b: ['b'],
   l: ['l'],
 }
-export function readSpacing(classes: string[], type: 'm' | 'p', side: string): number | string | null {
+export function readSpacing(classes: string[], type: SpacingType, side: string): number | string | null {
   const values = sides[side].map(s => {
     for (const direction of [s, ['l', 'r'].includes(s) ? 'x' : 'y', 'a']) {
       const cls = classes.find(c => new RegExp(`^${type}${direction}-(n?\\d+|auto)$`).test(c))
@@ -22,7 +23,7 @@ export function readSpacing(classes: string[], type: 'm' | 'p', side: string): n
 }
 export function writeSpacing(
   classes: string[],
-  type: 'm' | 'p',
+  type: SpacingType,
   side: string,
   value: number | string | null,
 ): string[] {

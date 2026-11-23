@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { parseLiteral } from '../../../entities/ui-node/model/runtime'
+import { useUiTreeStore, parseLiteral, pagePathError, variableNameError } from '../../../entities/ui-node'
+import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
 
 const store = useUiTreeStore()
 const open = ref(false)
@@ -9,16 +9,28 @@ const newName = ref('')
 const newPath = ref('')
 const newKey = ref('')
 const newValue = ref('')
-const label = computed(() => (store.editingLayout ? 'Shared layout' : store.activePage.name))
+// Problems show beside the field, while typing for new entries and on leaving the field for existing pages.
+const newPathError = computed(() => (newPath.value.trim() ? pagePathError(store.pages, newPath.value.trim()) : null))
+const newKeyError = computed(() => {
+  const name = newKey.value.trim()
+  if (!name) return null
+  return variableNameError(name) ?? (name in store.project.state ? 'A variable with this name already exists.' : null)
+})
+const paths = useCheckedDrafts(
+  (id, value) => (value ? pagePathError(store.pages, value, id) : 'Enter a route.'),
+  (id, value) => store.updatePage(id, { path: value }),
+)
 const formatValue = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value))
 
 const addPage = () => {
+  if (newPathError.value) return
   if (store.addPage(newName.value, newPath.value || undefined)) {
     newName.value = ''
     newPath.value = ''
   }
 }
 const addVariable = () => {
+  if (newKeyError.value) return
   if (store.setStateVariable(newKey.value.trim(), parseLiteral(newValue.value))) {
     newKey.value = ''
     newValue.value = ''
@@ -35,19 +47,11 @@ const toggleLayout = (on: boolean) => {
 </script>
 
 <template>
-  <VBtn
-    size="small"
-    variant="tonal"
-    prepend-icon="mdi-file-multiple-outline"
-    append-icon="mdi-menu-down"
-    class="pages-button"
-    aria-haspopup="dialog"
-    @click="open = true"
-  >
-    <span class="pages-button__label">{{ label }}</span>
+  <VBtn size="small" variant="tonal" prepend-icon="mdi-tune-variant" aria-haspopup="dialog" @click="open = true">
+    Pages &amp; variables
   </VBtn>
   <VDialog v-model="open" max-width="640" scrollable>
-    <VCard title="Pages & state">
+    <VCard title="Pages & variables">
       <VCardText>
         <div class="text-overline text-primary font-weight-bold mb-1">Pages</div>
         <VList density="compact" class="pa-0" aria-label="Pages">
@@ -70,13 +74,16 @@ const toggleLayout = (on: boolean) => {
                 @change="(e: Event) => store.updatePage(page.id, { name: (e.target as HTMLInputElement).value })"
               />
               <VTextField
-                :model-value="page.path"
+                :model-value="paths.shown(page.id, page.path)"
+                :error-messages="paths.errorOf(page.id)"
                 label="Path"
                 variant="outlined"
                 density="compact"
-                hide-details
+                hide-details="auto"
                 style="min-width: 0"
-                @change="(e: Event) => store.updatePage(page.id, { path: (e.target as HTMLInputElement).value })"
+                @update:model-value="value => paths.edit(page.id, value)"
+                @blur="paths.commit(page.id)"
+                @keydown.enter="paths.commit(page.id)"
               />
               <VBtn
                 icon="mdi-pencil-outline"
@@ -103,13 +110,14 @@ const toggleLayout = (on: boolean) => {
           <VTextField v-model="newName" label="New page name" variant="outlined" density="compact" hide-details />
           <VTextField
             v-model="newPath"
+            :error-messages="newPathError ?? []"
             label="Path (optional)"
             placeholder="/orders"
             variant="outlined"
             density="compact"
-            hide-details
+            hide-details="auto"
           />
-          <VBtn type="submit" color="primary" :disabled="!newName.trim()">Add</VBtn>
+          <VBtn type="submit" color="primary" :disabled="!newName.trim() || !!newPathError">Add</VBtn>
         </form>
 
         <div class="text-overline text-primary font-weight-bold mt-6 mb-1">Shared layout</div>
@@ -127,10 +135,11 @@ const toggleLayout = (on: boolean) => {
           >
         </div>
 
-        <div class="text-overline text-primary font-weight-bold mt-6 mb-1">State variables</div>
+        <div class="text-overline text-primary font-weight-bold mt-6 mb-1">Variables</div>
         <p class="text-body-2 mb-2">
-          Initial values for bindings and events. Use them as <code v-pre>{{ name }}</code>, in v-model, v-if and v-for.
-          Values: true, 3, text or JSON.
+          Values the page remembers while you preview it, such as whether a menu is open or what was typed in a search
+          box. Show one as <code v-pre>{{ name }}</code> or use it in an element's Behavior settings. A value can be
+          true, 3, text or JSON.
         </p>
         <div v-for="(value, key) in store.project.state" :key="key" class="d-flex align-center ga-2 mb-2">
           <code class="state-key">{{ key }}</code>
@@ -156,11 +165,12 @@ const toggleLayout = (on: boolean) => {
         <form class="d-flex align-center ga-2 mt-3" @submit.prevent="addVariable">
           <VTextField
             v-model="newKey"
+            :error-messages="newKeyError ?? []"
             label="Name"
             placeholder="isOpen"
             variant="outlined"
             density="compact"
-            hide-details
+            hide-details="auto"
           />
           <VTextField
             v-model="newValue"
@@ -170,7 +180,7 @@ const toggleLayout = (on: boolean) => {
             density="compact"
             hide-details
           />
-          <VBtn type="submit" color="primary" :disabled="!newKey.trim()">Add</VBtn>
+          <VBtn type="submit" color="primary" :disabled="!newKey.trim() || !!newKeyError">Add</VBtn>
         </form>
       </VCardText>
       <VCardActions><VSpacer /><VBtn @click="open = false">Close</VBtn></VCardActions>
@@ -179,12 +189,6 @@ const toggleLayout = (on: boolean) => {
 </template>
 
 <style scoped>
-.pages-button__label {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .state-key {
   min-width: 90px;
 }

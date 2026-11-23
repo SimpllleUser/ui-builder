@@ -32,11 +32,20 @@ export function usePreviewRuntime({ project, activePage, isPreviewMode, setNotic
       navigate,
     })
 
-  watch(isPreviewMode, on => {
-    if (!on) return
+  // A preview starts on the page being edited, with every variable at its starting value.
+  let startPageId = ''
+  const start = () => {
+    startPageId = activePage.value.id
+    reset()
+  }
+  /** Back to how the preview began: starting values and the page it opened on. */
+  const reset = () => {
     state.value = cloneNode(project.value.state)
-    pageId.value = activePage.value.id
+    pageId.value = project.value.pages.some(item => item.id === startPageId) ? startPageId : activePage.value.id
+  }
+  watch(isPreviewMode, on => {
+    if (on) start()
   })
 
-  return { state, pageId, page, root, navigate, dispatch }
+  return { state, pageId, page, root, navigate, dispatch, reset, start }
 }

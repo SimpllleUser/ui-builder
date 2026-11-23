@@ -1,35 +1,56 @@
 import { computed, ref } from 'vue'
 
-export function createHistory(serialize: () => string, applySnapshot: (snapshot: string) => void, maxEntries: number) {
-  const entries = ref<string[]>([serialize()])
+export interface HistoryEntry {
+  snapshot: string
+  /** What this version changed, e.g. “Added Data table”. */
+  label: string
+  at: number
+}
+
+interface HistoryOptions {
+  serialize: () => string
+  applySnapshot: (snapshot: string) => void
+  maxEntries: number
+  /** Names the change between two snapshots. */
+  describe?: (previous: string, next: string) => string
+  /** Called after a change was saved as a new version (not for undo and redo). */
+  onCommit?: (entry: HistoryEntry) => void
+}
+
+export function createHistory({ serialize, applySnapshot, maxEntries, describe, onCommit }: HistoryOptions) {
+  const entries = ref<HistoryEntry[]>([{ snapshot: serialize(), label: 'Opened', at: Date.now() }])
   const currentIndex = ref(0)
   const isRestoring = ref(false)
 
-  const pending = computed(() => serialize() !== entries.value[currentIndex.value])
+  const pending = computed(() => serialize() !== entries.value[currentIndex.value].snapshot)
   const canUndo = computed(() => pending.value || currentIndex.value > 0)
   const canRedo = computed(() => !pending.value && currentIndex.value < entries.value.length - 1)
   const versions = computed(() =>
-    entries.value.map((_, index) => ({
+    entries.value.map((entry, index) => ({
       index,
-      label: index === 0 ? 'Initial version' : `Version ${index + 1}`,
+      label: entry.label,
+      at: entry.at,
       isCurrent: index === currentIndex.value,
     })),
   )
 
   const commit = () => {
     const snapshot = serialize()
-    if (entries.value[currentIndex.value] === snapshot) return
+    const previous = entries.value[currentIndex.value].snapshot
+    if (previous === snapshot) return
 
+    const entry: HistoryEntry = { snapshot, label: describe?.(previous, snapshot) ?? 'Edited the page', at: Date.now() }
     entries.value = entries.value.slice(0, currentIndex.value + 1)
-    entries.value.push(snapshot)
+    entries.value.push(entry)
     if (entries.value.length > maxEntries) entries.value.shift()
     currentIndex.value = entries.value.length - 1
+    onCommit?.(entry)
   }
 
   const restoreCurrent = () => {
     isRestoring.value = true
     try {
-      applySnapshot(entries.value[currentIndex.value])
+      applySnapshot(entries.value[currentIndex.value].snapshot)
     } finally {
       isRestoring.value = false
     }

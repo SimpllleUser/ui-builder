@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useUiTreeStore } from '../../../entities/ui-node/model/store'
-import { cellSlotName as slotName } from '../../../entities/ui-node/model/componentDefinitions'
-import { tableColumns, tableRows } from '../../../entities/ui-node/model/tableMutations'
-import type { UiNode } from '../../../entities/ui-node/model/types'
+import {
+  ColumnAlign,
+  TableData,
+  useUiTreeStore,
+  cellSlotName as slotName,
+  columnKeyError,
+  tableColumns,
+  tableRows,
+  type UiNode,
+} from '../../../entities/ui-node'
+import { TableEditorTab } from '../model/tableEditorTab'
+import { computed, ref, watch } from 'vue'
+import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
 
 const props = defineProps<{ node: UiNode }>()
 const store = useUiTreeStore()
@@ -14,9 +22,18 @@ const rows = computed(() => tableRows(props.node))
 const boundRows = computed(() => (typeof props.node.props.items === 'string' ? props.node.props.items : ''))
 const boundColumns = computed(() => (typeof props.node.props.headers === 'string' ? props.node.props.headers : ''))
 const stateKeys = computed(() => Object.keys(store.project.state))
-const tab = ref<'columns' | 'rows'>('columns')
+const tab = ref<TableEditorTab>(TableEditorTab.Columns)
 
 const id = computed(() => props.node.id)
+
+// A key is checked when the field is left, and a wrong one stays in the field with the reason beside it.
+const keys = useCheckedDrafts(
+  (key, value) => columnKeyError(columns.value, value, key),
+  (key, value) => {
+    if (value !== key) store.table.updateColumn(id.value, key, { key: value })
+  },
+)
+watch(id, keys.reset)
 const parseCell = (value: string) => (/^-?\d+(\.\d+)?$/.test(value) ? Number(value) : value)
 const parseWidth = (value: string) => Number(value) || undefined
 const patchCell = (rowIndex: number, key: string, value: string) =>
@@ -42,7 +59,7 @@ const clearCell = (key: string) => {
   delete props.node.slots[slotName(key)]
   store.commit()
 }
-const bind = (prop: 'headers' | 'items', value: string | null) => {
+const bind = (prop: TableData, value: string | null) => {
   store.updateNodeProp(id.value, prop, value ? `{{${value.replace(/[{}\s]/g, '')}}}` : [])
   store.commit()
 }
@@ -51,11 +68,11 @@ const bind = (prop: 'headers' | 'items', value: string | null) => {
 <template>
   <div class="table-editor mb-4">
     <VBtnToggle v-model="tab" mandatory density="compact" color="primary" variant="outlined" class="mb-3">
-      <VBtn value="columns" size="small">Columns</VBtn>
-      <VBtn value="rows" size="small">Rows</VBtn>
+      <VBtn :value="TableEditorTab.Columns" size="small">Columns</VBtn>
+      <VBtn :value="TableEditorTab.Rows" size="small">Rows</VBtn>
     </VBtnToggle>
 
-    <template v-if="tab === 'columns'">
+    <template v-if="tab === TableEditorTab.Columns">
       <VCombobox
         :model-value="boundColumns.replace(/[{}]/g, '')"
         :items="stateKeys"
@@ -65,7 +82,7 @@ const bind = (prop: 'headers' | 'items', value: string | null) => {
         hide-details
         clearable
         class="mb-3"
-        @update:model-value="value => bind('headers', value)"
+        @update:model-value="value => bind(TableData.Headers, value)"
       />
       <template v-if="!boundColumns">
         <div v-for="column in columns" :key="column.key" class="table-editor__item">
@@ -81,15 +98,15 @@ const bind = (prop: 'headers' | 'items', value: string | null) => {
               "
             />
             <VTextField
-              :model-value="column.key"
+              :model-value="keys.shown(column.key, column.key)"
+              :error-messages="keys.errorOf(column.key)"
               label="Key"
               variant="outlined"
               density="compact"
-              hide-details
-              @change="
-                (e: Event) =>
-                  store.table.updateColumn(id, column.key, { key: (e.target as HTMLInputElement).value.trim() })
-              "
+              hide-details="auto"
+              @update:model-value="value => keys.edit(column.key, value)"
+              @blur="keys.commit(column.key)"
+              @keydown.enter="keys.commit(column.key)"
             />
             <VBtn
               icon="mdi-delete-outline"
@@ -102,8 +119,8 @@ const bind = (prop: 'headers' | 'items', value: string | null) => {
           </div>
           <div class="d-flex ga-3 align-center flex-wrap">
             <VSelect
-              :model-value="column.align ?? 'start'"
-              :items="['start', 'center', 'end']"
+              :model-value="column.align ?? ColumnAlign.Start"
+              :items="Object.values(ColumnAlign)"
               label="Align"
               variant="outlined"
               density="compact"
@@ -183,7 +200,7 @@ const bind = (prop: 'headers' | 'items', value: string | null) => {
         hide-details
         clearable
         class="mb-3"
-        @update:model-value="value => bind('items', value)"
+        @update:model-value="value => bind(TableData.Items, value)"
       />
       <template v-if="!boundRows && !boundColumns">
         <div class="table-editor__grid">
