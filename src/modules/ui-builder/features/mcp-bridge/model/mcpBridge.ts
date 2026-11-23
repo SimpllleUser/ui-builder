@@ -3,9 +3,12 @@ import { type useUiTreeStore } from '../../../entities/ui-node'
 
 export const MCP_BRIDGE_URL = import.meta.env.VITE_MCP_BRIDGE_URL ?? 'http://127.0.0.1:3002'
 
-/** Connects the editor to the local MCP server (dev only). EventSource reconnects on its own. */
+/**
+ * Connects the editor to the local MCP server (dev only). EventSource reconnects on its own.
+ * The server sends commands to the tab that was loaded last, so the page's load time is part of the address.
+ */
 export function connectMcpBridge(store: ReturnType<typeof useUiTreeStore>) {
-  const source = new EventSource(`${MCP_BRIDGE_URL}/events`)
+  const source = new EventSource(`${MCP_BRIDGE_URL}/events?loaded=${Math.round(performance.timeOrigin)}`)
   source.onmessage = async event => {
     const { id, command, args } = JSON.parse(event.data)
     let body: Record<string, unknown>

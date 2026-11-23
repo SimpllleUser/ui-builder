@@ -1,25 +1,36 @@
-import { WRAP_CONTAINER_TYPES } from '../../../entities/ui-node'
+import { WRAP_CONTAINER_TYPES, type PrefabPropValues } from '../../../entities/ui-node'
 import { need, ok, summarize, type McpCommand } from './mcpCommandUtils'
+
+/** Parameter values given by an agent as `{ name: text }`; anything else is ignored. */
+function propValues(input: unknown): PrefabPropValues {
+  if (input === null || typeof input !== 'object') return {}
+  return Object.fromEntries(Object.entries(input).map(([name, value]) => [name, String(value)]))
+}
 
 const WRAP_TYPES = WRAP_CONTAINER_TYPES.map(item => item.type)
 
 export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
   // ─── My components (saved elements that can be inserted again) ───────────────
   list_saved_components: store =>
-    store.prefabs.map(prefab => ({ prefabId: prefab.prefabId, name: prefab.name, preview: summarize(prefab.node) })),
+    store.prefabs.map(prefab => ({
+      prefabId: prefab.prefabId,
+      name: prefab.name,
+      props: prefab.props ?? [],
+      preview: summarize(prefab.node),
+    })),
   save_component: (store, a) => {
     const node = need(store, a.id)
     const name = String(a.name ?? '').trim()
     ok(!!name, 'A saved component needs a name.')
     const countBefore = store.prefabs.length
-    store.savePrefab(node.id, name)
+    store.savePrefab(node.id, name, propValues(a.props))
     ok(store.prefabs.length > countBefore, 'Could not save the component.')
     return { prefabId: store.prefabs[store.prefabs.length - 1].prefabId, name }
   },
   insert_saved_component: (store, a) => {
     if (a.parentId) need(store, a.parentId)
     ok(
-      store.insertPrefab(a.prefabId, a.parentId, a.slot ?? null),
+      store.insertPrefab(a.prefabId, a.parentId, a.slot ?? null, propValues(a.props)),
       `No saved component ${String(a.prefabId)} (see list_saved_components).`,
     )
     return { notice: store.notice, selected: store.selectedNodeIds }

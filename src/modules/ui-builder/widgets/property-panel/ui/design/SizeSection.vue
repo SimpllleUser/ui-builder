@@ -5,6 +5,7 @@ import { useNodeStyle } from '../../model/useNodeStyle'
 import { type UiNode } from '../../../../entities/ui-node'
 import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
+import IconToggleGroup from './IconToggleGroup.vue'
 import NumberField from './NumberField.vue'
 
 const DEFAULT_PIXELS = 100
@@ -34,7 +35,7 @@ const { style, apply } = useNodeStyle(() => props.node)
         placeholder="auto"
         @update:model-value="value => apply({ [dimension.property]: toPx(value) })"
       />
-      <div class="size-row__modes" role="group" :aria-label="`${dimension.name} mode`">
+      <IconToggleGroup :label="`${dimension.name} mode`">
         <IconToggle
           v-for="option in MODES"
           :key="option.mode"
@@ -44,7 +45,7 @@ const { style, apply } = useNodeStyle(() => props.node)
           :pressed="sizeMode(style[dimension.property]) === option.mode"
           @click="apply({ [dimension.property]: sizeValue(option.mode, style[dimension.property], DEFAULT_PIXELS) })"
         />
-      </div>
+      </IconToggleGroup>
     </div>
   </DesignSection>
 </template>

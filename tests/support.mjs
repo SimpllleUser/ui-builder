@@ -20,6 +20,8 @@ export let server,
   clonePaletteItem,
   parseMoveDestination,
   canSavePrefabName,
+  jsonTree,
+  fieldTabs,
   store
 const storage = new Map()
 before(async () => {
@@ -51,6 +53,8 @@ before(async () => {
   ;({ parseMoveDestination, canSavePrefabName } = await server.ssrLoadModule(
     '/src/modules/ui-builder/widgets/property-panel/model/propertyPanelUtils.ts',
   ))
+  jsonTree = await server.ssrLoadModule('/src/shared/lib/jsonTree.ts')
+  fieldTabs = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/fieldTabs.ts')
   global.window = { localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } }
 })
 beforeEach(() => {

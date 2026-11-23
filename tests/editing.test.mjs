@@ -11,6 +11,9 @@ import {
   clonePaletteItem,
   parseMoveDestination,
   canSavePrefabName,
+  jsonTree,
+  fieldTabs,
+  server,
   store,
 } from './support.mjs'
 
@@ -204,5 +207,150 @@ test('a page has one name: the root follows the page, and similar elements are n
   assert.deepEqual(
     store.rootNode.children.slice(3).map(node => node.name),
     ['Button', 'Button 2'],
+  )
+})
+
+test('saved component parameters are filled in on insert, with defaults for missing values', () => {
+  store.addComponent('VBtn')
+  const button = store.selectedNodeId
+  store.updateNodeProp(button, 'text', 'Hello {{props.who}}')
+  store.updateNodeProp(button, 'color', '{{ props.tone }}')
+  store.savePrefab(button, 'Greeting', { tone: 'primary' })
+  const [prefab] = store.prefabs
+  assert.deepEqual(prefab.props, [
+    { name: 'who', defaultValue: '' },
+    { name: 'tone', defaultValue: 'primary' },
+  ])
+  assert.equal(store.findNodeById(button).props.text, 'Hello {{props.who}}', 'the template itself stays unchanged')
+
+  store.insertPrefab(prefab.prefabId, 'root-canvas', null, { who: 'Ann' })
+  const inserted = store.findNodeById(store.selectedNodeId)
+  assert.equal(inserted.props.text, 'Hello Ann')
+  assert.equal(inserted.props.color, 'primary')
+})
+
+test('saved component parameters also work in text, conditions and click actions', () => {
+  const { addComponent, updateNodeName } = store
+  addComponent('VBtn')
+  const button = store.selectedNodeId
+  store.updateNodeLogic(button, {
+    vIf: 'page == {{props.page}}',
+    events: { click: { type: 'navigate', to: '/{{props.page}}' } },
+  })
+  const label = store.findNodeById(button).children[0]
+  updateNodeName(label.id, 'Open {{props.page}}')
+  store.savePrefab(button, 'Link', { page: 'home' })
+  store.insertPrefab(store.prefabs[0].prefabId, 'root-canvas', null, { page: 'engines' })
+  const inserted = store.findNodeById(store.selectedNodeId)
+  assert.equal(inserted.vIf, 'page == engines')
+  assert.equal(inserted.events.click.to, '/engines')
+  assert.equal(inserted.children[0].name, 'Open engines')
+})
+
+test('a saved component can be edited in place of the page, and its parameters follow the edits', () => {
+  store.addComponent('VBtn')
+  const button = store.selectedNodeId
+  store.savePrefab(button, 'Action')
+  const [{ prefabId }] = store.prefabs
+  const pageRoot = store.rootNode
+
+  assert.equal(store.editPrefab('nope'), false)
+  assert.equal(store.editPrefab(prefabId), true)
+  assert.equal(store.rootNode, store.editingPrefab.node)
+  assert.deepEqual(store.selectedNodeIds, [store.rootNode.id], 'its settings open in the properties panel')
+  assert.equal(store.canUndo, false, 'history only covers the project')
+
+  store.updateNodeProp(store.rootNode.id, 'color', '{{props.tone}}')
+  assert.deepEqual(store.prefabs[0].props, [{ name: 'tone', defaultValue: '' }])
+  assert.equal(pageRoot.children[0].props.color, undefined, 'the page is not changed')
+
+  store.stopEditingPrefab()
+  assert.equal(store.rootNode, pageRoot)
+  store.editPrefab(prefabId)
+  store.selectPage(store.pages[0].id)
+  assert.equal(store.editingPrefab, null, 'opening a page leaves the component')
+})
+
+test('preview of an edited component shows that component with its default parameters', () => {
+  store.addComponent('VBtn')
+  const button = store.selectedNodeId
+  store.updateNodeProp(button, 'text', 'Hello {{props.who}}')
+  store.savePrefab(button, 'Greeting', { who: 'Ann' })
+  store.editPrefab(store.prefabs[0].prefabId)
+  store.startPreview()
+  assert.equal(store.previewRoot.props.text, 'Hello Ann')
+  assert.equal(store.previewRoot.id, button)
+  assert.equal(store.rootNode.props.text, 'Hello {{props.who}}', 'the template itself is unchanged')
+  store.stopEditingPrefab()
+  assert.equal(store.previewRoot, store.activePage.root, 'back to the page')
+})
+
+test('previewing a component and switching to another one shows only the chosen component', () => {
+  store.addComponent('VBtn')
+  store.savePrefab(store.selectedNodeId, 'First')
+  store.addComponent('VIcon', 'root-canvas')
+  store.savePrefab(store.selectedNodeId, 'Second')
+  const [first, second] = store.prefabs
+  store.editPrefab(first.prefabId)
+  store.startPreview()
+  assert.equal(store.previewRoot.id, first.node.id)
+  store.editPrefab(second.prefabId)
+  assert.equal(store.previewRoot.id, second.node.id, 'preview follows the chosen component')
+  assert.equal(store.isPreviewMode, true)
+})
+
+test('Preview of a page hides the panels, while Preview of a component keeps them and only changes the mode', async () => {
+  const { useFocusMode } = await server.ssrLoadModule('/src/app/shell/useFocusMode.ts')
+  const { showChrome } = useFocusMode(store, 'Ctrl')
+  assert.equal(showChrome.value, true)
+  store.startPreview()
+  assert.equal(showChrome.value, false, 'a page is previewed on its own')
+  store.isPreviewMode = false
+
+  store.addComponent('VBtn')
+  store.savePrefab(store.selectedNodeId, 'Action')
+  store.editPrefab(store.prefabs[0].prefabId)
+  store.startPreview()
+  assert.equal(showChrome.value, true, 'a component is previewed on the canvas')
+})
+
+test('json tree helpers change, remove and add values without touching the original', () => {
+  const { JsonKind, jsonKind, setAtPath, removeAtPath, addChildAtPath, jsonKeyError, emptyJsonValue, jsonEntries } =
+    jsonTree
+  const original = { color: 'info', style: { padding: 4 }, items: ['a', 'b', 'c'] }
+  const snapshot = JSON.stringify(original)
+
+  assert.deepEqual(setAtPath(original, ['style', 'padding'], 8).style, { padding: 8 })
+  assert.deepEqual(setAtPath(original, ['items', '1'], 'x').items, ['a', 'x', 'c'])
+  assert.deepEqual(removeAtPath(original, ['items', '0']).items, ['b', 'c'])
+  assert.equal('color' in removeAtPath(original, ['color']), false)
+  assert.deepEqual(addChildAtPath(original, ['items'], '', 'd').items, ['a', 'b', 'c', 'd'])
+  assert.deepEqual(addChildAtPath(original, ['style'], 'margin', 2).style, { padding: 4, margin: 2 })
+  assert.equal(JSON.stringify(original), snapshot, 'the original is never changed')
+
+  assert.equal(jsonKeyError(original, 'color'), '“color” already exists.')
+  assert.equal(jsonKeyError(original, ' '), 'Write a name.')
+  assert.equal(jsonKeyError(original, 'size'), null)
+  assert.equal(jsonKeyError(original.items, ''), null, 'arrays need no key')
+
+  assert.equal(jsonKind(null), JsonKind.Null)
+  assert.equal(jsonKind([]), JsonKind.Array)
+  assert.equal(jsonKind(2), JsonKind.Number)
+  assert.deepEqual(emptyJsonValue(JsonKind.Object), {})
+  assert.deepEqual(jsonEntries(['a']), [{ key: '0', value: 'a' }])
+})
+
+test('a text element has no JSON or Design tab, since its text lives in its name', () => {
+  const { inspectorTabsFor, InspectorTab } = fieldTabs
+  const ids = tabs => tabs.map(tab => tab.id)
+  store.addComponent('VBtn')
+  const button = store.findNodeById(store.selectedNodeId)
+  const text = store.createNode('TEXT', 'Hello')
+  assert.ok(ids(inspectorTabsFor(button, true)).includes(InspectorTab.Json))
+  assert.ok(ids(inspectorTabsFor(button, true)).includes(InspectorTab.Design))
+  assert.equal(ids(inspectorTabsFor(button, false)).includes(InspectorTab.Design), false, 'the Design tab can be off')
+  assert.deepEqual(
+    ids(inspectorTabsFor(text, true)).filter(id => [InspectorTab.Json, InspectorTab.Design].includes(id)),
+    [],
   )
 })

@@ -68,8 +68,32 @@ const leaveCanvas = (event: DragEvent) => {
         {{ isPreviewMode ? 'Preview' : selectedNodeIds.length ? `${selectedNodeIds.length} selected` : 'Canvas' }}
       </div>
       <template v-if="isPreviewMode">
+        <!-- While a saved component is open, Preview shows only it; this switches to another one. -->
+        <VMenu v-if="store.editingPrefab" location="bottom start">
+          <template #activator="{ props: menu }">
+            <VBtn
+              v-bind="menu"
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-puzzle-outline"
+              append-icon="mdi-menu-down"
+              :aria-label="`Preview shows the component ${store.editingPrefab.name}. Choose another component`"
+            >
+              {{ store.editingPrefab.name }}
+            </VBtn>
+          </template>
+          <VList density="compact" aria-label="Saved components">
+            <VListItem
+              v-for="prefab in store.prefabs"
+              :key="prefab.prefabId"
+              :title="prefab.name"
+              :active="prefab.prefabId === store.editingPrefab.prefabId"
+              @click="store.editPrefab(prefab.prefabId)"
+            />
+          </VList>
+        </VMenu>
         <!-- Where the preview is now, like a browser's address bar; click to jump to another page. -->
-        <VMenu location="bottom start">
+        <VMenu v-else location="bottom start">
           <template #activator="{ props: menu }">
             <VBtn
               v-bind="menu"
@@ -121,6 +145,7 @@ const leaveCanvas = (event: DragEvent) => {
           Reset
         </VBtn>
         <VSelect
+          v-if="!store.editingPrefab"
           v-model="viewport"
           :items="devices"
           label="Viewport"
@@ -130,6 +155,7 @@ const leaveCanvas = (event: DragEvent) => {
           class="viewport-select"
         />
         <VSelect
+          v-if="!store.editingPrefab"
           v-model="zoom"
           :items="[50, 75, 100, 125].map(n => ({ title: `${n}%`, value: n }))"
           label="Zoom"
@@ -172,7 +198,8 @@ const leaveCanvas = (event: DragEvent) => {
         </VBtn>
       </div>
     </div>
-    <div v-if="isPreviewMode" class="preview-workspace">
+    <!-- A component is previewed on the canvas itself: only the mode changes, the panels and the canvas stay. -->
+    <div v-if="isPreviewMode && !store.editingPrefab" class="preview-workspace">
       <div class="preview-size" :style="{ width: `${(viewport * zoom) / 100}px`, height: `${(800 * zoom) / 100}px` }">
         <iframe
           title="Page preview"
@@ -197,7 +224,7 @@ const leaveCanvas = (event: DragEvent) => {
       @click="store.selectNode(null)"
       @dragleave="leaveCanvas"
     >
-      <div v-if="empty" class="canvas-empty" @click.stop>
+      <div v-if="empty && !isPreviewMode" class="canvas-empty" @click.stop>
         <VIcon icon="mdi-view-dashboard-outline" size="40" color="primary" />
         <h1>Build your first page</h1>
         <p>Add a component, drag one onto the canvas, or start with a template.</p>
@@ -211,10 +238,28 @@ const leaveCanvas = (event: DragEvent) => {
           </button>
         </div>
       </div>
-      <NodeRenderer :node="rootNode" />
-      <HoverBadge :container="canvas" />
-      <SelectionToolbar :container="canvas" />
-      <p v-if="empty" class="drop-hint">Drop components in the outlined area above.</p>
+      <VAlert
+        v-if="store.editingPrefab && !isPreviewMode"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        icon="mdi-puzzle-outline"
+        @click.stop
+      >
+        Editing component <strong>{{ store.editingPrefab.name }}</strong>. Write <code v-pre>{{ props.name }}</code> to
+        add a parameter. Copies already on pages are not changed.
+      </VAlert>
+      <NodeRenderer
+        :key="store.editingPrefab?.prefabId"
+        :node="isPreviewMode ? store.previewRoot : rootNode"
+        :in-page="!!store.editingPrefab"
+      />
+      <template v-if="!isPreviewMode">
+        <HoverBadge :container="canvas" />
+        <SelectionToolbar :container="canvas" />
+      </template>
+      <p v-if="empty && !isPreviewMode" class="drop-hint">Drop components in the outlined area above.</p>
     </div>
   </div>
 </template>

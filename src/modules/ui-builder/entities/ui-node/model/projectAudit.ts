@@ -12,8 +12,8 @@ export interface Issue {
   nodeName?: string
 }
 
-/** Names that exist inside repeated elements and table cells without being defined as variables. */
-const AMBIENT_NAMES = new Set(['item', 'index', 'value'])
+/** Names that exist inside repeated elements, table cells and saved-component templates (`props`) without being defined as variables. */
+const AMBIENT_NAMES = new Set(['item', 'index', 'value', 'props'])
 const BINDING = /\{\{\s*([^{}]+?)\s*\}\}/g
 const ROOT_NAME = /^\s*!?\s*([A-Za-z_$][\w$]*)/
 

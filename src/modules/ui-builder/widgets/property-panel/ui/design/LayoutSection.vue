@@ -15,6 +15,7 @@ import { useNodeStyle } from '../../model/useNodeStyle'
 import { type UiNode } from '../../../../entities/ui-node'
 import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
+import IconToggleGroup from './IconToggleGroup.vue'
 import NumberField from './NumberField.vue'
 
 const GRID: Position[] = [Position.Start, Position.Center, Position.End]
@@ -52,8 +53,17 @@ const place = (horizontal: Position, vertical: Position) => apply(alignmentStyle
 <template>
   <DesignSection title="Layout">
     <template v-if="!flex">
-      <p class="layout-hint">Children stack normally. Turn on auto layout to align them and set a gap.</p>
-      <VBtn size="small" variant="tonal" prepend-icon="mdi-view-sequential-outline" @click="turnOn">Auto layout</VBtn>
+      <div class="layout-off">
+        <p class="layout-hint">Children stack normally. Turn on auto layout to align them and set a gap.</p>
+        <VBtn
+          size="small"
+          variant="tonal"
+          prepend-icon="mdi-view-sequential-outline"
+          class="layout-off__button"
+          @click="turnOn"
+          >Auto layout</VBtn
+        >
+      </div>
     </template>
     <template v-else>
       <div class="layout-row">
@@ -72,7 +82,7 @@ const place = (horizontal: Position, vertical: Position) => apply(alignmentStyle
           </template>
         </div>
         <div class="layout-controls">
-          <div class="layout-directions" role="group" aria-label="Direction">
+          <IconToggleGroup label="Direction">
             <IconToggle
               v-for="direction in DIRECTIONS"
               :key="direction.axis"
@@ -87,7 +97,7 @@ const place = (horizontal: Position, vertical: Position) => apply(alignmentStyle
               :pressed="wraps"
               @click="apply({ flexWrap: wraps ? null : CssValue.Wrap })"
             />
-          </div>
+          </IconToggleGroup>
           <NumberField
             label="⇔"
             title="Gap between children"
@@ -101,7 +111,7 @@ const place = (horizontal: Position, vertical: Position) => apply(alignmentStyle
       <VBtn size="x-small" variant="text" class="mt-2" @click="turnOff">Turn off auto layout</VBtn>
     </template>
 
-    <div class="layout-text" role="group" aria-label="Text alignment">
+    <IconToggleGroup label="Text alignment" class="layout-text">
       <IconToggle
         v-for="option in TEXT_ALIGNMENTS"
         :key="option.align"
@@ -110,13 +120,23 @@ const place = (horizontal: Position, vertical: Position) => apply(alignmentStyle
         :pressed="style.textAlign === option.align"
         @click="apply({ textAlign: style.textAlign === option.align ? null : option.align })"
       />
-    </div>
+    </IconToggleGroup>
   </DesignSection>
 </template>
 
 <style scoped>
+.layout-off {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.layout-off__button {
+  flex-shrink: 0;
+}
 .layout-hint {
-  margin: 0 0 8px;
+  min-width: 0;
+  flex: 1;
+  margin: 0;
   font-size: 12px;
   opacity: 0.7;
 }
