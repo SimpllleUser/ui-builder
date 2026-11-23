@@ -10,17 +10,19 @@ import { z } from 'zod'
 
 const PORT = Number(process.env.UI_BUILDER_MCP_PORT ?? 3002)
 const TIMEOUT_MS = 10_000
-const clients = new Set()
+// Open editor tabs, each with the time its page was loaded.
+const clients = new Map()
 const pending = new Map()
 
 const bridge = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'content-type')
   if (req.method === 'OPTIONS') return res.writeHead(204).end()
-  if (req.url === '/events') {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  if (url.pathname === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')
-    clients.add(res)
+    clients.set(res, Number(url.searchParams.get('loaded')) || 0)
     req.on('close', () => clients.delete(res))
     return
   }
@@ -48,7 +50,9 @@ bridge.on('error', e => console.error(`[ui-builder-mcp] bridge failed: ${e.messa
 bridge.listen(PORT, '127.0.0.1', () => console.error(`[ui-builder-mcp] bridge on http://127.0.0.1:${PORT}`))
 
 function call(command, args = {}) {
-  const [client] = clients
+  // The most recently loaded tab is the one the person has just opened or reloaded. An old tab left open must not take
+  // the commands, and tabs reconnect in any order after the server restarts, so the order of connecting says nothing.
+  const [client] = [...clients].sort(([, loadedA], [, loadedB]) => loadedB - loadedA)[0] ?? []
   if (!client)
     return Promise.reject(
       new Error(`No editor connected. Run "npm run dev" and open http://localhost:3001 in a browser.`),
@@ -287,11 +291,16 @@ tool(
 tool('delete_checkpoint', 'Delete a checkpoint.', { checkpointId: z.string() })
 tool('restore_version', 'Go back to a step of the history by its index (see get_history).', { index: z.number() })
 tool('list_saved_components', 'The elements saved in My components, with their ids.', {})
-tool('save_component', 'Save an element (with its children) in My components for reuse.', { id, name: z.string() })
+const propValues = z.record(z.string(), z.string()).optional()
+tool(
+  'save_component',
+  'Save an element (with its children) in My components for reuse. Every {{props.name}} inside it becomes a parameter; `props` gives their default values.',
+  { id, name: z.string(), props: propValues },
+)
 tool(
   'insert_saved_component',
-  'Insert a saved component into a container (defaults to where the editor would insert).',
-  { prefabId: z.string(), parentId: z.string().optional(), slot },
+  'Insert a saved component into a container (defaults to where the editor would insert). `props` sets its parameters (see list_saved_components); missing ones use their defaults.',
+  { prefabId: z.string(), parentId: z.string().optional(), slot, props: propValues },
 )
 tool('delete_saved_component', 'Delete a saved component.', { prefabId: z.string() })
 tool(

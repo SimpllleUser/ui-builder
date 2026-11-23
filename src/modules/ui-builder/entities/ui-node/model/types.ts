@@ -43,10 +43,18 @@ export interface Project {
   state: Record<string, unknown>
 }
 
+/** A parameter of a saved component: `{{props.<name>}}` inside it is replaced when the component is inserted. */
+export interface PrefabProp {
+  name: string
+  defaultValue: string
+}
+
 export interface Prefab {
   prefabId: string
   name: string
   node: UiNode
+  /** Saved before parameters existed when missing. */
+  props?: PrefabProp[]
 }
 
 export interface HistoryCheckpoint {

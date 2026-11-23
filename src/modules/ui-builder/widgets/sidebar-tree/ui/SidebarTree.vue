@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useUiTreeStore } from '../../../entities/ui-node'
 import { LAYERS_HELP, SIDEBAR_VIEWS, SidebarView } from '../model/sidebarViews'
 import HistoryView from './HistoryView.vue'
 import LayersView from './LayersView.vue'
@@ -8,7 +9,17 @@ import WrapToolbar from './WrapToolbar.vue'
 
 /** The left panel: an activity bar that switches between components, layers, saved components and history. */
 const emit = defineEmits<{ close: [] }>()
+const store = useUiTreeStore()
 const activeView = ref<SidebarView>(SidebarView.Layers)
+// A saved component stays open on the canvas (and in Preview) until the person leaves its tab or closes the panel.
+// The panel itself disappears while Preview runs, so leaving is decided here and not when it is removed.
+watch(activeView, view => {
+  if (view !== SidebarView.Prefabs) store.stopEditingPrefab()
+})
+const closePanel = () => {
+  store.stopEditingPrefab()
+  emit('close')
+}
 const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeView.value)?.label ?? 'Layers')
 </script>
 
@@ -46,7 +57,7 @@ const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeVi
                 <VIcon icon="mdi-help-circle-outline" size="18" />
                 <VTooltip activator="parent" location="bottom" max-width="260">{{ LAYERS_HELP }}</VTooltip>
               </VBtn>
-              <VBtn icon size="x-small" variant="text" aria-label="Close panel" @click="emit('close')">
+              <VBtn icon size="x-small" variant="text" aria-label="Close panel" @click="closePanel">
                 <VIcon icon="mdi-close" size="18" />
               </VBtn>
             </span>
