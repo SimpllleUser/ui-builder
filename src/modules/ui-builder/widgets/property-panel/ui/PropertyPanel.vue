@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore, getComponentDef, ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node'
+import { useUiTreeStore, getComponentDef, TEXT_NODE_TYPE } from '../../../entities/ui-node'
 import { Icons } from '../../../../../shared/icons'
 import { useSettingsGroups } from '../model/useSettingsGroups'
 import { useClassEditor } from '../model/useClassEditor'
-import { defaultTab, sectionsForTab, InspectorTab } from '../model/fieldTabs'
+import { defaultTab, inspectorTabsFor, sectionsForTab, INSPECTOR_TABS, InspectorTab } from '../model/fieldTabs'
 import { useMoveDialog, useSavePrefabDialog } from '../model/useNodeDialogs'
 import { useDesignTabPreference } from '../model/useDesignTabPreference'
 import DesignTab from './design/DesignTab.vue'
@@ -13,6 +13,7 @@ import AdvancedProperties from './AdvancedProperties.vue'
 import InteractionsEditor from './InteractionsEditor.vue'
 import MoveNodeDialog from './MoveNodeDialog.vue'
 import MultiSelectSpacing from './MultiSelectSpacing.vue'
+import NodePropsEditor from './NodePropsEditor.vue'
 import PropertyField from './PropertyField.vue'
 import SavePrefabDialog from './SavePrefabDialog.vue'
 
@@ -23,7 +24,8 @@ const selectedNode = computed(() => {
   if (!selectedNodeId.value || selectedNodeIds.value.length !== 1) return null
   return store.findNodeById(selectedNodeId.value)
 })
-const isRoot = computed(() => selectedNode.value?.id === ROOT_NODE_ID)
+// The root of a page, the layout or a saved component cannot be deleted or moved.
+const isRoot = computed(() => selectedNode.value?.id === store.rootNode.id)
 const componentSections = computed(() =>
   selectedNode.value ? (getComponentDef(selectedNode.value.type)?.propertySections ?? []) : [],
 )
@@ -33,12 +35,14 @@ const breadcrumb = computed(() => (selectedNode.value ? store.pathTo(selectedNod
 // ─── Tabs and groups of settings ─────────────────────────────────────────────
 const activeTab = ref<InspectorTab>(InspectorTab.Content)
 const designTabEnabled = useDesignTabPreference()
-const showDesignTab = computed(() => designTabEnabled.value && selectedNode.value?.type !== TEXT_NODE_TYPE)
-// Switching the Design tab off while it is open returns to the usual first tab.
-watch(showDesignTab, shown => {
-  if (!shown && activeTab.value === InspectorTab.Design)
+const visibleTabs = computed(() => inspectorTabsFor(selectedNode.value, designTabEnabled.value))
+const showDesignTab = computed(() => visibleTabs.value.some(tab => tab.id === InspectorTab.Design))
+// When the open tab disappears (the Design tab is switched off, or a text element is selected), the usual first tab opens.
+watch(visibleTabs, tabs => {
+  if (!tabs.some(tab => tab.id === activeTab.value))
     activeTab.value = defaultTab(selectedNode.value, componentSections.value)
 })
+const activeTabLabel = computed(() => INSPECTOR_TABS.find(tab => tab.id === activeTab.value)?.label ?? '')
 const showsDesign = computed(() => !query.value && activeTab.value === InspectorTab.Design)
 const tabSections = computed(() => sectionsForTab(componentSections.value, activeTab.value))
 const {
@@ -134,85 +138,111 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
         clearable
         class="mb-2"
       />
-      <VTabs v-if="!query" v-model="activeTab" density="compact" class="property-tabs"
-        ><VTab :value="InspectorTab.Content">Content</VTab><VTab :value="InspectorTab.Layout">Layout</VTab
-        ><VTab :value="InspectorTab.Appearance">Style</VTab><VTab :value="InspectorTab.Advanced">Advanced</VTab
-        ><VTab v-if="showDesignTab" :value="InspectorTab.Design">Design</VTab></VTabs
-      >
+      <VDivider class="mb-2" />
 
-      <VDivider class="mb-4" />
-
-      <div class="pt-4">
-        <VTextarea
-          v-if="!query && activeTab === InspectorTab.Content && textChild"
-          :model-value="textChild.name"
-          label="Text content"
-          variant="outlined"
-          density="compact"
-          auto-grow
-          rows="2"
-          class="mb-4"
-          hide-details
-          @update:model-value="updateText"
-        />
-        <p
-          v-if="
-            !visibleSections.length &&
-            (query ||
-              (activeTab !== InspectorTab.Advanced &&
-                !showsDesign &&
-                !(activeTab === InspectorTab.Content && textChild)))
-          "
-          class="text-body-2 text-medium-emphasis"
+      <div class="inspector">
+        <!-- Vertical icon rail like the tool strips of design tools; the name shows on hover and for screen readers. -->
+        <nav
+          v-if="!query"
+          class="inspector__rail"
+          role="tablist"
+          aria-orientation="vertical"
+          aria-label="Property groups"
         >
-          {{ query ? `No settings match “${settingsQuery}”.` : `No ${activeTab} settings for this element.` }}
-        </p>
-        <template v-for="section in visibleSections" :key="section.title">
-          <div class="mb-4">
-            <button
-              v-if="section.title"
-              type="button"
-              class="section-toggle"
-              :aria-expanded="isSectionOpen(section)"
-              @click="toggleSection(section)"
+          <button
+            v-for="tab in visibleTabs"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            class="inspector__tab"
+            :class="{ 'inspector__tab--active': tab.id === activeTab }"
+            :aria-selected="tab.id === activeTab"
+            :aria-label="tab.label"
+            @click="activeTab = tab.id"
+          >
+            <VIcon :icon="tab.icon" size="20" aria-hidden="true" />
+            <VTooltip activator="parent" location="start">{{ tab.label }}</VTooltip>
+          </button>
+        </nav>
+
+        <div class="inspector__body">
+          <div v-if="!query" class="inspector__title">{{ activeTabLabel }}</div>
+
+          <div class="pt-4">
+            <VTextarea
+              v-if="!query && activeTab === InspectorTab.Content && textChild"
+              :model-value="textChild.name"
+              label="Text content"
+              variant="outlined"
+              density="compact"
+              auto-grow
+              rows="2"
+              class="mb-4"
+              hide-details
+              @update:model-value="updateText"
+            />
+            <p
+              v-if="
+                !visibleSections.length &&
+                (query ||
+                  (activeTab !== InspectorTab.Advanced &&
+                    activeTab !== InspectorTab.Json &&
+                    !showsDesign &&
+                    !(activeTab === InspectorTab.Content && textChild)))
+              "
+              class="text-body-2 text-medium-emphasis"
             >
-              <VIcon
-                :icon="isSectionOpen(section) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
-                size="18"
-                aria-hidden="true"
-              />
-              <span>{{ section.title }}</span>
-              <span class="section-toggle__count">{{ section.fields.length }}</span>
-            </button>
+              {{ query ? `No settings match “${settingsQuery}”.` : `No ${activeTab} settings for this element.` }}
+            </p>
+            <template v-for="section in visibleSections" :key="section.title">
+              <div class="mb-4">
+                <button
+                  v-if="section.title"
+                  type="button"
+                  class="section-toggle"
+                  :aria-expanded="isSectionOpen(section)"
+                  @click="toggleSection(section)"
+                >
+                  <VIcon
+                    :icon="isSectionOpen(section) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                    size="18"
+                    aria-hidden="true"
+                  />
+                  <span>{{ section.title }}</span>
+                  <span class="section-toggle__count">{{ section.fields.length }}</span>
+                </button>
 
-            <div v-show="isSectionOpen(section)" class="section-body">
-              <PropertyField
-                v-for="field in section.fields"
-                :key="fieldKey(field)"
-                :node="selectedNode"
-                :field="field"
-              />
-            </div>
+                <div v-show="isSectionOpen(section)" class="section-body">
+                  <PropertyField
+                    v-for="field in section.fields"
+                    :key="fieldKey(field)"
+                    :node="selectedNode"
+                    :field="field"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
-        </template>
+
+          <DesignTab v-if="showsDesign && selectedNode" :node="selectedNode" />
+          <NodePropsEditor v-if="!query && activeTab === InspectorTab.Json" :node="selectedNode" />
+
+          <!-- Behavior first: it is used far more often than the long list of CSS classes below it. -->
+          <InteractionsEditor
+            v-if="!query && activeTab === InspectorTab.Advanced && selectedNode.type !== TEXT_NODE_TYPE"
+            :node="selectedNode"
+          />
+          <AdvancedProperties
+            v-if="!query && activeTab === InspectorTab.Advanced"
+            :node="selectedNode"
+            :class-search="classSearch"
+            :filtered-groups="filteredGroups"
+            @update:class-search="classSearch = $event"
+            @toggle-class="toggleClass"
+            @add-custom-class="addCustomClass"
+          />
+        </div>
       </div>
-
-      <DesignTab v-if="showsDesign && selectedNode" :node="selectedNode" />
-
-      <!-- Behavior first: it is used far more often than the long list of CSS classes below it. -->
-      <InteractionsEditor
-        v-if="!query && activeTab === InspectorTab.Advanced && selectedNode.type !== TEXT_NODE_TYPE"
-        :node="selectedNode"
-      />
-      <AdvancedProperties
-        v-if="!query && activeTab === InspectorTab.Advanced"
-        :node="selectedNode"
-        :class-search="classSearch"
-        :filtered-groups="filteredGroups"
-        @update:class-search="classSearch = $event"
-        @toggle-class="toggleClass"
-        @add-custom-class="addCustomClass"
-      />
     </div>
 
     <div v-else class="pa-10 text-center text-medium-emphasis mt-10">
@@ -222,7 +252,10 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
     <SavePrefabDialog
       v-model="prefabDialog.open.value"
       :name="prefabDialog.name.value"
+      :prop-names="prefabDialog.propNames.value"
+      :defaults="prefabDialog.defaults.value"
       @update:name="prefabDialog.name.value = $event"
+      @update:default="(propName, value) => (prefabDialog.defaults.value[propName] = value)"
       @save="prefabDialog.save"
     />
     <MoveNodeDialog
@@ -282,10 +315,62 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
   content: '/';
   padding-right: 4px;
 }
-.property-tabs :deep(.v-tab) {
+.inspector {
+  display: flex;
+  gap: 8px;
+}
+.inspector__rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 2px;
+  align-self: flex-start;
+  padding-right: 6px;
+  border-right: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.inspector__tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+.inspector__tab:hover {
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  color: rgb(var(--v-theme-on-surface));
+}
+.inspector__tab--active {
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+}
+.inspector__tab--active::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgb(var(--v-theme-primary));
+}
+.inspector__body {
+  flex: 1;
   min-width: 0;
-  padding-inline: 10px;
-  font-size: 12px;
-  text-transform: none;
+}
+.inspector__title {
+  margin-bottom: 8px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 </style>

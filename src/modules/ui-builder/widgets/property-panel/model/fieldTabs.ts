@@ -5,8 +5,39 @@ export enum InspectorTab {
   Layout = 'layout',
   Appearance = 'appearance',
   Advanced = 'advanced',
+  /** The element's properties as editable JSON. */
+  Json = 'json',
   /** Figma-style controls; they write the element's own style rather than classes. */
   Design = 'design',
+}
+
+export interface InspectorTabDefinition {
+  id: InspectorTab
+  label: string
+  icon: string
+}
+
+/** The groups of the inspector in the order of its vertical tab rail. */
+export const INSPECTOR_TABS: InspectorTabDefinition[] = [
+  { id: InspectorTab.Content, label: 'Content', icon: 'mdi-text-box-outline' },
+  { id: InspectorTab.Layout, label: 'Layout', icon: 'mdi-view-dashboard-outline' },
+  { id: InspectorTab.Appearance, label: 'Style', icon: 'mdi-palette-outline' },
+  { id: InspectorTab.Advanced, label: 'Advanced', icon: 'mdi-tune-variant' },
+  { id: InspectorTab.Json, label: 'JSON', icon: 'mdi-code-json' },
+  { id: InspectorTab.Design, label: 'Design', icon: 'mdi-vector-square' },
+]
+
+/**
+ * The tabs that make sense for an element. A text element keeps its text in its name and has no properties
+ * or style of its own, so the JSON and Design tabs would only be empty.
+ */
+export function inspectorTabsFor(node: UiNode | null, designEnabled: boolean): InspectorTabDefinition[] {
+  const isText = node?.type === TEXT_NODE_TYPE
+  return INSPECTOR_TABS.filter(tab => {
+    if (tab.id === InspectorTab.Design) return designEnabled && !isText
+    if (tab.id === InspectorTab.Json) return !isText
+    return true
+  })
 }
 
 const CONTENT_PROPS = ['title', 'subtitle', 'label', 'placeholder', 'hint', 'src', 'alt', 'image', 'value']

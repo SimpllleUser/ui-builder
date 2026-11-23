@@ -63,6 +63,7 @@ import {
 } from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext } from './templateFactory'
 import { SaveState, type StepDirection, type TemplateKind } from './enums'
+import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
 const ACTIVE_PAGE_KEY = 'ui-builder:active-page'
@@ -116,18 +117,22 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const activePage = computed(
     () => project.value.pages.find(page => page.id === activePageId.value) ?? project.value.pages[0],
   )
-  /** The tree being edited: the shared layout or the active page. Every editing command works on it. */
+  const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
+  /** A saved component opened for editing in place of the page, or null while a page or the layout is edited. */
+  const editingPrefabId = ref<string | null>(null)
+  const editingPrefab = computed(() => prefabs.value.find(prefab => prefab.prefabId === editingPrefabId.value) ?? null)
+  /** The tree being edited: a saved component, the shared layout or the active page. Every editing command works on it. */
   const rootNode = computed<UiNode>({
-    get: () => (editingLayout.value && project.value.layout) || activePage.value.root,
+    get: () => editingPrefab.value?.node ?? ((editingLayout.value && project.value.layout) || activePage.value.root),
     set: value => {
-      if (editingLayout.value && project.value.layout) project.value.layout = value
+      if (editingPrefab.value) editingPrefab.value.node = value
+      else if (editingLayout.value && project.value.layout) project.value.layout = value
       else activePage.value.root = value
     },
   })
   const selectedNodeIds = ref<string[]>([])
   const selectedNodeId = computed(() => selectedNodeIds.value[0] ?? null)
   const isPreviewMode = ref(false)
-  const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
   /** Component types added lately, newest first. The library lists them up front. */
   const recentComponentTypes = useStorage<string[]>('ui-builder:recent-components', [])
   const checkpoints = useStorage<HistoryCheckpoint[]>('ui-builder:history-checkpoints', [])
@@ -166,7 +171,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       if (/^(Deleted|Removed)/.test(entry.label)) setNotice(`${entry.label}.`, true)
     },
   })
-  const { canUndo, canRedo, versions: historyVersions, commit: commitHistory } = history
+  const { versions: historyVersions, commit: commitHistory } = history
+  // History records the project only, so a saved component being edited has no undo.
+  const canUndo = computed(() => !editingPrefab.value && history.canUndo.value)
+  const canRedo = computed(() => !editingPrefab.value && history.canRedo.value)
   // While a transaction runs, steps are not saved one by one: they become a single version at the end.
   let transactionDepth = 0
   const commit = () => {
@@ -193,10 +201,12 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     }
   }
   const undo = () => {
+    if (editingPrefab.value) return
     clearTimeout(historyTimer)
     history.undo()
   }
   const redo = () => {
+    if (editingPrefab.value) return
     clearTimeout(historyTimer)
     history.redo()
   }
@@ -323,6 +333,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     while (taken.has(`${name} ${n}`)) n++
     return `${name} ${n}`
   }
+  /** Replaces all properties of an element at once (the JSON view edits them as one object). */
+  const updateNodeProps = (id: string, props: Record<string, unknown>) => {
+    const node = findNodeById(id)
+    if (!node) return false
+    node.props = props
+    return true
+  }
   const updateNodeProp = (id: string, prop: string, value: unknown) => {
     const node = findNodeById(id)
     if (!node) return false
@@ -396,9 +413,38 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     }
     return added
   }
-  const savePrefab = (nodeId: string, name: string) => savePrefabMutation(mutationContext, nodeId, name)
-  const insertPrefab = (prefabId: string, parentId = insertionTarget.value.id, slotName: string | null = null) =>
-    insertPrefabMutation(mutationContext, prefabId, parentId, slotName)
+  const savePrefab = (nodeId: string, name: string, defaults: PrefabPropValues = {}) =>
+    savePrefabMutation(mutationContext, nodeId, name, defaults)
+  const insertPrefab = (
+    prefabId: string,
+    parentId = insertionTarget.value.id,
+    slotName: string | null = null,
+    propValues: PrefabPropValues = {},
+  ) => insertPrefabMutation(mutationContext, prefabId, parentId, slotName, propValues)
+  const editPrefab = (prefabId: string) => {
+    const prefab = prefabs.value.find(item => item.prefabId === prefabId)
+    if (!prefab) return false
+    editingPrefabId.value = prefabId
+    // The component's own settings open at once: the properties panel stays collapsed while nothing is selected.
+    selectedNodeIds.value = [prefab.node.id]
+    return true
+  }
+  const stopEditingPrefab = () => {
+    if (!editingPrefabId.value) return
+    editingPrefabId.value = null
+    selectedNodeIds.value = []
+  }
+  // Writing `{{props.name}}` in the edited component adds a parameter for it, deleting the last one removes it.
+  watch(
+    () => editingPrefab.value?.node,
+    node => {
+      const prefab = editingPrefab.value
+      if (!prefab || !node) return
+      const next = reconcilePrefabProps(node, prefab.props)
+      if (JSON.stringify(next) !== JSON.stringify(prefab.props)) prefab.props = next
+    },
+    { deep: true, flush: 'sync' },
+  )
   const duplicateNode = (id: string) => duplicateNodeMutation(mutationContext, id)
   const deleteNode = (id: string) => deleteNodeMutation(mutationContext, id)
   const areNodesSiblings = (ids: string[]) => areNodesSiblingsMutation(mutationContext, ids)
@@ -421,6 +467,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     project.value = imported
     activePageId.value = imported.pages[0].id
     editingLayout.value = false
+    editingPrefabId.value = null
     selectedNodeIds.value = []
     commit()
     saveDocument()
@@ -436,9 +483,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     getActivePageId: () => activePageId.value,
     setActivePageId: id => {
       activePageId.value = id
+      editingPrefabId.value = null
     },
     setEditingLayout: editing => {
       editingLayout.value = editing
+      editingPrefabId.value = null
     },
     clearSelection: () => {
       selectedNodeIds.value = []
@@ -454,11 +503,18 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     isPreviewMode.value = true
     preview.start()
   }
+  /** What Preview draws: a component being edited with its default parameters, otherwise the layout or the page. */
+  const previewRoot = computed(() =>
+    editingPrefab.value
+      ? applyPrefabProps(editingPrefab.value.node, editingPrefab.value.props ?? [])
+      : preview.root.value,
+  )
   // Preview draws the page and, around it, the shared layout; a click can land on either.
-  const previewTrees = computed(() => [
-    preview.page.value.root,
-    ...(project.value.layout ? [project.value.layout] : []),
-  ])
+  const previewTrees = computed(() =>
+    editingPrefab.value
+      ? [previewRoot.value]
+      : [preview.page.value.root, ...(project.value.layout ? [project.value.layout] : [])],
+  )
   const findInPreview = (id: string) =>
     previewTrees.value.map(root => findNodeByIdInTree(id, root)).find(Boolean) ?? null
   /** Clicks an element in Preview as a person would. For a table row, `row` says which one was clicked. */
@@ -480,7 +536,12 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     if (!node?.model) throw new Error('That element is not linked to a variable.')
     preview.state.value[node.model] = value
   }
-  const describePreview = () => snapshotPreview(project.value, preview.page.value, preview.state.value)
+  const describePreview = () =>
+    snapshotPreview(
+      project.value,
+      editingPrefab.value ? { ...preview.page.value, root: previewRoot.value } : preview.page.value,
+      preview.state.value,
+    )
 
   const addTemplate = (kind: TemplateKind) => addTemplateMutation(mutationContext, kind)
 
@@ -490,6 +551,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     activePage,
     activePageId,
     editingLayout,
+    editingPrefab,
+    editPrefab,
+    stopEditingPrefab,
     rootNode,
     selectedNodeIds,
     selectedNodeId,
@@ -548,7 +612,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     runtimeState: preview.state,
     previewPageId: preview.pageId,
     previewPage: preview.page,
-    previewRoot: preview.root,
+    previewRoot,
     navigate: preview.navigate,
     dispatchAction: preview.dispatch,
     nodeLabel,
@@ -571,6 +635,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     updateNodeClasses,
     updateNodeName,
     updateNodeProp,
+    updateNodeProps,
     toggleMultiSelect: (id: string) => {
       if (!findNodeById(id)) return
       selectedNodeIds.value = selectedNodeIds.value.includes(id)

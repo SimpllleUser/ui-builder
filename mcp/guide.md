@@ -29,4 +29,4 @@ Work in this order: `get_document` → build → `check_project` → try it with
 ## Safety
 - Before a big change call **`create_checkpoint`**; if it goes wrong, **`restore_checkpoint`** (itself one Undo step). `get_history` lists the named steps; `restore_version` goes back to one.
 - **`get_status`** is a cheap check of the page, variables, selection and whether Preview runs.
-- **`save_component`** / **`insert_saved_component`** reuse an element; **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.
+- **`save_component`** / **`insert_saved_component`** reuse an element (write `{{props.title}}` in a property to make it a parameter, then pass `props: { title: "Hi" }` when inserting); **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.

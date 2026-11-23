@@ -1,5 +1,12 @@
 import { computed, ref, type ComputedRef } from 'vue'
-import { getNodeSlots, ROOT_NODE_ID, type useUiTreeStore, type UiNode } from '../../../entities/ui-node'
+import {
+  findPrefabPropNames,
+  getNodeSlots,
+  ROOT_NODE_ID,
+  type PrefabPropValues,
+  type useUiTreeStore,
+  type UiNode,
+} from '../../../entities/ui-node'
 import { canSavePrefabName, parseMoveDestination } from './propertyPanelUtils'
 
 type Store = ReturnType<typeof useUiTreeStore>
@@ -8,17 +15,21 @@ type Store = ReturnType<typeof useUiTreeStore>
 export function useSavePrefabDialog(store: Store, node: ComputedRef<UiNode | null>) {
   const open = ref(false)
   const name = ref('')
+  const defaults = ref<PrefabPropValues>({})
+  /** Parameters the element already uses as `{{props.name}}`; each can get a default. */
+  const propNames = computed(() => (node.value ? findPrefabPropNames(node.value) : []))
   const show = () => {
     name.value = node.value?.name ?? ''
+    defaults.value = {}
     open.value = true
   }
   const save = () => {
     if (node.value && canSavePrefabName(name.value)) {
-      store.savePrefab(node.value.id, name.value)
+      store.savePrefab(node.value.id, name.value, defaults.value)
       open.value = false
     }
   }
-  return { open, name, show, save }
+  return { open, name, defaults, propNames, show, save }
 }
 
 /** The “Move to…” dialog: every container (and named slot) the selected element can be moved into. */
