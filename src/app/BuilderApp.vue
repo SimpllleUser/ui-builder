@@ -14,6 +14,7 @@ import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
 import { TemplateSettingsDialog } from '../modules/ui-builder/features/add-template'
 import { CodeExportDialog } from '../modules/ui-builder/widgets/code-export'
+import { ThemeCustomizerDialog } from '../modules/theme/widgets/theme-customizer'
 import { BehaviorGuide, GuideSection } from '../modules/ui-builder/widgets/behavior-guide'
 import { OPEN_CONDITIONS_HELP } from '../shared/lib/conditionsHelp'
 import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/onboarding'
@@ -52,6 +53,7 @@ const pageTabs = ref<InstanceType<typeof PageTabs>>()
 const paletteOpen = ref(false)
 const { open: guideOpen, section: guideSection } = useGuideLocation()
 const codeExportOpen = ref(false)
+const themeOpen = ref(false)
 // A template with settings waits here for the user to fill them in; one without is added at once.
 const templateInSettings = ref<TemplateKind | null>(null)
 const addTemplate = (kind: TemplateKind) => {
@@ -81,6 +83,7 @@ const commandHost: CommandHost = {
   startTour,
   openBehaviorGuide: () => (guideOpen.value = true),
   openCodeExport: () => (codeExportOpen.value = true),
+  openThemeSettings: () => (themeOpen.value = true),
   addTemplate,
   openStructureGraph: () => (graphOpen.value = true),
   toggleFocus,
@@ -157,6 +160,7 @@ useEditorShortcuts({
           @export-project="exportProject"
           @export-code="codeExportOpen = true"
           @toggle-focus="toggleFocus"
+          @open-theme="themeOpen = true"
           @start-tour="startTour"
           @open-guide="guideOpen = true"
         />
@@ -185,6 +189,7 @@ useEditorShortcuts({
     </button>
     <CommandPalette v-model="paletteOpen" :host="commandHost" />
     <CodeExportDialog v-model="codeExportOpen" />
+    <ThemeCustomizerDialog v-model="themeOpen" />
     <TemplateSettingsDialog
       :kind="templateInSettings"
       @cancel="templateInSettings = null"

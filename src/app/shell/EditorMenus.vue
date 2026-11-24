@@ -8,6 +8,7 @@ defineEmits<{
   exportProject: []
   exportCode: []
   toggleFocus: []
+  openTheme: []
   startTour: []
   openGuide: []
 }>()
@@ -56,6 +57,12 @@ defineEmits<{
           title="Focus mode"
           :subtitle="`Only the canvas · ${modifierKey} \\`"
           @click="$emit('toggleFocus')"
+        />
+        <VListItem
+          prepend-icon="mdi-palette-swatch-outline"
+          title="Theme…"
+          subtitle="Colours, corners, density and dark mode"
+          @click="$emit('openTheme')"
         />
         <VListItem
           prepend-icon="mdi-palette-outline"

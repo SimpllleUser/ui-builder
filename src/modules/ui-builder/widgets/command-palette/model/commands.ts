@@ -37,6 +37,7 @@ export interface CommandHost {
   startTour(): void
   openBehaviorGuide(): void
   openCodeExport(): void
+  openThemeSettings(): void
   /** Asks for the template's settings first when it has any. */
   addTemplate(kind: TemplateKind): void
   openStructureGraph(): void
@@ -313,6 +314,14 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
     icon: 'mdi-code-tags',
     keywords: 'download copy vue sfc source generate page component layout',
     run: host.openCodeExport,
+  })
+  add({
+    id: 'editor:theme',
+    title: 'Theme settings',
+    group: 'Editor',
+    icon: 'mdi-palette-swatch-outline',
+    keywords: 'colors colours dark light mode radius density corners brand primary style appearance',
+    run: host.openThemeSettings,
   })
   add({
     id: 'editor:structure-graph',

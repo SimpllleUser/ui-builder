@@ -2,6 +2,7 @@
 import { AppView } from './appView'
 import { ref, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
 import { useUiTreeStore } from '../modules/ui-builder/entities/ui-node'
+import { useApplyTheme } from '../modules/theme/entities/theme-settings'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
 const LegacyBuilder = defineAsyncComponent(() => import('../features/ui-builder/ui/UiBuilder.vue'))
 // The previous editor is no longer offered in the menus. It stays reachable at /?classic for anyone who still needs it.
@@ -11,6 +12,8 @@ const leaveClassic = () => {
   window.history.replaceState(null, '', window.location.pathname)
 }
 const store = useUiTreeStore()
+// Colours, mode, corners and shadows change the whole app; density and button style only the page being built.
+useApplyTheme()
 let disconnectMcp = () => {}
 onMounted(async () => {
   if (!import.meta.env.DEV) return
