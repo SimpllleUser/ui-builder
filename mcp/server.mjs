@@ -168,8 +168,24 @@ tool('move_node', 'Move a node into another container.', { id, parentId: z.strin
 tool('duplicate_node', 'Duplicate a node next to the original.', { id })
 tool(
   'add_template',
-  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn).',
-  { kind: z.enum(['card', 'form', 'columns', 'dashboard', 'table', 'login']) },
+  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. What is not given keeps its default.',
+  {
+    kind: z.enum([
+      'card',
+      'form',
+      'columns',
+      'dashboard',
+      'table',
+      'login',
+      'testimonials',
+      'faq',
+      'onboarding',
+      'blog',
+      'contact',
+      'footer',
+    ]),
+    props: z.record(z.string(), z.unknown()).optional().describe('Settings of the template, see the description'),
+  },
 )
 tool('select_node', 'Select a node in the editor (omit id to clear).', { id: z.string().optional() })
 tool('undo', 'Undo the last change.', {})

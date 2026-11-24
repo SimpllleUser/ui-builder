@@ -61,7 +61,7 @@ import {
   savePrefab as savePrefabMutation,
   type PrefabMutationContext,
 } from './prefabMutations'
-import { addTemplate as addTemplateMutation, type TemplateContext } from './templateFactory'
+import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateProps } from './templateFactory'
 import { SaveState, type StepDirection, type TemplateKind } from './enums'
 import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
@@ -543,7 +543,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       preview.state.value,
     )
 
-  const addTemplate = (kind: TemplateKind) => addTemplateMutation(mutationContext, kind)
+  const addTemplate = (kind: TemplateKind, props: TemplateProps = {}) =>
+    addTemplateMutation(mutationContext, kind, props)
 
   return {
     project,

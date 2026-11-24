@@ -42,6 +42,18 @@ export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
 export { columnKeyError, tableColumns, tableRows } from './model/tableMutations'
 export { TEMPLATES } from './model/templateFactory'
+export {
+  defaultTemplateProps,
+  emptyListEntry,
+  TEMPLATE_SETTINGS,
+  templateHasSettings,
+  TemplateSettingKind,
+} from './model/templates/templateSettings'
+export { presetTemplateProps, templatePresets } from './model/templates/templatePresets'
+export type { TemplatePreset } from './model/templates/templatePresets'
+export type { TemplateField, TemplateSetting } from './model/templates/templateSettings'
+export type { TemplateProps } from './model/templateFactory'
+export type { TextRecord } from './model/templates/templateProps'
 export { applyPrefabProps, declarePrefabProps, findPrefabPropNames } from './model/prefabProps'
 export type { PrefabPropValues } from './model/prefabProps'
 export type { Page, Prefab, PrefabProp, Project, UiAction, UiNode } from './model/types'

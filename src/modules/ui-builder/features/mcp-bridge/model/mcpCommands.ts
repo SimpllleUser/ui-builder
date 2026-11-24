@@ -91,7 +91,7 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
   },
   duplicate_node: (store, a) => ({ id: store.duplicateNode(need(store, a.id).id) }),
   add_template(store, a) {
-    store.addTemplate(a.kind as TemplateKind)
+    store.addTemplate(a.kind as TemplateKind, a.props ?? {})
     return { notice: store.notice }
   },
   select_node: (store, a) => {

@@ -1,6 +1,22 @@
-import { ROOT_NODE_ID, TEXT_NODE_TYPE } from './constants'
+import { ROOT_NODE_ID } from './constants'
 import { ActionType, TemplateKind } from './enums'
-import type { UiAction, UiNode } from './types'
+import { buildBlog } from './templates/blog'
+import { buildContact } from './templates/contact'
+import { buildFaq } from './templates/faq'
+import { buildFooter } from './templates/footer'
+import { buildOnboarding } from './templates/onboarding'
+import {
+  element,
+  type Builder,
+  type Built,
+  type TemplateContext,
+  type TemplateProps,
+} from './templates/templateElement'
+import { resolveTemplateProps } from './templates/templatePresets'
+import { buildTestimonials } from './templates/testimonials'
+import type { UiNode } from './types'
+
+export type { TemplateContext, TemplateProps }
 
 export interface TemplateInfo {
   kind: TemplateKind
@@ -32,20 +48,52 @@ export const TEMPLATES: TemplateInfo[] = [
     icon: 'mdi-table-search',
   },
   { kind: TemplateKind.Login, label: 'Sign-in form', description: 'Fields that react in Preview', icon: 'mdi-login' },
+  {
+    kind: TemplateKind.Testimonials,
+    label: 'Testimonials',
+    description: 'Customer quotes in columns',
+    icon: 'mdi-format-quote-open-outline',
+  },
+  { kind: TemplateKind.Faq, label: 'FAQ', description: 'Questions that expand', icon: 'mdi-help-circle-outline' },
+  {
+    kind: TemplateKind.Onboarding,
+    label: 'Onboarding',
+    description: 'Steps that go forward and back',
+    icon: 'mdi-stairs-up',
+  },
+  { kind: TemplateKind.Blog, label: 'Blog', description: 'Post cards with tags', icon: 'mdi-post-outline' },
+  {
+    kind: TemplateKind.Contact,
+    label: 'Contact',
+    description: 'Details and a message form',
+    icon: 'mdi-email-edit-outline',
+  },
+  {
+    kind: TemplateKind.Footer,
+    label: 'Footer',
+    description: 'Brand, link columns, copyright',
+    icon: 'mdi-page-layout-footer',
+  },
 ]
 
-export interface TemplateContext {
-  createNode(type: string, name?: string): UiNode
-  cloneNodeWithNewIds(node: UiNode): UiNode
-  /** `prepare` runs inside the same undo step, right before the element is added. */
-  appendNode(parentId: string, node: UiNode, slotName: string | null, prepare?: () => void): boolean
-  /** Adds variables the project does not have yet; existing ones keep their value. */
-  ensureVariables(variables: Record<string, unknown>): void
+/** Starters with their own variables and behavior. Each reads its settings from the props and has a default for all of them. */
+const BUILDERS: Partial<Record<TemplateKind, Builder>> = {
+  [TemplateKind.Dashboard]: buildDashboard,
+  [TemplateKind.Table]: buildTablePage,
+  [TemplateKind.Login]: buildLogin,
+  [TemplateKind.Testimonials]: buildTestimonials,
+  [TemplateKind.Footer]: buildFooter,
+  [TemplateKind.Faq]: buildFaq,
+  [TemplateKind.Onboarding]: buildOnboarding,
+  [TemplateKind.Blog]: buildBlog,
+  [TemplateKind.Contact]: buildContact,
 }
 
-export function addTemplate(context: TemplateContext, kind: TemplateKind): void {
-  if (kind === TemplateKind.Dashboard || kind === TemplateKind.Table || kind === TemplateKind.Login) {
-    const { node, variables } = BUILDERS[kind](context)
+/** `props` customizes the template (texts, lists of entries, or a `preset` id); what is not given keeps its default. */
+export function addTemplate(context: TemplateContext, kind: TemplateKind, props: TemplateProps = {}): void {
+  const build = BUILDERS[kind]
+  if (build) {
+    const { node, variables } = build(context, resolveTemplateProps(kind, props))
     context.appendNode(ROOT_NODE_ID, node, null, () => context.ensureVariables(variables))
     return
   }
@@ -95,39 +143,6 @@ function createCard(context: TemplateContext, kind: TemplateKind): UiNode {
 }
 
 // ─── Templates that bring their own variables and behavior ─────────────────────
-
-interface ElementOptions {
-  name?: string
-  props?: Record<string, unknown>
-  classes?: string[]
-  /** Text of the element, for those that have a text inside (buttons, titles…). */
-  text?: string
-  children?: UiNode[]
-  model?: string
-  vIf?: string
-  click?: UiAction
-}
-
-/** An element with its settings in one place, so a template reads like the page it builds. */
-function element(context: TemplateContext, type: string, options: ElementOptions = {}): UiNode {
-  const node = context.createNode(type, options.name)
-  if (options.props) node.props = { ...node.props, ...options.props }
-  if (options.classes) node.classes = options.classes
-  if (options.text !== undefined) {
-    const text = node.children.find(child => child.type === TEXT_NODE_TYPE)
-    if (text) text.name = options.text
-  }
-  if (options.children) node.children = options.children
-  if (options.model) node.model = options.model
-  if (options.vIf) node.vIf = options.vIf
-  if (options.click) node.events = { click: options.click }
-  return node
-}
-
-interface Built {
-  node: UiNode
-  variables: Record<string, unknown>
-}
 
 const STATUS_COLUMN = { title: 'Status', key: 'status', chip: true }
 const ORDERS = [
@@ -301,5 +316,3 @@ function buildLogin(context: TemplateContext): Built {
   })
   return { node, variables: { email: '', password: '', remember: false, signedIn: false } }
 }
-
-const BUILDERS = { dashboard: buildDashboard, table: buildTablePage, login: buildLogin }

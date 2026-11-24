@@ -6,15 +6,20 @@ import {
   getComponentCategory,
   PALETTE_COMPONENTS,
   getComponentDef,
+  TEMPLATES,
   useUiTreeStore,
+  type TemplateKind,
 } from '../../../entities/ui-node'
 import PaletteItem from './PaletteItem.vue'
 import { quickSections } from '../model/quickSections'
+const emit = defineEmits<{ 'add-template': [kind: TemplateKind] }>()
 const store = useUiTreeStore()
 const search = ref('')
 const favorites = useStorage<string[]>('ui-builder:favorite-components', [])
 // "All components" stays folded until asked for, so the first screen is short.
 const showAll = useStorage('ui-builder:palette-show-all', false)
+// Templates are open by default: they are the quickest way to a finished section.
+const showTemplates = useStorage('ui-builder:palette-show-templates', true)
 const searching = computed(() => !!search.value?.trim())
 const available = new Set(PALETTE_COMPONENTS.map(component => component.type))
 const quick = computed(() =>
@@ -31,6 +36,10 @@ const toggleFavorite = (type: string) => {
 const components = computed(() =>
   PALETTE_COMPONENTS.filter(c => c.label.toLowerCase().includes((search.value ?? '').toLowerCase())),
 )
+const templates = computed(() => {
+  const query = (search.value ?? '').trim().toLowerCase()
+  return TEMPLATES.filter(template => `${template.label} ${template.description}`.toLowerCase().includes(query))
+})
 const componentGroups = computed(() =>
   COMPONENT_CATEGORY_ORDER.map(label => ({
     label,
@@ -81,6 +90,27 @@ const onDragStart = (e: DragEvent, type: string) => {
         <button
           type="button"
           class="palette-all-toggle"
+          :aria-expanded="showTemplates"
+          aria-controls="palette-templates"
+          @click="showTemplates = !showTemplates"
+        >
+          <VIcon :icon="showTemplates ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" aria-hidden="true" />
+          Templates <span>{{ TEMPLATES.length }}</span>
+        </button>
+        <ul v-show="showTemplates" id="palette-templates" class="palette-templates">
+          <li v-for="template in templates" :key="template.kind">
+            <button type="button" class="palette-template" @click="emit('add-template', template.kind)">
+              <VIcon :icon="template.icon" size="20" aria-hidden="true" />
+              <span class="palette-template__text">
+                <strong>{{ template.label }}</strong>
+                <span>{{ template.description }}</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+        <button
+          type="button"
+          class="palette-all-toggle"
           :aria-expanded="showAll"
           aria-controls="palette-all"
           @click="showAll = !showAll"
@@ -113,14 +143,34 @@ const onDragStart = (e: DragEvent, type: string) => {
           </div>
         </section>
       </div>
-      <p v-if="!components.length" class="insertion-hint">No components match your search.</p>
+      <section v-if="searching && templates.length" class="palette-group" aria-label="Matching templates">
+        <h3 class="palette-group__title">
+          Templates <span>{{ templates.length }}</span>
+        </h3>
+        <ul class="palette-templates">
+          <li v-for="template in templates" :key="template.kind">
+            <button type="button" class="palette-template" @click="emit('add-template', template.kind)">
+              <VIcon :icon="template.icon" size="20" aria-hidden="true" />
+              <span class="palette-template__text">
+                <strong>{{ template.label }}</strong>
+                <span>{{ template.description }}</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <p v-if="!components.length && !templates.length" class="insertion-hint">
+        No components or templates match your search.
+      </p>
     </div>
   </section>
 </template>
 
 <style scoped>
 .components-palette {
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .components-palette__body {
   padding: 8px 12px 12px;
@@ -152,8 +202,6 @@ const onDragStart = (e: DragEvent, type: string) => {
   overflow-wrap: anywhere;
 }
 .palette-groups {
-  overflow-y: auto;
-  max-height: 420px;
   padding: 0 3px 3px;
 }
 .palette-group + .palette-group {
@@ -205,6 +253,37 @@ const onDragStart = (e: DragEvent, type: string) => {
   font-size: 12px;
   font-weight: 400;
   opacity: 0.6;
+}
+.palette-templates {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.palette-template {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--v-border-color), 0.15);
+  border-radius: 6px;
+  text-align: left;
+}
+.palette-template:hover,
+.palette-template:focus-visible {
+  border-color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+.palette-template__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  font-size: 12px;
+}
+.palette-template__text span {
+  opacity: 0.7;
 }
 @container (min-width: 360px) {
   .palette-grid {
