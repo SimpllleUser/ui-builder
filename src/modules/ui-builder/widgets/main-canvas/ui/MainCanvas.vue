@@ -396,6 +396,23 @@ const leaveCanvas = (event: DragEvent) => {
   outline: 2px dashed rgb(var(--v-theme-primary)) !important;
   background: rgba(var(--v-theme-primary), 0.08) !important;
 }
+/* A small marker names the behavior an element has (repeat, condition, link, click), so logic is visible while editing. */
+.ui-builder-element[data-behavior]::after {
+  content: attr(data-behavior);
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(var(--v-theme-info));
+  color: rgb(var(--v-theme-on-info));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .v-card.ui-builder-element {
   min-height: 80px;
 }

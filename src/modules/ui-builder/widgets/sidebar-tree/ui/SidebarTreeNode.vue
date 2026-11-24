@@ -2,6 +2,7 @@
 import {
   StepDirection,
   type UiNode,
+  describeBehaviors,
   useUiTreeStore,
   getComponentDef,
   getNodeSlots,
@@ -10,6 +11,7 @@ import {
 } from '../../../entities/ui-node'
 import { computed, ref, watch, nextTick, inject, type Ref } from 'vue'
 import draggable from 'vuedraggable'
+import { BEHAVIOR_ICONS } from '../model/behaviorIcons'
 const props = defineProps<{ node: UiNode; depth?: number }>()
 const store = useUiTreeStore()
 const expanded = ref(true)
@@ -24,6 +26,7 @@ const selected = computed(() => store.selectedNodeIds.includes(props.node.id))
 const componentLabel = computed(() =>
   props.node.id === ROOT_NODE_ID ? 'Page canvas' : (getComponentDef(props.node.type)?.label ?? props.node.type),
 )
+const behaviors = computed(() => describeBehaviors(props.node))
 const slots = computed(() =>
   getNodeSlots(props.node).filter(
     s => s.name !== 'default' && (props.node.id !== ROOT_NODE_ID || props.node.slots[s.name]?.length),
@@ -113,7 +116,7 @@ const keydown = (e: KeyboardEvent) => {
       role="treeitem"
       :id="`treeitem-${node.id}`"
       :data-tree-id="node.id"
-      :aria-label="`${label}, ${componentLabel}`"
+      :aria-label="[`${label}, ${componentLabel}`, ...behaviors.map(note => note.description)].join('. ')"
       :aria-selected="selected"
       :aria-level="depth + 1"
       :aria-expanded="hasContent ? expanded : undefined"
@@ -154,6 +157,11 @@ const keydown = (e: KeyboardEvent) => {
         @blur="finishRename"
       />
       <span v-else class="node-label" :title="label">{{ label }}</span>
+      <span v-if="behaviors.length" class="node-behaviors" aria-hidden="true">
+        <span v-for="note in behaviors" :key="note.badge" :title="note.description">
+          <VIcon :icon="BEHAVIOR_ICONS[note.badge]" size="14" />
+        </span>
+      </span>
       <span class="node-actions" @click.stop @dblclick.stop>
         <VMenu v-if="store.canContain(node)">
           <template #activator="{ props: menuProps }"
@@ -317,6 +325,13 @@ const keydown = (e: KeyboardEvent) => {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.node-behaviors {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  color: rgb(var(--v-theme-info));
 }
 .tree-btn {
   display: inline-flex;

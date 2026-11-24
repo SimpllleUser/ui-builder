@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useUiTreeStore, getComponentDef, ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node'
+import {
+  useUiTreeStore,
+  describeBehaviors,
+  getComponentDef,
+  ROOT_NODE_ID,
+  TEXT_NODE_TYPE,
+} from '../../../entities/ui-node'
 import { elementBox, findCanvasElement, labelTop, type ElementBox } from '../model/canvasGeometry'
 
 /** Names the element under the pointer and outlines it, so similar elements can be told apart without a click. */
@@ -94,6 +100,13 @@ const kind = computed(() => {
   // Showing "Button · Button" would only repeat itself.
   return label === name.value ? '' : label
 })
+const behavior = computed(() =>
+  node.value
+    ? describeBehaviors(node.value)
+        .map(note => note.description)
+        .join(' · ')
+    : '',
+)
 </script>
 
 <template>
@@ -106,6 +119,7 @@ const kind = computed(() => {
     <div class="hover-badge" aria-hidden="true" :style="{ top: `${badgeTop}px`, left: `${Math.max(4, box.left)}px` }">
       <span class="hover-badge__name">{{ name }}</span>
       <span v-if="kind" class="hover-badge__kind">{{ kind }}</span>
+      <span v-if="behavior" class="hover-badge__behavior">{{ behavior }}</span>
     </div>
   </template>
 </template>
@@ -123,7 +137,7 @@ const kind = computed(() => {
   position: absolute;
   z-index: 15;
   display: flex;
-  max-width: 260px;
+  max-width: 480px;
   align-items: center;
   gap: 6px;
   height: 22px;
@@ -131,13 +145,20 @@ const kind = computed(() => {
   border-radius: 4px;
   background: rgb(var(--v-theme-primary));
   color: rgb(var(--v-theme-on-primary));
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
 }
 .hover-badge__name {
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hover-badge__behavior {
+  overflow: hidden;
+  padding-left: 6px;
+  border-left: 1px solid rgba(var(--v-theme-on-primary), 0.5);
+  font-weight: 400;
   text-overflow: ellipsis;
 }
 .hover-badge__kind {

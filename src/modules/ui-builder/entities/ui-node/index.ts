@@ -27,6 +27,8 @@ export { readFlex, readSpacing, writeFlex, writeSpacing } from './model/layoutCo
 export { pagePathError, variableNameError } from './model/projectMutations'
 export { describeFields } from './model/propertyFields'
 export { conditionError, evaluateCondition, parseLiteral } from './model/runtime'
+export { BehaviorBadge, describeBehaviors } from './model/behaviorSummary'
+export type { BehaviorNote } from './model/behaviorSummary'
 export { exportLayout, exportPage, exportPrefab } from './model/vueExport'
 export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
