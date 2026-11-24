@@ -165,7 +165,7 @@ const onDragStart = (e: DragEvent, type: string) => {
   gap: 6px;
   margin: 0 0 6px;
   color: rgb(var(--v-theme-on-surface));
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -178,7 +178,7 @@ const onDragStart = (e: DragEvent, type: string) => {
 }
 .palette-group__title span {
   order: 3;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   opacity: 0.6;
 }
@@ -202,7 +202,7 @@ const onDragStart = (e: DragEvent, type: string) => {
   text-transform: uppercase;
 }
 .palette-all-toggle span {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   opacity: 0.6;
 }

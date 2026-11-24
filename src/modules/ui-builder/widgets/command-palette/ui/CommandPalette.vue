@@ -163,6 +163,9 @@ const optionId = (index: number) => `command-option-${index}`
   padding: 12px 16px;
   border-bottom: 1px solid rgba(var(--v-border-color), 0.2);
 }
+.command-palette__search:focus-within {
+  box-shadow: inset 0 -2px 0 rgb(var(--v-theme-primary));
+}
 .command-palette__input {
   flex: 1;
   min-width: 0;
@@ -173,7 +176,7 @@ const optionId = (index: number) => `command-option-${index}`
 }
 .command-palette__label {
   padding: 8px 16px 2px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -226,7 +229,7 @@ const optionId = (index: number) => `command-option-${index}`
   flex-shrink: 0;
   max-width: 130px;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.55;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -237,7 +240,7 @@ const optionId = (index: number) => `command-option-${index}`
   border-radius: 4px;
   background: rgba(var(--v-theme-on-surface), 0.05);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
 }
 .command-palette__empty {
   padding: 24px 10px;
@@ -250,7 +253,7 @@ const optionId = (index: number) => `command-option-${index}`
   gap: 16px;
   padding: 8px 16px;
   border-top: 1px solid rgba(var(--v-border-color), 0.2);
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
 }
 .command-palette__footer kbd + kbd {

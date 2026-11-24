@@ -64,9 +64,41 @@ html {
   overflow: auto;
 }
 button:focus-visible,
+a:focus-visible,
 [tabindex]:focus-visible,
+[role='tab']:focus-visible,
+[role='menuitem']:focus-visible,
 summary:focus-visible {
   outline: 2px solid rgb(var(--v-theme-primary));
   outline-offset: 2px;
+}
+/* Fields that sit inside a pill or a row keep the ring inside their own edge so neighbours do not hide it. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
+/* People who ask their system for less motion get the final state at once (panels, dialogs, menus, tour). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* A finger needs a larger target than a pointer: small icon buttons and list rows grow on touch screens only. */
+@media (pointer: coarse) {
+  .v-btn--icon.v-btn--size-small,
+  .v-btn--icon.v-btn--size-x-small {
+    width: 44px;
+    height: 44px;
+  }
+  .v-list-item {
+    min-height: 44px;
+  }
 }
 </style>

@@ -162,7 +162,7 @@ const add = (key: string, newKind: JsonKind) => {
   border-radius: 8px;
   background: rgba(var(--v-theme-primary), 0.12);
   color: rgb(var(--v-theme-primary));
-  font-size: 11px;
+  font-size: 12px;
 }
 .json-row__field {
   flex: 1;

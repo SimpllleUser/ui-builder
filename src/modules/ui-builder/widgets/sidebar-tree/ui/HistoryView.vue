@@ -110,7 +110,7 @@ const save = () => {
 .history-section__title {
   margin: 0 4px 6px;
   color: rgb(var(--v-theme-on-surface));
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -155,7 +155,7 @@ const save = () => {
 }
 
 .checkpoint-restore small {
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.6;
 }
 
@@ -188,13 +188,13 @@ const save = () => {
 
 .history-time {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.6;
 }
 
 .history-current {
   flex-shrink: 0;
   color: rgb(var(--v-theme-primary));
-  font-size: 11px;
+  font-size: 12px;
 }
 </style>

@@ -29,7 +29,7 @@ defineProps<{ node: UiNode }>()
 <style scoped>
 .design-tab__note {
   margin: 12px 0 0;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.6;
 }
 </style>

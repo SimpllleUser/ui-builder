@@ -83,6 +83,12 @@ const favoriteLabel = computed(
 .palette-star--on {
   opacity: 1;
 }
+/* A screen without hover would never show the star, so it is always visible there. */
+@media (hover: none) {
+  .palette-star {
+    opacity: 1;
+  }
+}
 .palette-star--on {
   color: rgb(var(--v-theme-warning));
 }
