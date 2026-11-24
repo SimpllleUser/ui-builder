@@ -29,6 +29,7 @@ On a first visit to an empty project, a three-step **quick tour** points at the 
 - Problems with what you type (a table column key that is taken, a page route, a variable name, a condition that cannot be read, a link to a page that does not exist) appear right under the field and stay until fixed, instead of in a message that fades.
 - Undo/Redo supports Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z. Text inputs keep native text undo. Property edits are grouped while typing; immediate Undo includes the latest edit.
 - Save selected elements in **My components** for reuse.
+- **Behavior guide** (⋯ menu, or search): built-in documentation of conditions, repeats, clicks and variables with live examples and a playground.
 
 ## Saving and preview
 
@@ -44,10 +45,84 @@ The previous **Classic** editor is no longer in the menus, so there is one edito
 
 - **Page tabs** under the top bar switch pages in one click (arrow keys, or Alt+[ / Alt+] anywhere); **+** adds a page and **⋮** renames, duplicates, reorders or deletes the current one. The editor reopens on the last page you used. **Pages & variables** manages the shared layout and variables. A page is created empty; Undo/Redo covers the whole project.
 - **Shared layout**: *Create layout* adds `VApp` with an app bar, a navigation drawer and `VMain` containing **Page content**, the place where the current page appears in Preview. Remove the layout to preview pages on their own.
-- **Behavior** (inspector → Advanced, at the top; use **Add** to pick what the element does): a variable you type that does not exist yet is created on the spot, and its starting value can be changed under the field. Options: *Link to a variable* (`v-model`) binds a component to a variable, *Show only when…* (`v-if`) shows it conditionally (`open`, `!loading`, `status == paid`, `step >= 2`), *Repeat for each item of…* (`v-for`) repeats it for each item of an array or `n` times (`{{ item.title }}`, `{{ index }}`), and *When clicked* can go to a page, set or switch a variable (`{{ item }}` stores a whole table row). Text and props accept `{{ name }}`; `{{ rows }}` alone keeps arrays for tables. Dialogs, snackbars and drawers open from `v-model` plus a click action.
+- **Behavior** (inspector → Advanced, at the top; use **Add** to pick what the element does): a variable you type that does not exist yet is created on the spot, and its starting value can be changed under the field. Options: *Link to a variable* (`v-model`) binds a component to a variable, *Show only when…* (`v-if`) shows it conditionally (`open`, `!loading`, `status == paid`, `step >= 2`, `role == "admin" and not loading`, `contains(tags, "new")`; operators `== != < <= > >= && || ! and or not + - * / %` and `? :`, functions `length`, `empty`, `contains`), *Repeat for each item of…* (`v-for`) repeats it for each item of an array or `n` times (`{{ item.title }}`, `{{ index }}`), and *When clicked* can go to a page, set or switch a variable (`{{ item }}` stores a whole table row). Text and props accept `{{ name }}`; `{{ rows }}` alone keeps arrays for tables. Dialogs, snackbars and drawers open from `v-model` plus a click action.
 - Interactions run only in Preview, starting from the initial state values each time, and never execute code: bindings read paths, conditions and actions are a fixed set.
 - Overlays (`VDialog`, `VMenu`, `VSnackbar`, `VTooltip`) are drawn inline on the canvas for editing and behave as real overlays in Preview. Text fields accept a mask such as `##.##.####`, applied in Preview when bound with `v-model`.
 - Documents are saved as version 2 (`pages`, `layout`, `state`); version 1 files import as a single page.
+
+## Feature guide
+
+How the main features work, in the order you meet them. The short list above says what exists; this says how it behaves.
+
+### Variables and bindings
+
+- The project keeps one set of **variables** (its state), stored in the document next to the pages. Each has a starting value. Preview copies the starting values every time it opens, changes its own copy, and **Reset** copies them again, so Preview never edits the document.
+- A variable is created where it is first used (a behavior field, an action) with a starting value that fits: `false` for a condition or a switch, an empty list for a repeat, empty text for an input. Names use letters, digits and `_`, do not start with a digit, and the names `__proto__`, `constructor` and `prototype` are refused.
+- Text and properties read variables with double curly braces around a **path**: `name`, `user.name`, `rows[0].title`. Mixed text is turned into text (a missing value becomes empty). A binding that is alone in a property keeps its type, so `rows` stays a list for a table. Paths are only read; no code is evaluated.
+- Inside a repeated element or a table cell three more names exist: `item` (the current item), `index` (its position, starting at 0) and, in table cells, `value`. They are not project variables, so the check does not report them as unknown.
+
+### Behavior in depth
+
+Each element can carry up to four behaviors, edited in the inspector (Advanced, **Add**). They are stored on the element as `model`, `vIf`, `vFor` and `events.click`.
+
+| Behavior | Stored as | What Preview does |
+| --- | --- | --- |
+| Link to a variable | `model` | Input and variable hold the same value; typing writes the variable, a change of the variable updates the input. A mask such as `##.##.####` formats what is typed. |
+| Show only when… | `vIf` | The element is drawn only while the condition is true. |
+| Repeat for each item | `vFor` | One copy per item of a list, or `n` copies for a number (at most 500). Each copy gets its own `item` and `index`. |
+| When clicked | `events.click` | One action, described below. |
+
+For one element the order is: repeat (once per item), then the condition of each copy (it can read `item`), then drawing, then bindings in its text and properties.
+
+**Click actions**
+
+- *Go to page* opens a route of the project. A route no page has is reported next to the field and by the check.
+- *Set a variable* writes a value. The value is read as a literal: `5` is a number, `true` and `false` are yes/no values, `"text"` or plain text is text. A value that is a single binding (`item` in double curly braces) keeps its type, so a whole table row can be stored; the row is **copied**, so later changes to the table do not change what was stored.
+- *Switch on/off* flips a yes/no variable.
+- A click on an element inside a repeat, or on a table row, can use `item` in its action. An element outside every repeat has no `item`.
+
+**Conditions** are small expressions. They are never run as code: the text is only turned into a syntax tree (by the `jsep` parser) and a fixed evaluator in `entities/ui-node/model/expression.ts` walks it. That is why a condition cannot reach the browser, call a method or touch prototypes.
+
+| Group | Allowed |
+| --- | --- |
+| Values | numbers, `"text"` or `'text'`, `true`, `false`, `null`, lists such as `[1, 2]`, variable paths (`user.age`, `rows[0].title`) |
+| Logic | `&&`, `and`, `||`, `or`, `!`, `not`, `a ? b : c`, parentheses |
+| Compare | `==`, `!=` (compared as text, so `3` equals `"3"`), `===`, `!==` (same type required), `<`, `<=`, `>`, `>=` (both sides read as numbers) |
+| Arithmetic | `+`, `-`, `*`, `/`, `%`; `+` joins text when either side is text |
+| Functions | `length(x)` (text or list), `empty(x)` (nothing, empty text or an empty list), `contains(x, y)` (text contains a piece, or a list contains an item) |
+
+Rules worth knowing:
+
+- An **empty** condition shows the element. A condition that **cannot be read** also shows it in Preview (a typo never hides content), and the reason stays beside the field until it is fixed.
+- A name that is not a variable, written next to `==` or `!=`, is read as text, so older conditions such as `status == paid` keep working. Quote text that has spaces or looks like a number: `city == "New York"`.
+- A missing variable or a missing field is `undefined`: it is false in a condition, empty for `empty()`, and a comparison with it is false.
+- Double curly braces are allowed inside a condition and mean the bare path (`status == {{status}}`), which is how saved-component parameters look.
+- Anything else (assignment, `x.method()`, unknown functions, bit operators) is rejected with a message.
+
+Examples:
+
+```
+open                                       a yes/no variable
+!loading   /   not loading                 its opposite
+step >= 2 and role == "admin"              two checks
+not empty(email) and not contains(email, "@")
+price * qty >= 100                         arithmetic
+qty >= 1 and (vip or qty <= stock)         grouping
+count > 0 ? ready : done                   conditional
+row.status != "paid"                       a field of the current item
+```
+
+### Saved components and parameters
+
+**My components** stores an element with its children. Write `props.name` in double curly braces anywhere in it (text, properties, classes, a condition, a repeat, a linked variable, a click action) and `name` becomes a **parameter** with a default; the inspector shows it as a field when the component is inserted. Parameters are filled in at insertion, so the `props.` prefix keeps them apart from the project variables that stay live in Preview. In a condition the value is inserted as one safe value (a number stays a number, text becomes quoted), so a value with spaces cannot change what the condition means.
+
+### Checking a project
+
+`check_project` (and the same check in the editor) reports: variables that are used but not defined (found in text, properties, links, repeats and inside conditions), links to pages that do not exist, conditions that cannot be read, empty tables, a layout without **Page content**, and variables nobody uses. Function names and the words `and`, `or`, `not` are not mistaken for variables.
+
+### The Behavior guide
+
+The same material is built into the editor: **⋯ → Behavior guide**, or search (Ctrl/⌘ K → “behavior guide”). It has an address too: `/?guide` opens it and `/?guide=conditions` opens a section (`overview`, `variables`, `click`, `conditions`, `link`, `repeat`, `components`, `checking`), so a link can be shared. It is a full-screen guide with one section per topic (how it works, variables, clicks, conditions, link, repeat, saved components, mistakes). Every example shows its sample variables and what Preview would do, using the same evaluator as Preview, and the **Conditions** section has a playground where you type your own condition and variables as JSON. Its text lives in `widgets/behavior-guide/model/guideContent.ts`; a test checks that every example in it is a readable condition.
 
 ## MCP access
 
@@ -73,9 +148,9 @@ The server also gives agents instructions, a **guide** resource (`ui-builder://g
 The code follows Feature-Sliced Design, from the top layer down:
 
 - `src/app`: the application shell (`App.vue`, `BuilderApp.vue`, and in `shell/` the panels, keyboard shortcuts, focus mode and project files). It puts the other layers together.
-- `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour).
+- `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour, Behavior guide).
 - `src/modules/ui-builder/features/mcp-bridge`: lets an MCP client edit the page open in the browser.
-- `src/modules/ui-builder/entities/ui-node`: the document, its store, validation and rendering.
+- `src/modules/ui-builder/entities/ui-node`: the document, its store, validation and rendering. Conditions are read in `model/expression.ts` (parser `jsep` plus a fixed evaluator) and used by `model/runtime.ts`, the preview snapshot and the project check.
 - `src/shared`: code with no knowledge of the editor (icons, DOM helpers, `useCheckedDrafts`, table styles).
 
 Every slice has a public API in its `index.ts`. Code outside a slice imports from there and never from files inside it, a layer imports only from layers below it, and slices of the same layer do not import each other (they are combined in `app`, for example through a slot or by passing what they need in). Fixed sets of values are enums, not union types.

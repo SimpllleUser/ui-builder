@@ -16,6 +16,7 @@ test('command palette: finds commands, components, pages, elements and settings,
     importProject: () => calls.push('import'),
     exportProject: () => calls.push('export'),
     startTour: () => calls.push('tour'),
+    openBehaviorGuide: () => calls.push('guide'),
     toggleFocus: () => calls.push('focus'),
     togglePanel: side => calls.push(`panel:${side}`),
     modifierKey: 'Ctrl',
@@ -170,10 +171,10 @@ test('input problems come with a reason that can be shown beside the field', asy
   assert.match(variableNameError('constructor'), /reserved/)
 
   assert.equal(conditionError(''), null, 'no condition is fine')
-  for (const fine of ['open', '!open', 'status == paid', 'count >= 2', 'selected.step < 3'])
+  for (const fine of ['open', '!open', 'status == paid', 'count >= 2', 'selected.step < 3', 'a and not b', '(open)'])
     assert.equal(conditionError(fine), null, fine)
-  for (const bad of ['open &&', '== 3', 'a b c', '(open)'])
-    assert.match(conditionError(bad), /Write a variable name/, bad)
+  for (const bad of ['open &&', '== 3', 'a b c', 'alert(1)', 'open | closed', 'x = 1'])
+    assert.equal(typeof conditionError(bad), 'string', bad)
 
   // The same rules guard the commands behind the interface, so nothing wrong slips in by another route.
   assert.equal(store.setStateVariable('my var', 1), false)

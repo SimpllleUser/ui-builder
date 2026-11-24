@@ -21,7 +21,7 @@ export interface UiNode {
   slots: Record<string, UiNode[]>
   /** State key bound to the component's v-model. */
   model?: string
-  /** Condition for rendering in preview: `key`, `!key`, `key == value`, `key != value`. */
+  /** Condition for rendering in preview, an expression such as `key`, `!key`, `step >= 2 and role == "admin"` (see expression.ts). */
   vIf?: string
   /** State key holding an array (or a number) to repeat this element for; exposes `item` and `index`. */
   vFor?: string

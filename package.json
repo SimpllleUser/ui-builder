@@ -15,6 +15,7 @@
   "dependencies": {
     "@mdi/font": "7.4.47",
     "@vueuse/core": "^14.0.0",
+    "jsep": "^1.4.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.21",
     "vue-draggable-next": "^2.3.0",

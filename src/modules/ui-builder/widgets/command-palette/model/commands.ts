@@ -34,6 +34,7 @@ export interface CommandHost {
   importProject(): void
   exportProject(): void
   startTour(): void
+  openBehaviorGuide(): void
   toggleFocus(): void
   toggleLayersPanel(): void
   toggleProperties(): void
@@ -291,6 +292,14 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
     icon: 'mdi-compass-outline',
     keywords: 'help guide onboarding hints start',
     run: host.startTour,
+  })
+  add({
+    id: 'editor:behavior-guide',
+    title: 'Open the Behavior guide',
+    group: 'Editor',
+    icon: 'mdi-book-open-variant',
+    keywords: 'help documentation tutorial conditions v-if v-for v-model click variables expressions',
+    run: host.openBehaviorGuide,
   })
 
   // ─── Add a component ───────────────────────────────────────────────────────

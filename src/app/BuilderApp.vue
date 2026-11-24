@@ -6,11 +6,13 @@ import { useMediaQuery } from '@vueuse/core'
 import { ComponentsPalette } from '../modules/ui-builder/widgets/components-palette'
 import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
+import { BehaviorGuide } from '../modules/ui-builder/widgets/behavior-guide'
 import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/onboarding'
 import { CommandPalette, type CommandHost } from '../modules/ui-builder/widgets/command-palette'
 import { PageTabs, PagesPanel } from '../modules/ui-builder/widgets/pages-panel'
 import { PropertyPanel, useDesignTabPreference } from '../modules/ui-builder/widgets/property-panel'
 import { useEditorPanels } from './shell/useEditorPanels'
+import { useGuideLocation } from './shell/useGuideLocation'
 import { useEditorShortcuts } from './shell/useEditorShortcuts'
 import { platformModifierKey, useFocusMode } from './shell/useFocusMode'
 import { useProjectFiles } from './shell/useProjectFiles'
@@ -37,6 +39,7 @@ const { exportProject, importFromInput } = useProjectFiles(store)
 const importInput = ref<HTMLInputElement>()
 const pageTabs = ref<InstanceType<typeof PageTabs>>()
 const paletteOpen = ref(false)
+const { open: guideOpen, section: guideSection } = useGuideLocation()
 
 // What the search box and the quick tour can ask of the editor shell.
 const commandHost: CommandHost = {
@@ -45,6 +48,7 @@ const commandHost: CommandHost = {
   importProject: () => importInput.value?.click(),
   exportProject,
   startTour,
+  openBehaviorGuide: () => (guideOpen.value = true),
   toggleFocus,
   toggleLayersPanel: () => togglePanel(PanelSide.Left),
   toggleProperties: () => togglePanel(PanelSide.Right),
@@ -141,6 +145,12 @@ useEditorShortcuts({
               @click="designTab = !designTab"
             />
             <VListItem prepend-icon="mdi-compass-outline" title="Quick tour" @click="startTour" />
+            <VListItem
+              prepend-icon="mdi-book-open-variant"
+              title="Behavior guide"
+              subtitle="Conditions, repeats, clicks and variables"
+              @click="guideOpen = true"
+            />
           </VList>
         </VMenu>
         <VBtn
@@ -167,6 +177,7 @@ useEditorShortcuts({
       Exit focus mode <kbd>Esc</kbd>
     </button>
     <CommandPalette v-model="paletteOpen" :host="commandHost" />
+    <BehaviorGuide v-model="guideOpen" v-model:section="guideSection" />
     <OnboardingTour v-if="tourOpen" v-model="tourOpen" :suspended="store.isPreviewMode" @finish="finishTour" />
     <div class="builder-layout" :class="{ 'builder-layout--narrow': narrow }">
       <button

@@ -22,6 +22,8 @@ export let server,
   canSavePrefabName,
   jsonTree,
   fieldTabs,
+  playground,
+  guideContent,
   store
 const storage = new Map()
 before(async () => {
@@ -55,6 +57,8 @@ before(async () => {
   ))
   jsonTree = await server.ssrLoadModule('/src/shared/lib/jsonTree.ts')
   fieldTabs = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/fieldTabs.ts')
+  playground = await server.ssrLoadModule('/src/modules/ui-builder/widgets/behavior-guide/model/conditionPlayground.ts')
+  guideContent = await server.ssrLoadModule('/src/modules/ui-builder/widgets/behavior-guide/model/guideContent.ts')
   global.window = { localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } }
 })
 beforeEach(() => {

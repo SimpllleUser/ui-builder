@@ -1,8 +1,9 @@
 import { ActionType } from './enums'
+import { evaluateExpression, expressionError, type Scope } from './expression'
 import type { UiAction } from './types'
 
 /** Variables visible to bindings: project state plus `item`/`index` inside a repeated element. */
-export type Scope = Record<string, unknown>
+export type { Scope }
 
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype'])
 const PATH = /^[A-Za-z_$][\w$]*(?:\.[\w$]+|\[\d+\])*$/
@@ -45,35 +46,13 @@ export function parseLiteral(text: string): unknown {
   return trimmed.replace(/^(['"])(.*)\1$/, '$2')
 }
 
-const COMPARISONS: Record<string, (a: unknown, b: unknown) => boolean> = {
-  '==': (a, b) => String(a) === String(b),
-  '!=': (a, b) => String(a) !== String(b),
-  '>=': (a, b) => Number(a) >= Number(b),
-  '<=': (a, b) => Number(a) <= Number(b),
-  '>': (a, b) => Number(a) > Number(b),
-  '<': (a, b) => Number(a) < Number(b),
-}
-
-/**
- * Supports `key`, `!key`, and comparisons `key == value`, `!=`, `>=`, `<=`, `>`, `<` (numeric for the last four).
- * Paths may be dotted (`selected.step >= 2`). An empty or invalid condition shows the element.
- */
-const CONDITION = /^\s*(!)?\s*([A-Za-z_$][\w$.[\]]*)\s*(?:(==|!=|>=|<=|>|<)\s*(.+?))?\s*$/
-
 /** Why a condition cannot be used, or null when it is fine (or empty). */
-export function conditionError(expression: string | undefined): string | null {
-  if (!expression?.trim() || CONDITION.test(expression)) return null
-  return 'Write a variable name, !name, or a comparison such as name == value or count >= 2.'
-}
+export const conditionError = expressionError
 
+/** An empty or unreadable condition shows the element, so a typo never hides content in preview. */
 export function evaluateCondition(expression: string | undefined, scope: Scope): boolean {
-  if (!expression?.trim()) return true
-  const match = CONDITION.exec(expression)
-  if (!match) return true
-  const [, negate, path, operator, literal] = match
-  const value = resolvePath(path, scope)
-  if (operator) return COMPARISONS[operator](value, parseLiteral(literal))
-  return negate ? !value : !!value
+  if (!expression?.trim() || expressionError(expression)) return true
+  return Boolean(evaluateExpression(expression, scope))
 }
 
 /** Items to repeat an element for: an array, or `n` copies when the source is a number. */
