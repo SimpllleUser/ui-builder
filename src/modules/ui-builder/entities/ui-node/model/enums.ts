@@ -44,6 +44,12 @@ export enum TemplateKind {
   Dashboard = 'dashboard',
   Table = 'table',
   Login = 'login',
+  Testimonials = 'testimonials',
+  Footer = 'footer',
+  Faq = 'faq',
+  Onboarding = 'onboarding',
+  Blog = 'blog',
+  Contact = 'contact',
 }
 
 /** Margin or padding. The values are the prefixes of the utility classes (`mt-2`, `pa-4`). */

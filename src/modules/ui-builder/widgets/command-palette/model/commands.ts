@@ -8,6 +8,7 @@ import {
   ROOT_NODE_ID,
   describeFields,
   TEMPLATES,
+  type TemplateKind,
   type useUiTreeStore,
   type UiNode,
 } from '../../../entities/ui-node'
@@ -36,6 +37,8 @@ export interface CommandHost {
   startTour(): void
   openBehaviorGuide(): void
   openCodeExport(): void
+  /** Asks for the template's settings first when it has any. */
+  addTemplate(kind: TemplateKind): void
   openStructureGraph(): void
   toggleFocus(): void
   toggleLayersPanel(): void
@@ -342,7 +345,7 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
       group: 'Templates',
       icon: template.icon,
       keywords: 'starter page layout example',
-      run: () => store.addTemplate(template.kind),
+      run: () => host.addTemplate(template.kind),
     })
   }
 

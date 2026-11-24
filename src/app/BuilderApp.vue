@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { SaveState, useUiTreeStore, ROOT_NODE_ID } from '../modules/ui-builder/entities/ui-node'
+import {
+  SaveState,
+  templateHasSettings,
+  useUiTreeStore,
+  ROOT_NODE_ID,
+  type TemplateKind,
+} from '../modules/ui-builder/entities/ui-node'
 import { PanelSide } from './shell/panelSide'
 import { defineAsyncComponent, provide, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { ComponentsPalette } from '../modules/ui-builder/widgets/components-palette'
 import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
+import { TemplateSettingsDialog } from '../modules/ui-builder/features/add-template'
 import { CodeExportDialog } from '../modules/ui-builder/widgets/code-export'
 import { BehaviorGuide, GuideSection } from '../modules/ui-builder/widgets/behavior-guide'
 import { OPEN_CONDITIONS_HELP } from '../shared/lib/conditionsHelp'
@@ -45,6 +52,12 @@ const pageTabs = ref<InstanceType<typeof PageTabs>>()
 const paletteOpen = ref(false)
 const { open: guideOpen, section: guideSection } = useGuideLocation()
 const codeExportOpen = ref(false)
+// A template with settings waits here for the user to fill them in; one without is added at once.
+const templateInSettings = ref<TemplateKind | null>(null)
+const addTemplate = (kind: TemplateKind) => {
+  if (templateHasSettings(kind)) templateInSettings.value = kind
+  else store.addTemplate(kind)
+}
 const graphOpen = ref(false)
 // The graph library is large, so it is fetched when the graph is first opened and kept after that.
 const StructureGraphDialog = defineAsyncComponent(() =>
@@ -68,6 +81,7 @@ const commandHost: CommandHost = {
   startTour,
   openBehaviorGuide: () => (guideOpen.value = true),
   openCodeExport: () => (codeExportOpen.value = true),
+  addTemplate,
   openStructureGraph: () => (graphOpen.value = true),
   toggleFocus,
   toggleLayersPanel: () => togglePanel(PanelSide.Left),
@@ -171,6 +185,16 @@ useEditorShortcuts({
     </button>
     <CommandPalette v-model="paletteOpen" :host="commandHost" />
     <CodeExportDialog v-model="codeExportOpen" />
+    <TemplateSettingsDialog
+      :kind="templateInSettings"
+      @cancel="templateInSettings = null"
+      @submit="
+        (kind, settings) => {
+          store.addTemplate(kind, settings)
+          templateInSettings = null
+        }
+      "
+    />
     <StructureGraphDialog v-if="graphRequested" v-model="graphOpen" />
     <BehaviorGuide v-model="guideOpen" v-model:section="guideSection" />
     <OnboardingTour v-if="tourOpen" v-model="tourOpen" :suspended="store.isPreviewMode" @finish="finishTour" />
@@ -188,7 +212,7 @@ useEditorShortcuts({
         aria-label="Components and layers"
       >
         <SidebarTree @close="leftOpen = false" @open-graph="graphOpen = true">
-          <template #components><ComponentsPalette /></template>
+          <template #components><ComponentsPalette @add-template="addTemplate" /></template>
         </SidebarTree>
       </aside>
       <div
@@ -206,7 +230,7 @@ useEditorShortcuts({
         @keydown.right.prevent="resize(PanelSide.Left, 20)"
       />
       <main class="canvas-region">
-        <MainCanvas @open-components="openComponents" />
+        <MainCanvas @open-components="openComponents" @add-template="addTemplate" />
       </main>
       <div
         v-if="rightFull && !narrow && showChrome"

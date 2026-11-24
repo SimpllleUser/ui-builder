@@ -10,12 +10,13 @@ import {
   useUiTreeStore,
   valueToText,
   TEMPLATES,
+  type TemplateKind,
   NodeRenderer,
   canvasDragTargetId,
 } from '../../../entities/ui-node'
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
-const emit = defineEmits<{ 'open-components': [] }>()
+const emit = defineEmits<{ 'open-components': []; 'add-template': [kind: TemplateKind] }>()
 const store = useUiTreeStore()
 const { rootNode, canUndo, canRedo, isPreviewMode, selectedNodeIds } = storeToRefs(store)
 const theme = useTheme()
@@ -292,7 +293,7 @@ const leaveCanvas = (event: DragEvent) => {
           >Browse components</VBtn
         >
         <div class="template-grid" data-tour="start">
-          <button v-for="template in TEMPLATES" :key="template.kind" @click="store.addTemplate(template.kind)">
+          <button v-for="template in TEMPLATES" :key="template.kind" @click="emit('add-template', template.kind)">
             <VIcon :icon="template.icon" /><strong>{{ template.label }}</strong
             ><span>{{ template.description }}</span>
           </button>
