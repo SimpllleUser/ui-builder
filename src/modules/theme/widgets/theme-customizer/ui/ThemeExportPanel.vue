@@ -19,7 +19,7 @@ const css = computed(() => generateThemeCss(props.settings))
     </p>
     <pre class="theme-export__code" tabindex="0" aria-label="Vuetify configuration">{{ config }}</pre>
     <template v-if="css">
-      <p class="text-body-2 text-medium-emphasis">Add the corner radius to a global stylesheet:</p>
+      <p class="text-body-2 text-medium-emphasis">Add the corner radius and shadows to a global stylesheet:</p>
       <pre class="theme-export__code" tabindex="0" aria-label="Global styles">{{ css }}</pre>
     </template>
     <div>

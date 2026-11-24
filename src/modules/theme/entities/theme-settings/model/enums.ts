@@ -23,6 +23,10 @@ export enum ColorPreset {
   Green = 'green',
   Teal = 'teal',
   BlueGrey = 'blue-grey',
+  Stripe = 'stripe',
+  Discord = 'discord',
+  Twitch = 'twitch',
+  Figma = 'figma',
   Custom = 'custom',
 }
 
@@ -61,4 +65,12 @@ export enum CardStyle {
 export enum InteractiveStyle {
   Material = 'material',
   Modern = 'modern',
+}
+
+/** How raised cards and buttons cast their shadow. Default keeps Vuetify's own. */
+export enum ShadowProfile {
+  Default = 'default',
+  Soft = 'soft',
+  Crisp = 'crisp',
+  NeoBrutal = 'neo-brutal',
 }

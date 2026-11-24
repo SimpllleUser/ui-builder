@@ -9,6 +9,7 @@ import {
   MODE_OPTIONS,
   RADIUS_OPTIONS,
   SEMANTIC_PRESET_OPTIONS,
+  SHADOW_PROFILE_OPTIONS,
   SURFACE_PRESET_OPTIONS,
 } from '../model/options'
 import OptionToggle from './OptionToggle.vue'
@@ -37,7 +38,7 @@ const colorOptions = computed(() => [
 <template>
   <VDialog v-model="open" max-width="640" scrollable>
     <VCard aria-label="Theme settings">
-      <VCardTitle class="d-flex align-center">
+      <VCardTitle class="d-flex align-center theme-dialog__fixed">
         Theme
         <VSpacer />
         <VBtn size="small" variant="text" prepend-icon="mdi-restore" :disabled="!isCustomized()" @click="resetSettings">
@@ -45,9 +46,9 @@ const colorOptions = computed(() => [
         </VBtn>
         <VBtn icon="mdi-close" variant="text" size="small" aria-label="Close" @click="open = false" />
       </VCardTitle>
-      <VTabs v-model="tab" density="compact">
-        <VTab :value="CustomizerTab.Appearance">Appearance</VTab>
-        <VTab :value="CustomizerTab.Export">Export</VTab>
+      <VTabs v-model="tab" class="theme-dialog__fixed">
+        <VTab :value="CustomizerTab.Appearance" density="default">Appearance</VTab>
+        <VTab :value="CustomizerTab.Export" density="default">Export</VTab>
       </VTabs>
       <VDivider />
       <VCardText>
@@ -86,6 +87,10 @@ const colorOptions = computed(() => [
                 <OptionToggle v-model="settings.cardStyle" :options="CARD_STYLE_OPTIONS" label="Card style" />
               </SettingSection>
 
+              <SettingSection title="Shadows">
+                <OptionToggle v-model="settings.shadowProfile" :options="SHADOW_PROFILE_OPTIONS" label="Shadows" />
+              </SettingSection>
+
               <SettingSection title="Buttons and ripples">
                 <OptionToggle
                   v-model="settings.interactiveStyle"
@@ -118,6 +123,10 @@ const colorOptions = computed(() => [
 </template>
 
 <style scoped>
+/* In a scrollable dialog only the body may shrink; the title and tabs keep their height. */
+.theme-dialog__fixed {
+  flex-shrink: 0;
+}
 .custom-colors {
   display: flex;
   gap: 16px;

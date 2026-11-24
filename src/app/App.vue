@@ -12,8 +12,8 @@ const leaveClassic = () => {
   window.history.replaceState(null, '', window.location.pathname)
 }
 const store = useUiTreeStore()
-// The theme settings change the whole app, the editor and the pages being built alike.
-const themeDefaults = useApplyTheme()
+// Colours, mode, corners and shadows change the whole app; density and button style only the page being built.
+useApplyTheme()
 let disconnectMcp = () => {}
 onMounted(async () => {
   if (!import.meta.env.DEV) return
@@ -25,21 +25,19 @@ onBeforeUnmount(() => disconnectMcp())
 
 <template>
   <VApp>
-    <VDefaultsProvider :defaults="themeDefaults">
-      <!-- The current editor has its own toolbar; this header only exists to get back from the Classic editor. -->
-      <VToolbar v-if="view === AppView.Legacy" height="56" class="app-header" title="UI Builder — Classic">
-        <template #append>
-          <VBtn prepend-icon="mdi-arrow-left" @click="leaveClassic">Back to editor</VBtn>
-        </template>
-      </VToolbar>
-      <BuilderApp v-if="view === AppView.Current" />
-      <div v-else class="legacy-workspace pa-4">
-        <VAlert type="info" variant="tonal" class="mb-4"
-          >Classic is the previous editor. Its document is separate and is not saved automatically.</VAlert
-        >
-        <LegacyBuilder />
-      </div>
-    </VDefaultsProvider>
+    <!-- The current editor has its own toolbar; this header only exists to get back from the Classic editor. -->
+    <VToolbar v-if="view === AppView.Legacy" height="56" class="app-header" title="UI Builder — Classic">
+      <template #append>
+        <VBtn prepend-icon="mdi-arrow-left" @click="leaveClassic">Back to editor</VBtn>
+      </template>
+    </VToolbar>
+    <BuilderApp v-if="view === AppView.Current" />
+    <div v-else class="legacy-workspace pa-4">
+      <VAlert type="info" variant="tonal" class="mb-4"
+        >Classic is the previous editor. Its document is separate and is not saved automatically.</VAlert
+      >
+      <LegacyBuilder />
+    </div>
   </VApp>
 </template>
 

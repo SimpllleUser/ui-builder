@@ -10,6 +10,7 @@ import {
   type BrandPreset,
   type SemanticColorPreset,
   SemanticPreset,
+  ShadowProfile,
   SurfacePreset,
   ThemeDensity,
   ThemeMode,
@@ -46,6 +47,13 @@ export const CARD_STYLE_OPTIONS: ToggleOption<CardStyle>[] = [
   { value: CardStyle.Outlined, label: 'Outlined', icon: 'mdi-border-all' },
 ]
 
+export const SHADOW_PROFILE_OPTIONS: ToggleOption<ShadowProfile>[] = [
+  { value: ShadowProfile.Default, label: 'Default' },
+  { value: ShadowProfile.Soft, label: 'Soft' },
+  { value: ShadowProfile.Crisp, label: 'Crisp' },
+  { value: ShadowProfile.NeoBrutal, label: 'Neo-brutal' },
+]
+
 export const INTERACTIVE_STYLE_OPTIONS: ToggleOption<InteractiveStyle>[] = [
   { value: InteractiveStyle.Material, label: 'Material', icon: 'mdi-animation-play' },
   { value: InteractiveStyle.Modern, label: 'Modern', icon: 'mdi-cursor-default-click' },
@@ -63,6 +71,10 @@ const COLOR_PRESET_LABELS: Record<BrandPreset, string> = {
   [ColorPreset.Green]: 'Green',
   [ColorPreset.Teal]: 'Teal',
   [ColorPreset.BlueGrey]: 'Blue grey',
+  [ColorPreset.Stripe]: 'Stripe',
+  [ColorPreset.Discord]: 'Discord',
+  [ColorPreset.Twitch]: 'Twitch',
+  [ColorPreset.Figma]: 'Figma',
 }
 
 export const COLOR_PRESET_OPTIONS: SwatchOption<ColorPreset>[] = [

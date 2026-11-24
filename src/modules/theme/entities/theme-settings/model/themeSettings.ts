@@ -4,6 +4,7 @@ import {
   InteractiveStyle,
   SemanticPreset,
   SurfacePreset,
+  ShadowProfile,
   ThemeDensity,
   ThemeMode,
 } from './enums'
@@ -21,6 +22,7 @@ export interface ThemeSettings {
   radius: number | null
   density: ThemeDensity
   cardStyle: CardStyle
+  shadowProfile: ShadowProfile
   interactiveStyle: InteractiveStyle
 }
 
@@ -35,6 +37,7 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   radius: null,
   density: ThemeDensity.Default,
   cardStyle: CardStyle.Elevated,
+  shadowProfile: ShadowProfile.Default,
   interactiveStyle: InteractiveStyle.Material,
 }
 
@@ -63,6 +66,7 @@ export function sanitizeThemeSettings(raw: unknown): ThemeSettings {
     radius: RADIUS_VALUES.find(radius => radius === source.radius) ?? defaults.radius,
     density: pickEnum(ThemeDensity, source.density, defaults.density),
     cardStyle: pickEnum(CardStyle, source.cardStyle, defaults.cardStyle),
+    shadowProfile: pickEnum(ShadowProfile, source.shadowProfile, defaults.shadowProfile),
     interactiveStyle: pickEnum(InteractiveStyle, source.interactiveStyle, defaults.interactiveStyle),
   }
 }

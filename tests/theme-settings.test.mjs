@@ -120,3 +120,14 @@ test('object literals read like hand-written code', () => {
     "{\n  a: 'x',\n  'on-b': 'it\\'s',\n  n: 1,\n  off: false,\n  empty: {},\n}",
   )
 })
+
+test('a shadow profile adds rules for raised cards and buttons only', async () => {
+  const { ShadowProfile } = theme
+  const { buildThemeCss } = await server.ssrLoadModule(`${THEME}themeCss.ts`)
+  assert.equal(buildThemeCss(settings({})), '')
+  const soft = buildThemeCss(settings({ shadowProfile: ShadowProfile.Soft, radius: 8 }))
+  assert.match(soft, /border-radius: 8px/)
+  assert.match(soft, /\.v-card--variant-elevated/)
+  assert.match(theme.generateThemeCss(settings({ shadowProfile: ShadowProfile.NeoBrutal })), /4px 4px 0/)
+  assert.equal(theme.sanitizeThemeSettings({ shadowProfile: 'glow' }).shadowProfile, ShadowProfile.Default)
+})

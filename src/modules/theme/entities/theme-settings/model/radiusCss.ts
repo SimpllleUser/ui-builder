@@ -4,7 +4,11 @@ const ROUNDED_SELECTORS = [
   '.v-card',
   '.v-field',
   '.v-alert',
+  '.v-sheet',
+  '.v-img',
+  '.v-snackbar__wrapper',
   '.v-menu > .v-overlay__content',
+  '.v-tooltip > .v-overlay__content',
 ]
 
 /** The style rules that apply a corner radius to every component above, or nothing when there is no radius. */

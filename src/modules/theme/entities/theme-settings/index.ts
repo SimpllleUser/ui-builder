@@ -4,6 +4,7 @@ export {
   ColorPreset,
   InteractiveStyle,
   SemanticPreset,
+  ShadowProfile,
   SurfacePreset,
   ThemeDensity,
   ThemeMode,
@@ -25,3 +26,4 @@ export { resolveThemeColors } from './model/themeColors'
 export { BASE_THEME_COLORS } from './model/baseTheme'
 export { useApplyTheme } from './model/useApplyTheme'
 export { useThemeSettings } from './model/useThemeSettings'
+export { default as ThemeDefaultsProvider } from './ui/ThemeDefaultsProvider.vue'

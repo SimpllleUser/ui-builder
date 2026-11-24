@@ -31,6 +31,10 @@ export const BRAND_COLORS: Record<BrandPreset, BrandColors> = {
   [ColorPreset.Green]: { primary: '#43A047', secondary: '#FF7043' },
   [ColorPreset.Teal]: { primary: '#00897B', secondary: '#FFCA28' },
   [ColorPreset.BlueGrey]: { primary: '#546E7A', secondary: '#FFA726' },
+  [ColorPreset.Stripe]: { primary: '#635BFF', secondary: '#00D4FF' },
+  [ColorPreset.Discord]: { primary: '#5865F2', secondary: '#EB459E' },
+  [ColorPreset.Twitch]: { primary: '#9146FF', secondary: '#00E6CB' },
+  [ColorPreset.Figma]: { primary: '#F24E1E', secondary: '#0ACF83' },
 }
 
 export const SEMANTIC_COLORS: Record<SemanticColorPreset, SemanticColors> = {

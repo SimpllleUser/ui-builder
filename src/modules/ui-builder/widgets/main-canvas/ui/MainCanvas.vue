@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { platformModifierKey } from '../../../../../shared/lib/platform'
 import { PREVIEW_FRAME_STYLE } from '../model/previewFrameStyle'
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
 import {
@@ -14,6 +14,8 @@ import {
   NodeRenderer,
   canvasDragTargetId,
 } from '../../../entities/ui-node'
+import { mirrorStyles } from '../../../../../shared/lib/mirrorStyles'
+import { ThemeDefaultsProvider } from '../../../../theme/entities/theme-settings'
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
 const emit = defineEmits<{ 'open-components': []; 'add-template': [kind: TemplateKind] }>()
@@ -41,12 +43,14 @@ const devices = [
   { title: 'Tablet · 768', value: 768 },
   { title: 'Mobile · 390', value: 390 },
 ]
+// The frame follows the editor's styles, so theme changes reach an open preview.
+let stopMirroringStyles = () => {}
+onBeforeUnmount(() => stopMirroringStyles())
 const loadPreview = (event: Event) => {
   const doc = (event.target as HTMLIFrameElement).contentDocument
   if (!doc) return
-  document
-    .querySelectorAll('style, link[rel="stylesheet"]')
-    .forEach(style => doc.head.appendChild(style.cloneNode(true)))
+  stopMirroringStyles()
+  stopMirroringStyles = mirrorStyles(document, doc)
   const reset = doc.createElement('style')
   reset.textContent = PREVIEW_FRAME_STYLE
   doc.head.appendChild(reset)
@@ -57,6 +61,7 @@ const loadPreview = (event: Event) => {
 }
 watch(isPreviewMode, () => {
   previewTarget.value = null
+  stopMirroringStyles()
 })
 watch(
   () => store.selectedNodeId,
@@ -273,7 +278,9 @@ const leaveCanvas = (event: DragEvent) => {
       </div>
       <Teleport v-if="previewTarget" :to="previewTarget">
         <div class="v-application preview-app" :class="`v-theme--${theme.global.name.value}`">
-          <NodeRenderer :key="store.previewPage.id" :node="store.previewRoot" :in-page="!store.project.layout" />
+          <ThemeDefaultsProvider>
+            <NodeRenderer :key="store.previewPage.id" :node="store.previewRoot" :in-page="!store.project.layout" />
+          </ThemeDefaultsProvider>
         </div>
       </Teleport>
     </div>
@@ -311,11 +318,13 @@ const leaveCanvas = (event: DragEvent) => {
         Editing component <strong>{{ store.editingPrefab.name }}</strong>. Write <code v-pre>{{ props.name }}</code> to
         add a parameter. Copies already on pages are not changed.
       </VAlert>
-      <NodeRenderer
-        :key="store.editingPrefab?.prefabId"
-        :node="isPreviewMode ? store.previewRoot : rootNode"
-        :in-page="!!store.editingPrefab"
-      />
+      <ThemeDefaultsProvider>
+        <NodeRenderer
+          :key="store.editingPrefab?.prefabId"
+          :node="isPreviewMode ? store.previewRoot : rootNode"
+          :in-page="!!store.editingPrefab"
+        />
+      </ThemeDefaultsProvider>
       <template v-if="!isPreviewMode">
         <HoverBadge :container="canvas" />
         <SelectionToolbar :container="canvas" />

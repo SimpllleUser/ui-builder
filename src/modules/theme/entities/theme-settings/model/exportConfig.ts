@@ -1,5 +1,5 @@
 import { ThemeVariant } from './enums'
-import { buildRadiusCss } from './radiusCss'
+import { buildThemeCss } from './themeCss'
 import { resolveThemeColors } from './themeColors'
 import type { ThemeSettings } from './themeSettings'
 import { buildVuetifyDefaults } from './vuetifyDefaults'
@@ -17,4 +17,4 @@ export function generateVuetifyConfig(settings: ThemeSettings): string {
 }
 
 /** The style rules for a global stylesheet; empty when the settings need none. */
-export const generateThemeCss = (settings: ThemeSettings) => buildRadiusCss(settings.radius)
+export const generateThemeCss = (settings: ThemeSettings) => buildThemeCss(settings)
