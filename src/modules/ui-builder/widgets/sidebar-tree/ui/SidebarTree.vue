@@ -5,11 +5,12 @@ import { LAYERS_HELP, SIDEBAR_VIEWS, SidebarView } from '../model/sidebarViews'
 import HistoryView from './HistoryView.vue'
 import LayersView from './LayersView.vue'
 import SavedComponentsView from './SavedComponentsView.vue'
+import StructureView from './StructureView.vue'
 import VariablesView from './VariablesView.vue'
 import WrapToolbar from './WrapToolbar.vue'
 
-/** The left panel: an activity bar that switches between components, layers, variables, saved components and history. */
-const emit = defineEmits<{ close: [] }>()
+/** The left panel: an activity bar that switches between components, layers, the project structure, variables, saved components and history. */
+const emit = defineEmits<{ close: []; openGraph: [] }>()
 const store = useUiTreeStore()
 const activeView = ref<SidebarView>(SidebarView.Layers)
 // A saved component stays open on the canvas (and in Preview) until the person leaves its tab or closes the panel.
@@ -70,6 +71,7 @@ const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeVi
             v-else-if="activeView === SidebarView.Layers"
             @browse-components="activeView = SidebarView.Components"
           />
+          <StructureView v-else-if="activeView === SidebarView.Structure" @open-graph="emit('openGraph')" />
           <VariablesView v-else-if="activeView === SidebarView.Variables" />
           <SavedComponentsView v-else-if="activeView === SidebarView.Prefabs" />
           <HistoryView v-else />

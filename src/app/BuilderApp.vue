@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { SaveState, useUiTreeStore, ROOT_NODE_ID } from '../modules/ui-builder/entities/ui-node'
 import { PanelSide } from './shell/panelSide'
-import { provide, ref, watch } from 'vue'
+import { defineAsyncComponent, provide, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { ComponentsPalette } from '../modules/ui-builder/widgets/components-palette'
 import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
@@ -45,6 +45,15 @@ const pageTabs = ref<InstanceType<typeof PageTabs>>()
 const paletteOpen = ref(false)
 const { open: guideOpen, section: guideSection } = useGuideLocation()
 const codeExportOpen = ref(false)
+const graphOpen = ref(false)
+// The graph library is large, so it is fetched when the graph is first opened and kept after that.
+const StructureGraphDialog = defineAsyncComponent(() =>
+  import('../modules/ui-builder/widgets/structure-graph').then(module => module.StructureGraphDialog),
+)
+const graphRequested = ref(false)
+watch(graphOpen, isOpen => {
+  if (isOpen) graphRequested.value = true
+})
 provide(OPEN_CONDITIONS_HELP, () => {
   guideSection.value = GuideSection.Conditions
   guideOpen.value = true
@@ -59,6 +68,7 @@ const commandHost: CommandHost = {
   startTour,
   openBehaviorGuide: () => (guideOpen.value = true),
   openCodeExport: () => (codeExportOpen.value = true),
+  openStructureGraph: () => (graphOpen.value = true),
   toggleFocus,
   toggleLayersPanel: () => togglePanel(PanelSide.Left),
   toggleProperties: () => togglePanel(PanelSide.Right),
@@ -161,6 +171,7 @@ useEditorShortcuts({
     </button>
     <CommandPalette v-model="paletteOpen" :host="commandHost" />
     <CodeExportDialog v-model="codeExportOpen" />
+    <StructureGraphDialog v-if="graphRequested" v-model="graphOpen" />
     <BehaviorGuide v-model="guideOpen" v-model:section="guideSection" />
     <OnboardingTour v-if="tourOpen" v-model="tourOpen" :suspended="store.isPreviewMode" @finish="finishTour" />
     <div class="builder-layout" :class="{ 'builder-layout--narrow': narrow }">
@@ -176,7 +187,7 @@ useEditorShortcuts({
         :style="{ width: `${leftWidth}px` }"
         aria-label="Components and layers"
       >
-        <SidebarTree @close="leftOpen = false">
+        <SidebarTree @close="leftOpen = false" @open-graph="graphOpen = true">
           <template #components><ComponentsPalette /></template>
         </SidebarTree>
       </aside>

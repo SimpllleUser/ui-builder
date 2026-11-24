@@ -8,10 +8,10 @@ import {
   getNodeSlots,
   PALETTE_COMPONENTS,
   ROOT_NODE_ID,
+  BEHAVIOR_ICONS,
 } from '../../../entities/ui-node'
 import { computed, ref, watch, nextTick, inject, type Ref } from 'vue'
 import draggable from 'vuedraggable'
-import { BEHAVIOR_ICONS } from '../model/behaviorIcons'
 const props = defineProps<{ node: UiNode; depth?: number }>()
 const store = useUiTreeStore()
 const expanded = ref(true)

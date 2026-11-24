@@ -1,5 +1,6 @@
-import { BehaviorBadge } from '../../../entities/ui-node'
+import { BehaviorBadge } from './behaviorSummary'
 
+/** The icon that stands for each kind of behavior, wherever it is drawn. */
 export const BEHAVIOR_ICONS: Record<BehaviorBadge, string> = {
   [BehaviorBadge.Repeat]: 'mdi-repeat',
   [BehaviorBadge.Condition]: 'mdi-eye-outline',
