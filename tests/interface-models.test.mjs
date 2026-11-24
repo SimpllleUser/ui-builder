@@ -18,12 +18,21 @@ test('command palette: finds commands, components, pages, elements and settings,
     startTour: () => calls.push('tour'),
     openBehaviorGuide: () => calls.push('guide'),
     openCodeExport: () => calls.push('code'),
+    openThemeSettings: () => calls.push('theme'),
     openStructureGraph: () => calls.push('graph'),
     toggleFocus: () => calls.push('focus'),
     togglePanel: side => calls.push(`panel:${side}`),
     modifierKey: 'Ctrl',
   }
   const find = (commands, query) => searchCommands(commands, query)
+  assert.deepEqual(
+    (() => {
+      find(buildCommands(store, host), 'theme colors')[0].run()
+      return calls.splice(0)
+    })(),
+    ['theme'],
+    'the theme settings open from the search',
+  )
 
   // Nothing selected: components, pages and editor commands are there; element settings are not.
   let commands = buildCommands(store, host)
