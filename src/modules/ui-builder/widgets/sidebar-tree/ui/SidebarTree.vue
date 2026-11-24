@@ -66,7 +66,10 @@ const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeVi
 
           <!-- The component library is another widget; the app puts it here, so this widget needs no import of it. -->
           <slot v-if="activeView === SidebarView.Components" name="components" />
-          <LayersView v-else-if="activeView === SidebarView.Layers" />
+          <LayersView
+            v-else-if="activeView === SidebarView.Layers"
+            @browse-components="activeView = SidebarView.Components"
+          />
           <VariablesView v-else-if="activeView === SidebarView.Variables" />
           <SavedComponentsView v-else-if="activeView === SidebarView.Prefabs" />
           <HistoryView v-else />

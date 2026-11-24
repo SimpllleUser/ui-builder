@@ -15,6 +15,7 @@ import {
 } from '../model/fieldTabs'
 import { useMoveDialog, useSavePrefabDialog } from '../model/useNodeDialogs'
 import { useDesignTabPreference } from '../model/useDesignTabPreference'
+import EmptyState from '../../../../../shared/ui/EmptyState.vue'
 import DesignTab from './design/DesignTab.vue'
 import AdvancedProperties from './AdvancedProperties.vue'
 import InteractionsEditor from './InteractionsEditor.vue'
@@ -267,10 +268,13 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
       </div>
     </div>
 
-    <div v-else class="pa-10 text-center text-medium-emphasis mt-10">
-      <VIcon :icon="Icons.CursorClick" size="x-large" class="mb-4 opacity-20" />
-      <div class="text-body-2">Select an element to edit properties</div>
-    </div>
+    <EmptyState
+      v-else
+      :icon="Icons.CursorClick"
+      title="Nothing selected"
+      description="Click an element on the canvas or in Layers to edit it here. Shift-click selects several at once."
+      class="mt-10"
+    />
     <SavePrefabDialog
       v-model="prefabDialog.open.value"
       :name="prefabDialog.name.value"

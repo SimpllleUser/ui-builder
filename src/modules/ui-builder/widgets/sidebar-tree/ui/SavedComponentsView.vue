@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EmptyState from '../../../../../shared/ui/EmptyState.vue'
 import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore, getComponentDef, type Prefab, type PrefabPropValues } from '../../../entities/ui-node'
@@ -42,13 +43,12 @@ const confirmDelete = () => {
 
 <template>
   <div class="sidebar-view__scroll pa-2">
-    <div v-if="prefabs.length === 0" class="text-center pa-8">
-      <VIcon icon="mdi-puzzle-outline" size="36" class="mb-3 opacity-20" />
-      <div class="text-body-2 text-medium-emphasis">No saved components yet</div>
-      <div class="text-caption text-medium-emphasis mt-1 opacity-70">
-        Select a node and click <VIcon icon="mdi-content-save-outline" size="12" /> in the property panel
-      </div>
-    </div>
+    <EmptyState
+      v-if="prefabs.length === 0"
+      icon="mdi-puzzle-outline"
+      title="No saved components yet"
+      description="Select an element, then press the save icon at the top of the inspector to keep it here and reuse it. Write props.name in double curly braces inside it to make a parameter."
+    />
     <div v-else class="prefabs-list">
       <div
         v-for="prefab in prefabs"

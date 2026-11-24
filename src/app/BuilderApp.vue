@@ -17,7 +17,8 @@ import EditorMenus from './shell/EditorMenus.vue'
 import { useEditorPanels } from './shell/useEditorPanels'
 import { useGuideLocation } from './shell/useGuideLocation'
 import { useEditorShortcuts } from './shell/useEditorShortcuts'
-import { platformModifierKey, useFocusMode } from './shell/useFocusMode'
+import { platformModifierKey } from '../shared/lib/platform'
+import { useFocusMode } from './shell/useFocusMode'
 import { useProjectFiles } from './shell/useProjectFiles'
 
 const store = useUiTreeStore()
@@ -288,7 +289,7 @@ useEditorShortcuts({
   border: 1px solid rgba(var(--v-border-color), 0.3);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
 }
 .document-toolbar {
@@ -305,7 +306,7 @@ useEditorShortcuts({
   border: 1px solid rgba(var(--v-border-color), 0.3);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
 }
 @media (max-width: 700px) {

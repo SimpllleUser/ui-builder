@@ -1,27 +1,38 @@
 <script setup lang="ts">
+import { platformModifierKey } from '../../../../../shared/lib/platform'
 import { PREVIEW_FRAME_STYLE } from '../model/previewFrameStyle'
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
-import { useUiTreeStore, TEMPLATES, NodeRenderer, canvasDragTargetId } from '../../../entities/ui-node'
+import {
+  explainHiddenElements,
+  isNodeEmpty,
+  useUiTreeStore,
+  valueToText,
+  TEMPLATES,
+  NodeRenderer,
+  canvasDragTargetId,
+} from '../../../entities/ui-node'
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
 const emit = defineEmits<{ 'open-components': [] }>()
 const store = useUiTreeStore()
 const { rootNode, canUndo, canRedo, isPreviewMode, selectedNodeIds } = storeToRefs(store)
 const theme = useTheme()
+const modifierKey = platformModifierKey()
 const viewport = ref(1280)
 const zoom = ref(100)
 const previewTarget = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLElement>()
-const empty = computed(
-  () => !rootNode.value.children.length && !Object.values(rootNode.value.slots).some(nodes => nodes.length),
-)
+const empty = computed(() => isNodeEmpty(rootNode.value))
+// In Preview the page itself may be empty even when a shared layout fills the screen around it.
+const previewPageEmpty = computed(() => isNodeEmpty(store.previewPage.root))
 const variables = computed(() =>
-  Object.entries(store.runtimeState).map(([name, value]) => ({
-    name,
-    value: (typeof value === 'string' ? JSON.stringify(value) : (JSON.stringify(value) ?? 'undefined')).slice(0, 80),
-  })),
+  Object.entries(store.runtimeState).map(([name, value]) => ({ name, value: valueToText(value) })),
+)
+// Why something is missing from the page: the elements a condition keeps out of sight right now.
+const hiddenElements = computed(() =>
+  isPreviewMode.value ? explainHiddenElements(store.describePreview().hidden, store.runtimeState) : [],
 )
 const pageItems = computed(() => store.pages.map(page => ({ title: page.name, subtitle: page.path, value: page.id })))
 const devices = [
@@ -135,6 +146,37 @@ const leaveCanvas = (event: DragEvent) => {
             </dl>
           </VCard>
         </VMenu>
+        <!-- An element that is not on the page is hard to explain; this says which condition hides it and why. -->
+        <VMenu v-if="hiddenElements.length" location="bottom start" :close-on-content-click="false">
+          <template #activator="{ props: menu }">
+            <VBtn v-bind="menu" size="small" variant="text" prepend-icon="mdi-eye-off-outline">
+              {{ hiddenElements.length }} hidden
+            </VBtn>
+          </template>
+          <VCard min-width="300" max-width="420" class="pa-3">
+            <div class="text-overline mb-1">Hidden by conditions</div>
+            <ul class="hidden-list">
+              <li v-for="element in hiddenElements" :key="element.id" class="hidden-list__item">
+                <div class="hidden-list__name">
+                  {{ element.name
+                  }}<span v-if="element.copies > 1" class="text-medium-emphasis"> × {{ element.copies }}</span>
+                </div>
+                <code class="hidden-list__condition">{{ element.condition }}</code>
+                <div class="text-caption text-medium-emphasis">
+                  <template v-if="element.reads.length">
+                    Right now:
+                    <span v-for="(read, position) in element.reads" :key="read.name">
+                      <span v-if="position">, </span><b>{{ read.name }}</b> = {{ read.value }}
+                    </span>
+                  </template>
+                  <template v-if="element.dependsOnRepeat">
+                    {{ element.reads.length ? ' · ' : '' }}also depends on each item of its repeat
+                  </template>
+                </div>
+              </li>
+            </ul>
+          </VCard>
+        </VMenu>
         <VBtn
           size="small"
           variant="text"
@@ -172,7 +214,7 @@ const leaveCanvas = (event: DragEvent) => {
             size="small"
             variant="text"
             :disabled="!canUndo"
-            title="Undo (Ctrl / ⌘ Z)"
+            :title="`Undo (${modifierKey} Z)`"
             aria-label="Undo"
             @click="store.undo()"
           />
@@ -181,7 +223,7 @@ const leaveCanvas = (event: DragEvent) => {
             size="small"
             variant="text"
             :disabled="!canRedo"
-            title="Redo (Ctrl / ⌘ Shift Z)"
+            :title="`Redo (${modifierKey} Shift Z)`"
             aria-label="Redo"
             @click="store.redo()"
           />
@@ -192,6 +234,11 @@ const leaveCanvas = (event: DragEvent) => {
           :variant="isPreviewMode ? 'flat' : 'tonal'"
           color="primary"
           data-tour="preview"
+          :title="
+            isPreviewMode
+              ? 'Back to the editor (Esc)'
+              : 'Try the page: clicks, conditions and inputs work (Esc returns)'
+          "
           @click="isPreviewMode = !isPreviewMode"
         >
           {{ isPreviewMode ? 'Back to editor' : 'Preview' }}
@@ -200,6 +247,19 @@ const leaveCanvas = (event: DragEvent) => {
     </div>
     <!-- A component is previewed on the canvas itself: only the mode changes, the panels and the canvas stay. -->
     <div v-if="isPreviewMode && !store.editingPrefab" class="preview-workspace">
+      <VAlert
+        v-if="previewPageEmpty"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="preview-empty"
+        title="This page has no elements yet"
+      >
+        Preview shows what you build. Go back to the editor and add a component or start from a template.
+        <template #append>
+          <VBtn size="small" variant="text" @click="isPreviewMode = false">Back to editor</VBtn>
+        </template>
+      </VAlert>
       <div class="preview-size" :style="{ width: `${(viewport * zoom) / 100}px`, height: `${(800 * zoom) / 100}px` }">
         <iframe
           title="Page preview"
@@ -310,6 +370,22 @@ const leaveCanvas = (event: DragEvent) => {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
 }
+.hidden-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hidden-list__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.hidden-list__condition {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .variable-list {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -332,6 +408,10 @@ const leaveCanvas = (event: DragEvent) => {
   overflow: auto;
   padding: 20px;
   background: rgb(var(--v-theme-surface-light));
+}
+.preview-empty {
+  max-width: 640px;
+  margin: 0 auto 12px;
 }
 .preview-size {
   margin-inline: auto;

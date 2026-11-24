@@ -12,7 +12,3 @@ export function useFocusMode(store: ReturnType<typeof useUiTreeStore>, modifierK
   }
   return { focusMode, showChrome, toggleFocus }
 }
-
-/** ⌘ on macOS, Ctrl elsewhere. */
-export const platformModifierKey = () =>
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
