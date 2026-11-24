@@ -28,6 +28,7 @@ export let server,
   behaviorModel,
   conditionInsert,
   nodeModel,
+  graphLayout,
   tabScroll,
   variableList,
   exportTargets,
@@ -78,6 +79,7 @@ before(async () => {
     ...(await server.ssrLoadModule(`${model}conditionOutcome.ts`)),
     ...(await server.ssrLoadModule(`${model}variableUsage.ts`)),
     ...(await server.ssrLoadModule(`${model}hiddenExplanation.ts`)),
+    ...(await server.ssrLoadModule(`${model}structureOutline.ts`)),
   }
   conditionInsert = await server.ssrLoadModule(
     '/src/modules/ui-builder/widgets/property-panel/model/conditionInsert.ts',
@@ -85,6 +87,7 @@ before(async () => {
   variableList = await server.ssrLoadModule('/src/modules/ui-builder/widgets/sidebar-tree/model/variableList.ts')
   nodeModel = await server.ssrLoadModule(`${model}nodeUtils.ts`)
   tabScroll = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/useTabScroll.ts')
+  graphLayout = await server.ssrLoadModule('/src/modules/ui-builder/widgets/structure-graph/model/graphLayout.ts')
   pascalCase = await server.ssrLoadModule('/src/shared/lib/pascalCase.ts')
   global.window = { localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } }
 })

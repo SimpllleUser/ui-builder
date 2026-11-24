@@ -36,6 +36,7 @@ export interface CommandHost {
   startTour(): void
   openBehaviorGuide(): void
   openCodeExport(): void
+  openStructureGraph(): void
   toggleFocus(): void
   toggleLayersPanel(): void
   toggleProperties(): void
@@ -309,6 +310,14 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
     icon: 'mdi-code-tags',
     keywords: 'download copy vue sfc source generate page component layout',
     run: host.openCodeExport,
+  })
+  add({
+    id: 'editor:structure-graph',
+    title: 'Open the structure graph',
+    group: 'Editor',
+    icon: 'mdi-graph-outline',
+    keywords: 'tree outline structure diagram nodes pages components layers overview map',
+    run: host.openStructureGraph,
   })
 
   // ─── Add a component ───────────────────────────────────────────────────────

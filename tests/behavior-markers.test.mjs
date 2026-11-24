@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { nextTick, ref } from 'vue'
-import { behaviorModel, conditionInsert, nodeModel, store, tabScroll, variableList } from './support.mjs'
+import { behaviorModel, conditionInsert, graphLayout, nodeModel, store, tabScroll, variableList } from './support.mjs'
 
 test('an element shows what Behavior it has, in the order Preview applies it', () => {
   store.addComponent('VBtn')
@@ -190,4 +190,110 @@ test('a scrolling panel remembers where it was in each tab and starts from the t
   await nextTick()
   await nextTick()
   assert.equal(panel.value.scrollTop, 0, 'and forgets the earlier positions')
+})
+
+test('the project structure lists every page, the layout and every saved component as a tree and as text', () => {
+  store.addComponent('VCard')
+  const card = store.selectedNodeId
+  store.updateNodeLogic(card, { vIf: 'open', events: { click: { type: 'toggle', key: 'open' } } })
+  store.addComponent('VBtn', card)
+  const button = store.selectedNodeId
+  store.addComponent('VChip', card)
+  store.updateNodeLogic(store.selectedNodeId, { vFor: 'rows' })
+  store.savePrefab(button, 'Save button', {})
+  store.editLayout(true)
+
+  const sections = behaviorModel.buildOutline(store.project, store.prefabs)
+  assert.deepEqual(
+    sections.map(section => section.kind),
+    ['page', 'layout', 'component'],
+  )
+  const [page, layout, component] = sections
+  assert.equal(page.title, store.activePage.name)
+  assert.equal(page.roots.length, 1, 'the empty canvas root is left out, only what is on the page')
+  assert.equal(page.roots[0].type, 'VCard')
+  assert.deepEqual(
+    page.roots[0].behaviors.map(note => note.badge),
+    ['condition', 'click'],
+  )
+  assert.equal(page.roots[0].children.length, 2)
+  assert.deepEqual(
+    page.roots[0].children[1].behaviors.map(note => note.shortLabel),
+    ['for'],
+  )
+  assert.equal(page.roots[0].icon, 'mdi-card-outline', 'each element carries the icon of its component')
+  assert.equal(layout.title, 'Shared layout')
+  assert.equal(component.title, 'Save button')
+  assert.equal(component.roots[0].type, 'VBtn', 'a component shows its own element as the root')
+
+  const text = behaviorModel.outlineToText(page)
+  assert.equal(
+    text,
+    [
+      `${page.title} — ${page.detail}`,
+      '└─ Card (VCard) [if, click]',
+      '   ├─ Button (VBtn)',
+      '   │  └─ “Button”',
+      '   └─ Chip (VChip) [for]',
+      '      └─ “Chip”',
+    ].join('\n'),
+  )
+  assert.match(behaviorModel.outlineToText({ title: 'Empty', detail: '/e', roots: [] }), /\(empty\)$/)
+})
+
+test('a named slot appears as its own branch and a long text is shortened', () => {
+  const text = id => ({ id, type: 'TEXT', name: 'x'.repeat(60), props: {}, classes: [], children: [], slots: {} })
+  const node = {
+    id: 'a',
+    type: 'VCard',
+    name: 'Card',
+    props: {},
+    classes: [],
+    children: [text('t1')],
+    slots: { title: [text('t2')], default: [] },
+  }
+  const [root] = behaviorModel.buildOutline(
+    {
+      pages: [{ id: 'p', name: 'P', path: '/p', root: { ...node, id: 'root', children: [node], slots: {} } }],
+      layout: null,
+      state: {},
+    },
+    [],
+  )[0].roots
+  assert.equal(root.children[0].label.length, 43, 'forty characters, an ellipsis and two quotes')
+  assert.equal(root.children[1].isSlot, true)
+  assert.equal(root.children[1].label, '#title')
+  assert.equal(root.children[1].children.length, 1)
+})
+
+test('the structure graph has one card per element, one edge per parent link and no overlapping cards', () => {
+  store.addComponent('VCard')
+  const card = store.selectedNodeId
+  store.updateNodeLogic(card, { vIf: 'open' })
+  store.addComponent('VBtn', card)
+  store.addComponent('VChip', card)
+  const [page] = behaviorModel.buildOutline(store.project, [])
+  const count = outline => outline.reduce((sum, node) => sum + 1 + count(node.children), 0)
+
+  const vertical = graphLayout.buildGraph(page, 'mdi-file-outline', graphLayout.GraphDirection.Vertical)
+  assert.equal(vertical.nodes.length, count(page.roots) + 1, 'the page itself is the root')
+  assert.equal(vertical.edges.length, vertical.nodes.length - 1, 'a tree has one edge less than it has cards')
+  assert.ok(vertical.nodes[0].id.startsWith(graphLayout.SECTION_NODE_PREFIX))
+  assert.equal(vertical.nodes[0].data.isSection, true)
+
+  const at = (graph, id) => graph.nodes.find(node => node.id === id).position
+  const root = vertical.nodes[0].id
+  const cardNode = page.roots[0]
+  assert.ok(at(vertical, cardNode.id).y > at(vertical, root).y, 'children sit below their parent')
+  const [first, second] = cardNode.children.slice(0, 2).map(child => at(vertical, child.id))
+  assert.ok(first.x !== second.x || first.y !== second.y, 'siblings do not share a place')
+  assert.ok(Math.abs(first.x - second.x) >= graphLayout.GRAPH_NODE_WIDTH, 'siblings do not overlap')
+
+  const horizontal = graphLayout.buildGraph(page, 'mdi-file-outline', graphLayout.GraphDirection.Horizontal)
+  assert.ok(at(horizontal, cardNode.id).x > at(horizontal, root).x, 'left to right puts children to the right')
+  assert.equal(horizontal.nodes[1].data.direction, 'LR')
+  assert.deepEqual(
+    vertical.nodes.find(node => node.id === cardNode.id).data.behaviors.map(note => note.badge),
+    ['condition'],
+  )
 })
