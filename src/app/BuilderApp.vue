@@ -13,6 +13,7 @@ import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/o
 import { CommandPalette, type CommandHost } from '../modules/ui-builder/widgets/command-palette'
 import { PageTabs, PagesPanel } from '../modules/ui-builder/widgets/pages-panel'
 import { PropertyPanel, useDesignTabPreference } from '../modules/ui-builder/widgets/property-panel'
+import EditorMenus from './shell/EditorMenus.vue'
 import { useEditorPanels } from './shell/useEditorPanels'
 import { useGuideLocation } from './shell/useGuideLocation'
 import { useEditorShortcuts } from './shell/useEditorShortcuts'
@@ -121,52 +122,19 @@ useEditorShortcuts({
           <span class="sr-only">Saved in this browser</span>
         </template>
         <template v-else-if="store.saveState === SaveState.Saving">Saving…</template>
-        <template v-else>Not saved — use ⋯ → Export to keep a backup</template>
+        <template v-else>Not saved — use File → Export project to keep a backup</template>
       </span>
       <div class="document-actions">
-        <VMenu location="bottom end">
-          <template #activator="{ props: menu }">
-            <VBtn
-              v-bind="menu"
-              icon="mdi-dots-horizontal"
-              size="small"
-              variant="text"
-              aria-label="More actions"
-              title="Import, export and more"
-            />
-          </template>
-          <VList density="compact">
-            <VListItem prepend-icon="mdi-import" title="Import project…" @click="importInput?.click()" />
-            <VListItem prepend-icon="mdi-export" title="Export project" @click="exportProject" />
-            <VListItem
-              prepend-icon="mdi-code-tags"
-              title="Export code…"
-              subtitle="Vue files for pages and components"
-              @click="codeExportOpen = true"
-            />
-            <VDivider />
-            <VListItem
-              prepend-icon="mdi-arrow-expand-all"
-              title="Focus mode"
-              :subtitle="`Only the canvas · ${modifierKey} \\`"
-              @click="toggleFocus"
-            />
-            <VListItem
-              prepend-icon="mdi-palette-outline"
-              title="Design tab in Properties"
-              subtitle="Figma-style size, layout, radius and fill"
-              :append-icon="designTab ? 'mdi-check' : undefined"
-              @click="designTab = !designTab"
-            />
-            <VListItem prepend-icon="mdi-compass-outline" title="Quick tour" @click="startTour" />
-            <VListItem
-              prepend-icon="mdi-book-open-variant"
-              title="Behavior guide"
-              subtitle="Conditions, repeats, clicks and variables"
-              @click="guideOpen = true"
-            />
-          </VList>
-        </VMenu>
+        <EditorMenus
+          v-model:design-tab="designTab"
+          :modifier-key="modifierKey"
+          @import-project="importInput?.click()"
+          @export-project="exportProject"
+          @export-code="codeExportOpen = true"
+          @toggle-focus="toggleFocus"
+          @start-tour="startTour"
+          @open-guide="guideOpen = true"
+        />
         <VBtn
           icon="mdi-tune-variant"
           size="small"
