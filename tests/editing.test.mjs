@@ -354,3 +354,28 @@ test('a text element has no JSON or Design tab, since its text lives in its name
     [],
   )
 })
+
+test('the inspector keeps everyday tabs first, gives Behavior its own tab and leaves it out for text', () => {
+  const { inspectorTabsFor, InspectorTab, InspectorTabGroup, INSPECTOR_TABS } = fieldTabs
+  store.addComponent('VBtn')
+  const button = store.findNodeById(store.selectedNodeId)
+  const text = store.createNode('TEXT', 'Hello')
+  const ids = tabs => tabs.map(tab => tab.id)
+  assert.deepEqual(ids(inspectorTabsFor(button, true)), [
+    InspectorTab.Content,
+    InspectorTab.Layout,
+    InspectorTab.Appearance,
+    InspectorTab.Design,
+    InspectorTab.Behavior,
+    InspectorTab.Advanced,
+    InspectorTab.Json,
+  ])
+  assert.equal(ids(inspectorTabsFor(text, true)).includes(InspectorTab.Behavior), false)
+  // The groups never interleave, so the divider between them appears once.
+  const groups = INSPECTOR_TABS.map(tab => tab.group)
+  assert.deepEqual(
+    groups,
+    [...groups].sort((a, b) => (a === InspectorTabGroup.Main ? -1 : b === InspectorTabGroup.Main ? 1 : 0)),
+  )
+  for (const tab of INSPECTOR_TABS) assert.ok(tab.description.length > 5, `${tab.label} explains itself`)
+})
