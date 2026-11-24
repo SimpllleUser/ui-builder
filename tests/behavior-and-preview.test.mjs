@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseProject, runtime, store } from './support.mjs'
+import { guideContent, parseProject, playground, runtime, store } from './support.mjs'
 
 test('bindings, events and state are validated and persisted', () => {
   store.addComponent('VBtn')
@@ -38,6 +38,16 @@ test('runtime resolves bindings, conditions, repeats and masks without evaluatin
   assert.equal(runtime.evaluateCondition('count >= 3', scope), true)
   assert.equal(runtime.evaluateCondition('count > 3', scope), false)
   assert.equal(runtime.evaluateCondition('user.name == Anna', scope), true)
+  assert.equal(runtime.evaluateCondition('count >= 2 and status == "paid"', scope), true)
+  assert.equal(runtime.evaluateCondition('count > 5 or not open', scope), true)
+  assert.equal(runtime.evaluateCondition('(count > 5 || open) && status == paid', scope), false)
+  assert.equal(runtime.evaluateCondition('contains(rows, 2) && length(rows) == 2', scope), true)
+  assert.equal(runtime.evaluateCondition('empty(rows) ? open : count == 3', scope), true)
+  assert.equal(runtime.evaluateCondition('status == {{status}}', scope), true, 'bindings read as variables')
+  assert.equal(runtime.evaluateCondition('user.constructor == 1 || user.__proto__', scope), false)
+  assert.equal(runtime.evaluateCondition('rows.push(1)', scope), true, 'method calls are refused, not run')
+  assert.deepEqual(scope.rows, [1, 2])
+  assert.match(runtime.conditionError('rows.push(1)'), /not available/)
   const row = { id: 7, step: 2 }
   assert.equal(runtime.evaluateCondition('row.step >= 2', { row }), true)
   assert.equal(runtime.evaluateCondition('row.step >= 3', { row }), false)
@@ -98,4 +108,27 @@ test('resetting the preview restores starting values and the page it opened on',
     assert.equal(store.previewPage.id, home)
     assert.equal(store.project.state.open, false, 'the saved starting values were never changed')
   })
+})
+
+test('the Behavior guide playground answers like Preview and explains what is wrong', () => {
+  const { scope } = playground.parseVariables('{"age": 20, "role": "admin", "tags": ["new"]}')
+  assert.equal(playground.evaluateSample('age >= 18 and role == "admin"', scope).outcome, 'shown')
+  assert.equal(playground.evaluateSample('age < 18 or contains(tags, "old")', scope).outcome, 'hidden')
+  const broken = playground.evaluateSample('age >', scope)
+  assert.equal(broken.outcome, 'unreadable')
+  assert.equal(typeof broken.problem, 'string')
+  assert.match(playground.parseVariables('[1, 2]').problem, /JSON object/)
+  assert.match(playground.parseVariables('{oops').problem, /JSON object/)
+  assert.equal(playground.parseVariables('  ').problem, null)
+  assert.equal(guideContent.isGuideSection('conditions'), true)
+  assert.equal(guideContent.isGuideSection('nope'), false)
+})
+
+test('every example in the Behavior guide is a readable condition', () => {
+  const examples = guideContent.GUIDE_SECTIONS.flatMap(section =>
+    section.blocks.filter(block => block.kind === guideContent.GuideBlockKind.Example),
+  )
+  assert.ok(examples.length >= 10)
+  for (const { condition, variables } of examples)
+    assert.equal(playground.evaluateSample(condition, variables).problem, null, condition)
 })

@@ -100,6 +100,23 @@ test('check_project reports what would break', async () => {
   assert.ok(issues.find(issue => issue.kind === 'missing-route').nodeId)
 })
 
+test('check_project reads variables inside compound conditions, not operators or function names', async () => {
+  const { executeMcpCommand: run } = await load()
+  for (const name of ['plan', 'email']) run(store, 'set_state', { name, value: '' })
+  run(store, 'add_subtree', {
+    tree: {
+      type: 'div',
+      children: [
+        { type: 'VBtn', text: 'Ok', vIf: 'not empty(plan) and contains(email, "@") or status == paid' },
+        { type: 'VBtn', text: 'Bad', vIf: 'missing > 1 and plan' },
+      ],
+    },
+  })
+  const messages = run(store, 'check_project').issues.map(issue => issue.message)
+  assert.equal(messages.filter(message => /“(not|empty|contains|paid)”/.test(message)).length, 0)
+  assert.equal(messages.filter(message => message.includes('“missing”')).length, 1)
+})
+
 test('preview tools run the page and report what is shown', async () => {
   const { executeMcpCommand: run } = await load()
   run(store, 'set_state', { name: 'open', value: false })

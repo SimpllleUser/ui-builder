@@ -14,7 +14,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 ## Variables, bindings and events
 - `set_state` defines a variable. A value is JSON (`3`, `true`, `"text"`, `[1,2]`), so give text without extra quotes only when it is plain text.
 - Text and props accept `{{ name }}` and `{{ item.field }}`. Inside a repeated element (`vFor`) use `{{ item.field }}` and `{{ index }}`; inside a table cell slot use `{{ item.field }}` too.
-- `model` links an input to a variable. `vIf` shows an element only when true: `open`, `!loading`, `status == paid`, `step >= 2`. `vFor` repeats for each item of an array variable (or `n` times).
+- `model` links an input to a variable. `vIf` shows an element only when true: `open`, `!loading`, `status == paid`, `step >= 2`, `role == "admin" and not loading`, `contains(tags, "new")`, `count > 0 ? a : b` (operators `== != < <= > >= && || ! and or not + - * / %`, functions `length`, `empty`, `contains`). `vFor` repeats for each item of an array variable (or `n` times).
 - A click does one of: `{type:"navigate", to:"/path"}`, `{type:"set", key, value}`, `{type:"toggle", key}`. Dialogs, drawers and snackbars open with `model` plus a click.
 - `{{ rows }}` alone keeps an array, so a table bound to a variable gets its rows.
 

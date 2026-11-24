@@ -8,6 +8,8 @@ import type { PrefabProp, UiNode } from './types'
  */
 const PROP_PLACEHOLDER = /\{\{\s*props\.([A-Za-z_]\w*)\s*\}\}/g
 
+const QUOTED_PROP_PLACEHOLDER = /(["'])\{\{\s*props\.([A-Za-z_]\w*)\s*\}\}\1/g
+
 export type PrefabPropValues = Record<string, string>
 
 function forEachString(value: unknown, visit: (text: string) => void): void {
@@ -58,8 +60,22 @@ export function applyPrefabProps(node: UiNode, props: PrefabProp[], values: Pref
   const resolved = new Map(props.map(prop => [prop.name, values[prop.name] ?? prop.defaultValue]))
   const fill = (text: string) =>
     text.replace(PROP_PLACEHOLDER, (placeholder, name: string) => resolved.get(name) ?? placeholder)
+  // In a condition the value must stay one word or number, so a value with spaces or symbols cannot change its meaning.
+  const fillCondition = (condition: string) =>
+    condition
+      .replace(QUOTED_PROP_PLACEHOLDER, (placeholder, quote: string, name: string) =>
+        resolved.has(name)
+          ? `${quote}${(resolved.get(name) ?? '').replaceAll(quote, `\\${quote}`)}${quote}`
+          : placeholder,
+      )
+      .replace(PROP_PLACEHOLDER, (placeholder, name: string) => {
+        const value = resolved.get(name)
+        if (value === undefined) return placeholder
+        return value.trim() !== '' && Number.isFinite(Number(value)) ? value.trim() : JSON.stringify(value)
+      })
   const apply = (current: UiNode): UiNode => ({
     ...mapStrings(ownContent(current), fill),
+    ...(current.vIf ? { vIf: fillCondition(current.vIf) } : {}),
     children: current.children.map(apply),
     slots: Object.fromEntries(Object.entries(current.slots).map(([slot, nodes]) => [slot, nodes.map(apply)])),
   })

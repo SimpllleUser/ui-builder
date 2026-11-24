@@ -194,7 +194,7 @@ const setActionVariable = (name: string) => {
         :model-value="condition.shown('condition', node.vIf)"
         :error-messages="condition.errorOf('condition')"
         label="Condition"
-        placeholder="isOpen, !loading, status == paid, step >= 2"
+        placeholder='isOpen, !loading, step >= 2 and role == "admin"'
         variant="outlined"
         density="compact"
         hide-details="auto"

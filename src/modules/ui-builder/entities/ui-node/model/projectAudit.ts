@@ -1,5 +1,6 @@
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { ActionType, IssueKind, IssueSeverity } from './enums'
+import { expressionVariables } from './expression'
 import { conditionError } from './runtime'
 import type { Page, Project, UiNode } from './types'
 
@@ -85,7 +86,10 @@ export function auditProject(project: Project): Issue[] {
             pageId,
             node,
           })
-        } else useVariable(rootOf(node.vIf), IssueSeverity.Error, walked, `${here} (show only when)`)
+        } else
+          expressionVariables(node.vIf).forEach(name =>
+            useVariable(name, IssueSeverity.Error, walked, `${here} (show only when)`),
+          )
       }
 
       const click = node.events?.click

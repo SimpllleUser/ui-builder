@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PREVIEW_FRAME_STYLE } from '../model/previewFrameStyle'
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
@@ -35,8 +36,7 @@ const loadPreview = (event: Event) => {
     .querySelectorAll('style, link[rel="stylesheet"]')
     .forEach(style => doc.head.appendChild(style.cloneNode(true)))
   const reset = doc.createElement('style')
-  reset.textContent =
-    'html, body { margin: 0; overflow: auto !important; } .preview-app { min-height: 100vh; background: rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background)); }'
+  reset.textContent = PREVIEW_FRAME_STYLE
   doc.head.appendChild(reset)
   doc.addEventListener('keydown', event => {
     if (event.key === 'Escape') isPreviewMode.value = false

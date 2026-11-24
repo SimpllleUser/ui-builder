@@ -242,7 +242,7 @@ test('saved component parameters also work in text, conditions and click actions
   store.savePrefab(button, 'Link', { page: 'home' })
   store.insertPrefab(store.prefabs[0].prefabId, 'root-canvas', null, { page: 'engines' })
   const inserted = store.findNodeById(store.selectedNodeId)
-  assert.equal(inserted.vIf, 'page == engines')
+  assert.equal(inserted.vIf, 'page == "engines"', 'a parameter in a condition becomes one quoted value')
   assert.equal(inserted.events.click.to, '/engines')
   assert.equal(inserted.children[0].name, 'Open engines')
 })
