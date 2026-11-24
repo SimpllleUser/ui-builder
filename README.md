@@ -29,6 +29,7 @@ On a first visit to an empty project, a three-step **quick tour** points at the 
 - Problems with what you type (a table column key that is taken, a page route, a variable name, a condition that cannot be read, a link to a page that does not exist) appear right under the field and stay until fixed, instead of in a message that fades.
 - Undo/Redo supports Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z. Text inputs keep native text undo. Property edits are grouped while typing; immediate Undo includes the latest edit.
 - Save selected elements in **My components** for reuse.
+- **Export code** (⋯ → Export code…, or search): each page, the shared layout and each saved component as a Vue file, to copy or download.
 - **Behavior guide** (⋯ menu, or search): built-in documentation of conditions, repeats, clicks and variables with live examples and a playground.
 
 ## Saving and preview
@@ -120,6 +121,19 @@ row.status != "paid"                       a field of the current item
 
 `check_project` (and the same check in the editor) reports: variables that are used but not defined (found in text, properties, links, repeats and inside conditions), links to pages that do not exist, conditions that cannot be read, empty tables, a layout without **Page content**, and variables nobody uses. Function names and the words `and`, `or`, `not` are not mistaken for variables.
 
+### Export code
+
+**⋯ → Export code…** (or search → “export code”) opens a dialog with the code of one page, the shared layout or one saved component as a Vue single-file component, ready to **Copy** or **Download** (`OrderDesk.vue`). It opens on what you are editing; the list at the top switches to anything else.
+
+What the file contains:
+
+- A `<template>` with the same elements, props, classes, styles and slots (table cells included). `Link to a variable` becomes `v-model`, *Repeat* becomes `v-for="(item, index) in …"`, *Show only when* becomes `v-if`, text and property bindings become `{{ }}` and `:prop`. When an element has both a repeat and a condition, the repeat wraps it so the condition can still read `item`.
+- A `<script setup>` with a `ref` for every variable the file uses, starting from the project's values, plus `useRouter` when a click goes to a page.
+- Conditions are translated to JavaScript with the same result as in the editor (missing values read as `undefined`, `==` compares as text, `empty`, `contains` and `length` become small helper functions written at the top of the file). A test runs the exported JavaScript against the editor's evaluator on many conditions, and compiles the generated files with Vue's own compiler.
+- A saved component has its parameters (`props.name`) as `defineProps`, so `props.name` in the template keeps working. The shared layout has `<RouterView />` where the page goes.
+
+Things to know: every file has its own copy of the variables (share them, for example in a Pinia store, when pages must see the same data); input masks are not exported; table stripes, borders and header colours are CSS classes from `src/shared/tableStyles.css`, so copy that file too. The generator is in `entities/ui-node/model/vueExport.ts`; the dialog is the `code-export` widget.
+
 ### The Behavior guide
 
 The same material is built into the editor: **⋯ → Behavior guide**, or search (Ctrl/⌘ K → “behavior guide”). It has an address too: `/?guide` opens it and `/?guide=conditions` opens a section (`overview`, `variables`, `click`, `conditions`, `link`, `repeat`, `components`, `checking`), so a link can be shared. It is a full-screen guide with one section per topic (how it works, variables, clicks, conditions, link, repeat, saved components, mistakes). Every example shows its sample variables and what Preview would do, using the same evaluator as Preview, and the **Conditions** section has a playground where you type your own condition and variables as JSON. Its text lives in `widgets/behavior-guide/model/guideContent.ts`; a test checks that every example in it is a readable condition.
@@ -148,7 +162,7 @@ The server also gives agents instructions, a **guide** resource (`ui-builder://g
 The code follows Feature-Sliced Design, from the top layer down:
 
 - `src/app`: the application shell (`App.vue`, `BuilderApp.vue`, and in `shell/` the panels, keyboard shortcuts, focus mode and project files). It puts the other layers together.
-- `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour, Behavior guide).
+- `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour, Behavior guide, code export).
 - `src/modules/ui-builder/features/mcp-bridge`: lets an MCP client edit the page open in the browser.
 - `src/modules/ui-builder/entities/ui-node`: the document, its store, validation and rendering. Conditions are read in `model/expression.ts` (parser `jsep` plus a fixed evaluator) and used by `model/runtime.ts`, the preview snapshot and the project check.
 - `src/shared`: code with no knowledge of the editor (icons, DOM helpers, `useCheckedDrafts`, table styles).

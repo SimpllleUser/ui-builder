@@ -1,3 +1,4 @@
+import { downloadTextFile } from '../../shared/lib/downloadTextFile'
 import { type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 
 const MAX_IMPORT_BYTES = 5_000_000
@@ -5,14 +6,7 @@ const EXPORT_FILE_NAME = 'ui-builder-project.json'
 
 /** Saving the project as a JSON file and restoring it from one. */
 export function useProjectFiles(store: ReturnType<typeof useUiTreeStore>) {
-  const exportProject = () => {
-    const url = URL.createObjectURL(new Blob([store.exportDocument()], { type: 'application/json' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = EXPORT_FILE_NAME
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
+  const exportProject = () => downloadTextFile(EXPORT_FILE_NAME, store.exportDocument(), 'application/json')
 
   /** Handles the file chosen in an `<input type="file">`. */
   const importFromInput = async (event: Event) => {
