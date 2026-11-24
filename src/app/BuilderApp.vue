@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { SaveState, useUiTreeStore, ROOT_NODE_ID } from '../modules/ui-builder/entities/ui-node'
 import { PanelSide } from './shell/panelSide'
-import { ref, watch } from 'vue'
+import { provide, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { ComponentsPalette } from '../modules/ui-builder/widgets/components-palette'
 import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
 import { CodeExportDialog } from '../modules/ui-builder/widgets/code-export'
-import { BehaviorGuide } from '../modules/ui-builder/widgets/behavior-guide'
+import { BehaviorGuide, GuideSection } from '../modules/ui-builder/widgets/behavior-guide'
+import { OPEN_CONDITIONS_HELP } from '../shared/lib/conditionsHelp'
 import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/onboarding'
 import { CommandPalette, type CommandHost } from '../modules/ui-builder/widgets/command-palette'
 import { PageTabs, PagesPanel } from '../modules/ui-builder/widgets/pages-panel'
@@ -42,6 +43,10 @@ const pageTabs = ref<InstanceType<typeof PageTabs>>()
 const paletteOpen = ref(false)
 const { open: guideOpen, section: guideSection } = useGuideLocation()
 const codeExportOpen = ref(false)
+provide(OPEN_CONDITIONS_HELP, () => {
+  guideSection.value = GuideSection.Conditions
+  guideOpen.value = true
+})
 
 // What the search box and the quick tour can ask of the editor shell.
 const commandHost: CommandHost = {
