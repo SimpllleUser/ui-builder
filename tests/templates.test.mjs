@@ -76,6 +76,7 @@ test('starter templates: dashboard, table page and sign-in form come ready with 
 
     startTour() {},
     openBehaviorGuide() {},
+    openCodeExport() {},
     toggleFocus() {},
     togglePanel() {},
     modifierKey: 'Ctrl',

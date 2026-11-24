@@ -36,16 +36,3 @@ export function statusChipSlots(headers: unknown): Record<string, CellSlot> {
       ]),
   )
 }
-
-/** Table looks that Vuetify has no prop for are CSS classes (see shared/tableStyles.css). */
-export function tableStyleClasses({ striped, bordered, headerColor }: Record<string, unknown>): string[] {
-  return [
-    striped ? 'ui-table--striped' : '',
-    bordered ? 'ui-table--bordered' : '',
-    typeof headerColor === 'string' && headerColor ? `ui-table-header--${headerColor}` : '',
-  ].filter(Boolean)
-}
-
-/** The inspector stores height as text; Vuetify wants a number for pixel heights. */
-export const tableHeight = (height: unknown) =>
-  typeof height === 'string' && height.trim() ? Number(height) || height : height

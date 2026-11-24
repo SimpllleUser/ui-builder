@@ -38,7 +38,7 @@ const FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
 }
 
 /** The tree from `jsep` is typed per node kind only on the library's own union, so this tells TypeScript so. */
-function isCoreExpression(node: jsep.Expression): node is jsep.CoreExpression {
+export function isCoreExpression(node: jsep.Expression): node is jsep.CoreExpression {
   return typeof node.type === 'string'
 }
 
@@ -48,7 +48,7 @@ const stripBindings = (text: string) => text.replace(BINDING, '$1')
 
 const parsed = new Map<string, jsep.Expression>()
 
-function parse(text: string): jsep.Expression {
+export function parseExpression(text: string): jsep.Expression {
   const source = stripBindings(text)
   let tree = parsed.get(source)
   if (!tree) {
@@ -153,7 +153,7 @@ function evaluateCall(node: jsep.CallExpression, scope: Scope): unknown {
 export function expressionError(text: string | undefined): string | null {
   if (!text?.trim()) return null
   try {
-    assertSupported(parse(text))
+    assertSupported(parseExpression(text))
     return null
   } catch (error) {
     return error instanceof Error ? error.message.replace(/ at character \d+$/, '') : 'Cannot read this condition.'
@@ -205,7 +205,7 @@ function assertSupported(node: jsep.Expression): void {
 
 /** Value of an expression for the given variables. Throws on text that `expressionError` reports. */
 export function evaluateExpression(text: string, scope: Scope): unknown {
-  return evaluateNode(parse(text), scope)
+  return evaluateNode(parseExpression(text), scope)
 }
 
 /**
@@ -240,6 +240,6 @@ export function expressionVariables(text: string): string[] {
       default:
     }
   }
-  collect(parse(text))
+  collect(parseExpression(text))
   return [...names]
 }

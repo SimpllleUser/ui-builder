@@ -24,6 +24,9 @@ export let server,
   fieldTabs,
   playground,
   guideContent,
+  codegen,
+  exportTargets,
+  pascalCase,
   store
 const storage = new Map()
 before(async () => {
@@ -59,6 +62,13 @@ before(async () => {
   fieldTabs = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/fieldTabs.ts')
   playground = await server.ssrLoadModule('/src/modules/ui-builder/widgets/behavior-guide/model/conditionPlayground.ts')
   guideContent = await server.ssrLoadModule('/src/modules/ui-builder/widgets/behavior-guide/model/guideContent.ts')
+  const model = '/src/modules/ui-builder/entities/ui-node/model/'
+  codegen = {
+    ...(await server.ssrLoadModule(`${model}vueExport.ts`)),
+    ...(await server.ssrLoadModule(`${model}expressionToJs.ts`)),
+  }
+  exportTargets = await server.ssrLoadModule('/src/modules/ui-builder/widgets/code-export/model/exportTargets.ts')
+  pascalCase = await server.ssrLoadModule('/src/shared/lib/pascalCase.ts')
   global.window = { localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } }
 })
 beforeEach(() => {

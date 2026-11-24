@@ -35,6 +35,7 @@ export interface CommandHost {
   exportProject(): void
   startTour(): void
   openBehaviorGuide(): void
+  openCodeExport(): void
   toggleFocus(): void
   toggleLayersPanel(): void
   toggleProperties(): void
@@ -300,6 +301,14 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
     icon: 'mdi-book-open-variant',
     keywords: 'help documentation tutorial conditions v-if v-for v-model click variables expressions',
     run: host.openBehaviorGuide,
+  })
+  add({
+    id: 'editor:export-code',
+    title: 'Export code (Vue files)',
+    group: 'Editor',
+    icon: 'mdi-code-tags',
+    keywords: 'download copy vue sfc source generate page component layout',
+    run: host.openCodeExport,
   })
 
   // ─── Add a component ───────────────────────────────────────────────────────

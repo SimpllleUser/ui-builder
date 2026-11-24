@@ -16,8 +16,8 @@ import {
 } from '../model/runtime'
 import type { UiNode } from '../model/types'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
-import { resolveTableData } from '../model/tableBindings'
-import { statusChipSlots, tableHeight, tableStyleClasses } from './dataTableRendering'
+import { resolveTableData, tableHeight, tableStyleClasses } from '../model/tableBindings'
+import { statusChipSlots } from './dataTableRendering'
 
 export { canvasDragTargetId }
 
