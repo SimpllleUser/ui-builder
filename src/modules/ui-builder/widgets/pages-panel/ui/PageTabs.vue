@@ -86,7 +86,15 @@ const submit = () => {
 
 <template>
   <div class="page-tabs">
-    <div ref="tablist" class="page-tabs__list" role="tablist" aria-label="Pages" @keydown="onKeydown">
+    <div
+      ref="tablist"
+      class="page-tabs__list"
+      role="tablist"
+      aria-label="Pages"
+      title="Switch pages with ← → or Alt+[ and Alt+]"
+      aria-keyshortcuts="Alt+[ Alt+]"
+      @keydown="onKeydown"
+    >
       <button
         v-for="page in store.pages"
         :key="page.id"
@@ -242,7 +250,7 @@ const submit = () => {
   white-space: nowrap;
 }
 .page-tab__path {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.6;
   font-weight: 400;
 }

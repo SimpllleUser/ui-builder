@@ -57,7 +57,7 @@ export const GUIDE_SECTIONS: GuideSectionContent[] = [
     icon: 'mdi-lightbulb-on-outline',
     blocks: [
       paragraph(
-        'Behavior makes an element react in Preview: open a page, appear only when something is true, stay in sync with an input, or repeat for every item of a list. Select an element, open Advanced in the inspector and press Add in the Behavior block.',
+        'Behavior makes an element react in Preview: open a page, appear only when something is true, stay in sync with an input, or repeat for every item of a list. Select an element, open the Behavior tab in the inspector and press Add.',
       ),
       paragraph(
         'The project keeps a set of variables (its state). Behavior only reads and changes those variables, and the page is redrawn from them. Nothing runs while you edit. Preview starts from the starting values every time, works on its own copy and never changes the document, so you can try anything and press Reset.',

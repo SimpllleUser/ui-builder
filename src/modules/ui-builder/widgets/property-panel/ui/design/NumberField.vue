@@ -95,7 +95,7 @@ const startScrub = (event: PointerEvent) => {
   width: 22px;
   flex-shrink: 0;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.6;
   cursor: ew-resize;
   user-select: none;
@@ -109,7 +109,6 @@ const startScrub = (event: PointerEvent) => {
   min-width: 0;
   padding-right: 6px;
   font-size: 12px;
-  outline: none;
   background: transparent;
   color: inherit;
   appearance: textfield;

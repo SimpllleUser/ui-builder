@@ -16,6 +16,7 @@ import {
 } from '../model/runtime'
 import type { UiNode } from '../model/types'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
+import { behaviorMarker } from '../model/behaviorSummary'
 import { resolveTableData, tableHeight, tableStyleClasses } from '../model/tableBindings'
 import { statusChipSlots } from './dataTableRendering'
 
@@ -107,6 +108,7 @@ const NodeRenderer = defineComponent({
         'div',
         {
           'data-node-id': node.id,
+          ...behaviorMarker(node),
           class: [
             'ui-builder-element',
             'overlay-placeholder',
@@ -203,6 +205,7 @@ const NodeRenderer = defineComponent({
           ...componentProps,
           ...extraProps,
           'data-node-id': node.id,
+          ...behaviorMarker(node),
           class: [
             ...classes,
             'ui-builder-element',

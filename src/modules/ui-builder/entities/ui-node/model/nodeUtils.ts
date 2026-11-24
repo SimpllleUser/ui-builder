@@ -25,3 +25,7 @@ function regenerateNodeIds(node: UiNode): UiNode {
     ),
   }
 }
+
+/** A container with no elements inside it, neither as children nor in any named slot. */
+export const isNodeEmpty = (node: UiNode): boolean =>
+  !node.children.length && !Object.values(node.slots).some(nodes => nodes.length)

@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { SaveState, useUiTreeStore, ROOT_NODE_ID } from '../modules/ui-builder/entities/ui-node'
 import { PanelSide } from './shell/panelSide'
-import { ref, watch } from 'vue'
+import { provide, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { ComponentsPalette } from '../modules/ui-builder/widgets/components-palette'
 import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
 import { CodeExportDialog } from '../modules/ui-builder/widgets/code-export'
-import { BehaviorGuide } from '../modules/ui-builder/widgets/behavior-guide'
+import { BehaviorGuide, GuideSection } from '../modules/ui-builder/widgets/behavior-guide'
+import { OPEN_CONDITIONS_HELP } from '../shared/lib/conditionsHelp'
 import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/onboarding'
 import { CommandPalette, type CommandHost } from '../modules/ui-builder/widgets/command-palette'
 import { PageTabs, PagesPanel } from '../modules/ui-builder/widgets/pages-panel'
 import { PropertyPanel, useDesignTabPreference } from '../modules/ui-builder/widgets/property-panel'
+import EditorMenus from './shell/EditorMenus.vue'
 import { useEditorPanels } from './shell/useEditorPanels'
 import { useGuideLocation } from './shell/useGuideLocation'
 import { useEditorShortcuts } from './shell/useEditorShortcuts'
-import { platformModifierKey, useFocusMode } from './shell/useFocusMode'
+import { platformModifierKey } from '../shared/lib/platform'
+import { useFocusMode } from './shell/useFocusMode'
 import { useProjectFiles } from './shell/useProjectFiles'
 
 const store = useUiTreeStore()
@@ -42,6 +45,10 @@ const pageTabs = ref<InstanceType<typeof PageTabs>>()
 const paletteOpen = ref(false)
 const { open: guideOpen, section: guideSection } = useGuideLocation()
 const codeExportOpen = ref(false)
+provide(OPEN_CONDITIONS_HELP, () => {
+  guideSection.value = GuideSection.Conditions
+  guideOpen.value = true
+})
 
 // What the search box and the quick tour can ask of the editor shell.
 const commandHost: CommandHost = {
@@ -116,52 +123,19 @@ useEditorShortcuts({
           <span class="sr-only">Saved in this browser</span>
         </template>
         <template v-else-if="store.saveState === SaveState.Saving">Saving…</template>
-        <template v-else>Not saved — use ⋯ → Export to keep a backup</template>
+        <template v-else>Not saved — use File → Export project to keep a backup</template>
       </span>
       <div class="document-actions">
-        <VMenu location="bottom end">
-          <template #activator="{ props: menu }">
-            <VBtn
-              v-bind="menu"
-              icon="mdi-dots-horizontal"
-              size="small"
-              variant="text"
-              aria-label="More actions"
-              title="Import, export and more"
-            />
-          </template>
-          <VList density="compact">
-            <VListItem prepend-icon="mdi-import" title="Import project…" @click="importInput?.click()" />
-            <VListItem prepend-icon="mdi-export" title="Export project" @click="exportProject" />
-            <VListItem
-              prepend-icon="mdi-code-tags"
-              title="Export code…"
-              subtitle="Vue files for pages and components"
-              @click="codeExportOpen = true"
-            />
-            <VDivider />
-            <VListItem
-              prepend-icon="mdi-arrow-expand-all"
-              title="Focus mode"
-              :subtitle="`Only the canvas · ${modifierKey} \\`"
-              @click="toggleFocus"
-            />
-            <VListItem
-              prepend-icon="mdi-palette-outline"
-              title="Design tab in Properties"
-              subtitle="Figma-style size, layout, radius and fill"
-              :append-icon="designTab ? 'mdi-check' : undefined"
-              @click="designTab = !designTab"
-            />
-            <VListItem prepend-icon="mdi-compass-outline" title="Quick tour" @click="startTour" />
-            <VListItem
-              prepend-icon="mdi-book-open-variant"
-              title="Behavior guide"
-              subtitle="Conditions, repeats, clicks and variables"
-              @click="guideOpen = true"
-            />
-          </VList>
-        </VMenu>
+        <EditorMenus
+          v-model:design-tab="designTab"
+          :modifier-key="modifierKey"
+          @import-project="importInput?.click()"
+          @export-project="exportProject"
+          @export-code="codeExportOpen = true"
+          @toggle-focus="toggleFocus"
+          @start-tour="startTour"
+          @open-guide="guideOpen = true"
+        />
         <VBtn
           icon="mdi-tune-variant"
           size="small"
@@ -315,7 +289,7 @@ useEditorShortcuts({
   border: 1px solid rgba(var(--v-border-color), 0.3);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
 }
 .document-toolbar {
@@ -332,7 +306,7 @@ useEditorShortcuts({
   border: 1px solid rgba(var(--v-border-color), 0.3);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
 }
 @media (max-width: 700px) {

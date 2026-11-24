@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore, getComponentDef, TEXT_NODE_TYPE } from '../../../entities/ui-node'
+import { describeBehaviors, useUiTreeStore, getComponentDef, TEXT_NODE_TYPE } from '../../../entities/ui-node'
 import { Icons } from '../../../../../shared/icons'
 import { useSettingsGroups } from '../model/useSettingsGroups'
 import { useClassEditor } from '../model/useClassEditor'
-import { defaultTab, inspectorTabsFor, sectionsForTab, INSPECTOR_TABS, InspectorTab } from '../model/fieldTabs'
+import {
+  defaultTab,
+  inspectorTabsFor,
+  sectionsForTab,
+  INSPECTOR_TABS,
+  InspectorTab,
+  InspectorTabGroup,
+} from '../model/fieldTabs'
 import { useMoveDialog, useSavePrefabDialog } from '../model/useNodeDialogs'
 import { useDesignTabPreference } from '../model/useDesignTabPreference'
+import { useTabScroll } from '../model/useTabScroll'
+import EmptyState from '../../../../../shared/ui/EmptyState.vue'
 import DesignTab from './design/DesignTab.vue'
 import AdvancedProperties from './AdvancedProperties.vue'
 import InteractionsEditor from './InteractionsEditor.vue'
@@ -41,7 +50,13 @@ watch(visibleTabs, tabs => {
   if (!tabs.some(tab => tab.id === activeTab.value))
     activeTab.value = defaultTab(selectedNode.value, componentSections.value)
 })
-const activeTabLabel = computed(() => INSPECTOR_TABS.find(tab => tab.id === activeTab.value)?.label ?? '')
+const activeTabInfo = computed(() => INSPECTOR_TABS.find(tab => tab.id === activeTab.value))
+// The Behavior tab says how many behaviors the element has, so logic is not hidden behind a tab nobody opens.
+const behaviorCount = computed(() => (selectedNode.value ? describeBehaviors(selectedNode.value).length : 0))
+const tabBadge = (tab: InspectorTab) => (tab === InspectorTab.Behavior ? behaviorCount.value : 0)
+const startsMoreGroup = (index: number) =>
+  visibleTabs.value[index].group === InspectorTabGroup.More &&
+  visibleTabs.value[index - 1]?.group !== InspectorTabGroup.More
 const showsDesign = computed(() => !query.value && activeTab.value === InspectorTab.Design)
 const tabSections = computed(() => sectionsForTab(componentSections.value, activeTab.value))
 const {
@@ -62,6 +77,9 @@ watch(
   { immediate: true },
 )
 
+const panel = ref<HTMLElement>()
+useTabScroll(panel, activeTab, selectedNodeId)
+
 // ─── The rest of the panel ───────────────────────────────────────────────────
 const { classSearch, filteredGroups, toggleClass, addCustomClass } = useClassEditor(selectedNode, (id, classes) =>
   store.updateNodeClasses(id, classes),
@@ -74,7 +92,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
 </script>
 
 <template>
-  <div class="property-panel">
+  <div ref="panel" class="property-panel">
     <MultiSelectSpacing v-if="selectedNodeIds.length > 1" />
     <div v-else-if="selectedNode" :key="selectedNode.id" class="pa-4">
       <div class="d-flex align-center justify-space-between mb-1">
@@ -148,24 +166,30 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
           aria-orientation="vertical"
           aria-label="Property groups"
         >
-          <button
-            v-for="tab in visibleTabs"
-            :key="tab.id"
-            type="button"
-            role="tab"
-            class="inspector__tab"
-            :class="{ 'inspector__tab--active': tab.id === activeTab }"
-            :aria-selected="tab.id === activeTab"
-            :aria-label="tab.label"
-            @click="activeTab = tab.id"
-          >
-            <VIcon :icon="tab.icon" size="20" aria-hidden="true" />
-            <VTooltip activator="parent" location="start">{{ tab.label }}</VTooltip>
-          </button>
+          <template v-for="(tab, index) in visibleTabs" :key="tab.id">
+            <hr v-if="startsMoreGroup(index)" class="inspector__divider" aria-hidden="true" />
+            <button
+              type="button"
+              role="tab"
+              class="inspector__tab"
+              :class="{ 'inspector__tab--active': tab.id === activeTab }"
+              :aria-selected="tab.id === activeTab"
+              :aria-label="tabBadge(tab.id) ? `${tab.label}, ${tabBadge(tab.id)} set` : tab.label"
+              :title="tab.description"
+              @click="activeTab = tab.id"
+            >
+              <VIcon :icon="tab.icon" size="20" aria-hidden="true" />
+              <span class="inspector__tab-label" aria-hidden="true">{{ tab.label }}</span>
+              <span v-if="tabBadge(tab.id)" class="inspector__badge" aria-hidden="true">{{ tabBadge(tab.id) }}</span>
+            </button>
+          </template>
         </nav>
 
         <div class="inspector__body">
-          <div v-if="!query" class="inspector__title">{{ activeTabLabel }}</div>
+          <template v-if="!query && activeTabInfo">
+            <div class="inspector__title">{{ activeTabInfo.label }}</div>
+            <p class="inspector__description">{{ activeTabInfo.description }}</p>
+          </template>
 
           <div class="pt-4">
             <VTextarea
@@ -185,13 +209,18 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
                 !visibleSections.length &&
                 (query ||
                   (activeTab !== InspectorTab.Advanced &&
+                    activeTab !== InspectorTab.Behavior &&
                     activeTab !== InspectorTab.Json &&
                     !showsDesign &&
                     !(activeTab === InspectorTab.Content && textChild)))
               "
               class="text-body-2 text-medium-emphasis"
             >
-              {{ query ? `No settings match “${settingsQuery}”.` : `No ${activeTab} settings for this element.` }}
+              {{
+                query
+                  ? `No settings match “${settingsQuery}”.`
+                  : `No ${activeTabInfo?.label.toLowerCase()} settings for this element.`
+              }}
             </p>
             <template v-for="section in visibleSections" :key="section.title">
               <div class="mb-4">
@@ -226,9 +255,8 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
           <DesignTab v-if="showsDesign && selectedNode" :node="selectedNode" />
           <NodePropsEditor v-if="!query && activeTab === InspectorTab.Json" :node="selectedNode" />
 
-          <!-- Behavior first: it is used far more often than the long list of CSS classes below it. -->
           <InteractionsEditor
-            v-if="!query && activeTab === InspectorTab.Advanced && selectedNode.type !== TEXT_NODE_TYPE"
+            v-if="!query && activeTab === InspectorTab.Behavior && selectedNode.type !== TEXT_NODE_TYPE"
             :node="selectedNode"
           />
           <AdvancedProperties
@@ -244,10 +272,13 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
       </div>
     </div>
 
-    <div v-else class="pa-10 text-center text-medium-emphasis mt-10">
-      <VIcon :icon="Icons.CursorClick" size="x-large" class="mb-4 opacity-20" />
-      <div class="text-body-2">Select an element to edit properties</div>
-    </div>
+    <EmptyState
+      v-else
+      :icon="Icons.CursorClick"
+      title="Nothing selected"
+      description="Click an element on the canvas or in Layers to edit it here. Shift-click selects several at once."
+      class="mt-10"
+    />
     <SavePrefabDialog
       v-model="prefabDialog.open.value"
       :name="prefabDialog.name.value"
@@ -292,7 +323,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
   padding: 0 6px;
   border-radius: 8px;
   background: rgba(var(--v-theme-primary), 0.12);
-  font-size: 11px;
+  font-size: 12px;
 }
 .section-body {
   padding-left: 4px;
@@ -332,10 +363,13 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
 .inspector__tab {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 2px;
+  width: 56px;
+  min-height: 44px;
+  padding: 4px 0;
   border-radius: 6px;
   color: rgba(var(--v-theme-on-surface), 0.6);
   transition:
@@ -345,6 +379,35 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
 .inspector__tab:hover {
   background: rgba(var(--v-theme-on-surface), 0.08);
   color: rgb(var(--v-theme-on-surface));
+}
+.inspector__tab-label {
+  font-size: 12px;
+  line-height: 1.1;
+}
+.inspector__badge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgb(var(--v-theme-info));
+  color: rgb(var(--v-theme-on-info));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.inspector__divider {
+  width: 70%;
+  margin: 6px auto;
+  border: 0;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.inspector__description {
+  margin: -4px 0 8px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 12px;
 }
 .inspector__tab--active {
   background: rgba(var(--v-theme-primary), 0.14);
@@ -367,7 +430,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
 .inspector__title {
   margin-bottom: 8px;
   color: rgba(var(--v-theme-on-surface), 0.7);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

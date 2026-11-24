@@ -98,7 +98,7 @@ const cornerValue = (corner: Corner) => parsePx(style.value[cornerProperty(corne
   padding: 2px 8px;
   border: 1px solid rgba(var(--v-border-color), 0.25);
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .radius-preset--on {
   border-color: rgb(var(--v-theme-primary));

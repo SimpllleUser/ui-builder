@@ -159,7 +159,7 @@ watch(step, () => requestAnimationFrame(locate))
     0 0 0 1px rgba(var(--v-border-color), 0.2);
 }
 .tour__step {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;

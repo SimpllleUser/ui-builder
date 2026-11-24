@@ -106,7 +106,6 @@ const picked = (event: Event) => emit('update:modelValue', inputValue(event))
   border-radius: 6px;
   background: rgba(var(--v-theme-on-surface), 0.06);
   font-size: 12px;
-  outline: none;
 }
 .color-field__clear {
   display: grid;

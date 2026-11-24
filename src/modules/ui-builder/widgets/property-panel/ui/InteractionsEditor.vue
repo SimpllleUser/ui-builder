@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ActionType, useUiTreeStore, conditionError, type UiAction, type UiNode } from '../../../entities/ui-node'
+import { ActionType, useUiTreeStore, type UiAction, type UiNode } from '../../../entities/ui-node'
 import { BehaviorKind } from '../model/behaviorKinds'
 import { computed, ref, watch } from 'vue'
-import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
+import EmptyState from '../../../../../shared/ui/EmptyState.vue'
+import ConditionField from './ConditionField.vue'
 import VariableField from './VariableField.vue'
+import { useEnsureVariable } from '../model/useEnsureVariable'
 
 const props = defineProps<{ node: UiNode }>()
 const store = useUiTreeStore()
@@ -54,29 +56,11 @@ const removeBehavior = (kind: BehaviorKind) => {
   else setLogic({ [kind]: '' })
 }
 
-// Variables are created where they are first used, with a starting value that fits the use.
-const ensureVariable = (name: string, initial: unknown) => {
-  const trimmed = name.trim()
-  if (!trimmed || trimmed in store.project.state) return
-  if (store.setStateVariable(trimmed, initial))
-    store.setNotice(`Created variable “${trimmed}”. Change its starting value under the field.`)
-}
+const ensureVariable = useEnsureVariable(store)
 const setVariableLogic = (kind: BehaviorKind.Model | BehaviorKind.VFor, name: string) => {
   ensureVariable(name, kind === BehaviorKind.VFor ? [] : '')
   setLogic({ [kind]: name })
 }
-// A condition that cannot be read stays in the field with the reason; it would otherwise be ignored silently.
-const condition = useCheckedDrafts(
-  (_field, value) => conditionError(value),
-  (_field, value) => setCondition(value),
-)
-watch(() => props.node.id, condition.reset)
-const setCondition = (expression: string) => {
-  const root = /^\s*!?\s*([A-Za-z_$][\w$]*)/.exec(expression)?.[1]
-  if (root) ensureVariable(root, false)
-  setLogic({ vIf: expression })
-}
-
 const stateKeys = computed(() => Object.keys(store.project.state))
 // The field keeps the item's title, so the title must be the route itself; the page name goes in the subtitle.
 const pageItems = computed(() => store.pages.map(page => ({ title: page.path, subtitle: page.name, value: page.path })))
@@ -131,10 +115,19 @@ const setActionVariable = (name: string) => {
       </VMenu>
     </div>
 
-    <p v-if="!active.length" class="text-caption text-medium-emphasis">
-      Nothing yet. Add a behavior so this element reacts in Preview: open a page, show or hide itself, repeat for a
-      list.
-    </p>
+    <EmptyState
+      v-if="!active.length"
+      icon="mdi-lightning-bolt-outline"
+      title="This element does nothing yet"
+      description="Choose what it should do when you try the page in Preview."
+    >
+      <div class="behavior-starts">
+        <button v-for="kind in available" :key="kind" type="button" class="behavior-start" @click="addBehavior(kind)">
+          <span class="behavior-start__title">{{ behaviors[kind].title() }}</span>
+          <span class="behavior-start__description text-medium-emphasis">{{ behaviors[kind].description }}</span>
+        </button>
+      </div>
+    </EmptyState>
 
     <div v-for="kind in active" :key="kind" class="behavior-card" :data-behavior="kind">
       <div class="behavior-card__head">
@@ -189,19 +182,7 @@ const setActionVariable = (name: string) => {
         </template>
       </template>
 
-      <VTextField
-        v-else-if="kind === BehaviorKind.VIf"
-        :model-value="condition.shown('condition', node.vIf)"
-        :error-messages="condition.errorOf('condition')"
-        label="Condition"
-        placeholder='isOpen, !loading, step >= 2 and role == "admin"'
-        variant="outlined"
-        density="compact"
-        hide-details="auto"
-        @update:model-value="value => condition.edit('condition', value)"
-        @blur="condition.commit('condition')"
-        @keydown.enter="condition.commit('condition')"
-      />
+      <ConditionField v-else-if="kind === BehaviorKind.VIf" :node="node" />
 
       <VariableField
         v-else-if="kind === BehaviorKind.Model"
@@ -222,6 +203,31 @@ const setActionVariable = (name: string) => {
 </template>
 
 <style scoped>
+.behavior-starts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.behavior-start {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+  text-align: left;
+}
+.behavior-start:hover {
+  border-color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), 0.06);
+}
+.behavior-start__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.behavior-start__description {
+  font-size: 12px;
+}
 .behavior-card {
   margin-bottom: 10px;
   padding: 8px 10px 12px;

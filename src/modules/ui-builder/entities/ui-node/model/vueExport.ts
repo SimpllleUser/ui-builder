@@ -1,13 +1,10 @@
-import { TEXT_NODE_TYPE } from './constants'
-import { expressionError, expressionVariables } from './expression'
 import { helperSources, HelperName } from './expressionToJs'
 import { jsLiteral } from './jsLiteral'
-import { AMBIENT_NAMES, bindingRoots } from './projectAudit'
+import { AMBIENT_NAMES, variablesOfNode, walkNodes } from './variableUsage'
 import type { Page, Prefab, UiNode } from './types'
 import { renderNodes, type TemplateContext } from './vueTemplate'
 
 const INDENT = '  '
-const ROOT_NAME = /^\s*([A-Za-z_$][\w$]*)/
 
 export interface VueFile {
   /** Name to save it under, such as `OrderDesk.vue`. */
@@ -15,31 +12,9 @@ export interface VueFile {
   code: string
 }
 
-function childNodes(node: UiNode): UiNode[] {
-  return [...node.children, ...Object.values(node.slots).flat()]
-}
-
 /** Names of the project variables an element tree reads or writes, in order of first use. */
 function collectVariables(root: UiNode): string[] {
-  const names = new Set<string>()
-  const add = (name: string | undefined) => {
-    if (name && !AMBIENT_NAMES.has(name)) names.add(name)
-  }
-  const addFromText = (text: string) => bindingRoots(text).forEach(add)
-  const visit = (node: UiNode) => {
-    if (node.type === TEXT_NODE_TYPE) addFromText(node.name)
-    for (const value of Object.values(node.props)) if (typeof value === 'string') addFromText(value)
-    add(node.model)
-    if (node.vFor) add(ROOT_NAME.exec(node.vFor)?.[1])
-    if (node.vIf && !expressionError(node.vIf)) expressionVariables(node.vIf).forEach(add)
-    const click = node.events?.click
-    if (click && 'key' in click) add(click.key)
-    if (click && 'to' in click) addFromText(click.to)
-    if (click && 'value' in click) addFromText(click.value)
-    childNodes(node).forEach(visit)
-  }
-  visit(root)
-  return [...names]
+  return [...new Set([...walkNodes(root)].flatMap(node => variablesOfNode(node).map(reference => reference.name)))]
 }
 
 const variableDeclaration = (name: string, state: Record<string, unknown>) =>

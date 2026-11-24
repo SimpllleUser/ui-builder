@@ -1,8 +1,10 @@
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { ActionType, IssueKind, IssueSeverity } from './enums'
-import { expressionVariables } from './expression'
 import { conditionError } from './runtime'
-import type { Page, Project, UiNode } from './types'
+import type { Project, UiNode } from './types'
+import { UsageKind, variablesOfNode, walkNodes, walkProject, type ProjectNode } from './variableUsage'
+
+export { AMBIENT_NAMES, bindingRoots } from './variableUsage'
 
 export interface Issue {
   kind: IssueKind
@@ -13,25 +15,22 @@ export interface Issue {
   nodeName?: string
 }
 
-/** Names that exist inside repeated elements, table cells and saved-component templates (`props`) without being defined as variables. */
-export const AMBIENT_NAMES = new Set(['item', 'index', 'value', 'props'])
-const BINDING = /\{\{\s*([^{}]+?)\s*\}\}/g
-const ROOT_NAME = /^\s*!?\s*([A-Za-z_$][\w$]*)/
-
-/** The variables a text refers to with `{{ name.path }}`. */
-export const bindingRoots = (text: string): string[] =>
-  [...text.matchAll(BINDING)].flatMap(match => ROOT_NAME.exec(match[1])?.[1] ?? [])
-
-const rootOf = (expression: string | undefined) => (expression ? ROOT_NAME.exec(expression)?.[1] : undefined)
-
-interface Walk {
-  pageId?: string
-  node: UiNode
+/** How seriously an unknown variable counts, by where it is used: a missing one in text only shows nothing. */
+const UNKNOWN_SEVERITY: Record<UsageKind, IssueSeverity> = {
+  [UsageKind.Text]: IssueSeverity.Warning,
+  [UsageKind.Property]: IssueSeverity.Warning,
+  [UsageKind.Link]: IssueSeverity.Error,
+  [UsageKind.Repeat]: IssueSeverity.Error,
+  [UsageKind.Condition]: IssueSeverity.Error,
+  [UsageKind.Click]: IssueSeverity.Error,
 }
-
-function* walk(node: UiNode, pageId?: string): Generator<Walk> {
-  yield { pageId, node }
-  for (const child of [...node.children, ...Object.values(node.slots).flat()]) yield* walk(child, pageId)
+const USAGE_SUFFIX: Record<UsageKind, string> = {
+  [UsageKind.Text]: '',
+  [UsageKind.Property]: '',
+  [UsageKind.Link]: ' (link to a variable)',
+  [UsageKind.Repeat]: ' (repeat)',
+  [UsageKind.Condition]: ' (show only when)',
+  [UsageKind.Click]: ' (click)',
 }
 
 /** Problems that would make a project misbehave in Preview, found without running it. */
@@ -45,8 +44,7 @@ export function auditProject(project: Project): Issue[] {
     const { node, ...rest } = issue
     issues.push({ ...rest, ...(node ? { nodeId: node.id, nodeName: node.name } : {}) })
   }
-  const useVariable = (name: string | undefined, severity: IssueSeverity, walked: Walk, where: string) => {
-    if (!name || AMBIENT_NAMES.has(name)) return
+  const useVariable = (name: string, severity: IssueSeverity, walked: ProjectNode, where: string) => {
     used.add(name)
     if (!defined.has(name)) {
       report({
@@ -59,67 +57,48 @@ export function auditProject(project: Project): Issue[] {
     }
   }
 
-  const trees: Array<{ root: UiNode; pageId?: string }> = [
-    ...project.pages.map((page: Page) => ({ root: page.root, pageId: page.id })),
-    ...(project.layout ? [{ root: project.layout }] : []),
-  ]
-  for (const { root, pageId } of trees) {
-    for (const walked of walk(root, pageId)) {
-      const { node } = walked
-      const here = node.type === TEXT_NODE_TYPE ? `The text “${node.name.slice(0, 30)}”` : `“${node.name}”`
+  for (const walked of walkProject(project)) {
+    const { node, pageId } = walked
+    const here = node.type === TEXT_NODE_TYPE ? `The text “${node.name.slice(0, 30)}”` : `“${node.name}”`
 
-      if (node.type === TEXT_NODE_TYPE)
-        bindingRoots(node.name).forEach(name => useVariable(name, IssueSeverity.Warning, walked, here))
-      for (const value of Object.values(node.props)) {
-        if (typeof value === 'string')
-          bindingRoots(value).forEach(name => useVariable(name, IssueSeverity.Warning, walked, here))
-      }
-      if (node.model) useVariable(node.model, IssueSeverity.Error, walked, `${here} (link to a variable)`)
-      if (node.vFor) useVariable(rootOf(node.vFor), IssueSeverity.Error, walked, `${here} (repeat)`)
-      if (node.vIf) {
-        const problem = conditionError(node.vIf)
-        if (problem) {
-          report({
-            kind: IssueKind.InvalidCondition,
-            severity: IssueSeverity.Error,
-            message: `${here}: ${problem}`,
-            pageId,
-            node,
-          })
-        } else
-          expressionVariables(node.vIf).forEach(name =>
-            useVariable(name, IssueSeverity.Error, walked, `${here} (show only when)`),
-          )
-      }
-
-      const click = node.events?.click
-      if (click?.type === ActionType.Navigate && !click.to.includes('{{') && !routes.has(click.to)) {
+    for (const reference of variablesOfNode(node))
+      useVariable(reference.name, UNKNOWN_SEVERITY[reference.kind], walked, `${here}${USAGE_SUFFIX[reference.kind]}`)
+    if (node.vIf) {
+      const problem = conditionError(node.vIf)
+      if (problem) {
         report({
-          kind: IssueKind.MissingRoute,
+          kind: IssueKind.InvalidCondition,
           severity: IssueSeverity.Error,
-          message: `${here} goes to “${click.to}”, but no page has that route.`,
-          pageId,
-          node,
-        })
-      }
-      if (click && click.type !== ActionType.Navigate)
-        useVariable(click.key, IssueSeverity.Error, walked, `${here} (click)`)
-      if (click?.type === ActionType.Set)
-        bindingRoots(click.value).forEach(name => useVariable(name, IssueSeverity.Error, walked, `${here} (click)`))
-
-      if (node.type === 'VDataTable' && Array.isArray(node.props.headers) && node.props.headers.length === 0) {
-        report({
-          kind: IssueKind.EmptyTable,
-          severity: IssueSeverity.Warning,
-          message: `${here} has no columns.`,
+          message: `${here}: ${problem}`,
           pageId,
           node,
         })
       }
     }
+
+    const click = node.events?.click
+    if (click?.type === ActionType.Navigate && !click.to.includes('{{') && !routes.has(click.to)) {
+      report({
+        kind: IssueKind.MissingRoute,
+        severity: IssueSeverity.Error,
+        message: `${here} goes to “${click.to}”, but no page has that route.`,
+        pageId,
+        node,
+      })
+    }
+
+    if (node.type === 'VDataTable' && Array.isArray(node.props.headers) && node.props.headers.length === 0) {
+      report({
+        kind: IssueKind.EmptyTable,
+        severity: IssueSeverity.Warning,
+        message: `${here} has no columns.`,
+        pageId,
+        node,
+      })
+    }
   }
 
-  if (project.layout && ![...walk(project.layout)].some(({ node }) => node.type === OUTLET_NODE_TYPE)) {
+  if (project.layout && ![...walkNodes(project.layout)].some(node => node.type === OUTLET_NODE_TYPE)) {
     report({
       kind: IssueKind.MissingOutlet,
       severity: IssueSeverity.Warning,
