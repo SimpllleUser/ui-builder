@@ -97,7 +97,14 @@ const toggleLayout = (on: boolean) => {
           </VListItem>
         </VList>
         <form class="d-flex align-center ga-2 mt-3" @submit.prevent="addPage">
-          <VTextField v-model="newName" label="New page name" variant="outlined" density="compact" hide-details />
+          <VTextField
+            v-model="newName"
+            :error-messages="newNameError"
+            label="New page name"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+          />
           <VTextField
             v-model="newPath"
             :error-messages="newPathError ?? []"
@@ -107,7 +114,7 @@ const toggleLayout = (on: boolean) => {
             density="compact"
             hide-details="auto"
           />
-          <VBtn type="submit" color="primary" :disabled="!newName.trim() || !!newPathError">Add</VBtn>
+          <VBtn type="submit" variant="tonal" color="primary" prepend-icon="mdi-plus">Add page</VBtn>
         </form>
 
         <div class="text-overline text-primary font-weight-bold mt-6 mb-1">Shared layout</div>

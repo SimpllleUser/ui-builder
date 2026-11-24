@@ -76,7 +76,7 @@ const confirmDelete = () => {
             @click.stop="insert(prefab)"
           />
           <VBtn
-            icon="mdi-trash-can-outline"
+            icon="mdi-delete-outline"
             :aria-label="`Delete saved component ${prefab.name}`"
             variant="text"
             size="x-small"

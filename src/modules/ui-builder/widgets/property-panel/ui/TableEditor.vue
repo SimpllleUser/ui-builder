@@ -186,7 +186,9 @@ const bind = (prop: TableData, value: string | null) => {
           Cell components can use <code v-pre>{{ value }}</code> (this cell) and <code v-pre>{{ item.key }}</code> (the
           row), also in click actions. Edit them in Layers under the table.
         </p>
-        <VBtn size="small" variant="tonal" prepend-icon="mdi-plus" @click="store.table.addColumn(id)">Add column</VBtn>
+        <VBtn size="small" variant="tonal" color="primary" prepend-icon="mdi-plus" @click="store.table.addColumn(id)"
+          >Add column</VBtn
+        >
       </template>
     </template>
 

@@ -15,6 +15,7 @@ import {
 } from '../model/fieldTabs'
 import { useMoveDialog, useSavePrefabDialog } from '../model/useNodeDialogs'
 import { useDesignTabPreference } from '../model/useDesignTabPreference'
+import { useTabScroll } from '../model/useTabScroll'
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
 import DesignTab from './design/DesignTab.vue'
 import AdvancedProperties from './AdvancedProperties.vue'
@@ -76,6 +77,9 @@ watch(
   { immediate: true },
 )
 
+const panel = ref<HTMLElement>()
+useTabScroll(panel, activeTab, selectedNodeId)
+
 // ─── The rest of the panel ───────────────────────────────────────────────────
 const { classSearch, filteredGroups, toggleClass, addCustomClass } = useClassEditor(selectedNode, (id, classes) =>
   store.updateNodeClasses(id, classes),
@@ -88,7 +92,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
 </script>
 
 <template>
-  <div class="property-panel">
+  <div ref="panel" class="property-panel">
     <MultiSelectSpacing v-if="selectedNodeIds.length > 1" />
     <div v-else-if="selectedNode" :key="selectedNode.id" class="pa-4">
       <div class="d-flex align-center justify-space-between mb-1">
