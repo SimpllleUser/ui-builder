@@ -5,9 +5,10 @@ import { LAYERS_HELP, SIDEBAR_VIEWS, SidebarView } from '../model/sidebarViews'
 import HistoryView from './HistoryView.vue'
 import LayersView from './LayersView.vue'
 import SavedComponentsView from './SavedComponentsView.vue'
+import VariablesView from './VariablesView.vue'
 import WrapToolbar from './WrapToolbar.vue'
 
-/** The left panel: an activity bar that switches between components, layers, saved components and history. */
+/** The left panel: an activity bar that switches between components, layers, variables, saved components and history. */
 const emit = defineEmits<{ close: [] }>()
 const store = useUiTreeStore()
 const activeView = ref<SidebarView>(SidebarView.Layers)
@@ -66,6 +67,7 @@ const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeVi
           <!-- The component library is another widget; the app puts it here, so this widget needs no import of it. -->
           <slot v-if="activeView === SidebarView.Components" name="components" />
           <LayersView v-else-if="activeView === SidebarView.Layers" />
+          <VariablesView v-else-if="activeView === SidebarView.Variables" />
           <SavedComponentsView v-else-if="activeView === SidebarView.Prefabs" />
           <HistoryView v-else />
         </section>
@@ -167,7 +169,7 @@ const viewTitle = computed(() => SIDEBAR_VIEWS.find(view => view.id === activeVi
   min-height: 36px;
   padding: 0 12px;
   color: rgb(var(--v-theme-on-surface));
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

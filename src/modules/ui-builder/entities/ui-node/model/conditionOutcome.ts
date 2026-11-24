@@ -1,6 +1,6 @@
 import { CELL_SLOT_PREFIX } from './componentDefinitions'
 import { expressionError, expressionVariables } from './expression'
-import { AMBIENT_NAMES } from './projectAudit'
+import { AMBIENT_NAMES } from './variableUsage'
 import { evaluateCondition, type Scope } from './runtime'
 import type { UiNode } from './types'
 
