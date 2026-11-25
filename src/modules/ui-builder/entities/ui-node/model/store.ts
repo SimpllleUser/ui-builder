@@ -53,7 +53,7 @@ import {
 } from './treeUtils'
 import { createHistory, type HistoryEntry } from './history'
 import { OUTSIDE_CHANGE_LABEL, useComponentHistory } from './componentHistory'
-import { useDeletedPrefab } from './deletedPrefab'
+import { useDeletedPrefabs } from './deletedPrefab'
 import {
   editedPrefabId,
   isOnLayout,
@@ -90,7 +90,7 @@ import {
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateProps } from './templateFactory'
 import { EventName, type Breakpoint, type StepDirection, type TemplateKind } from './enums'
 import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
-import type { DataSource, HistoryCheckpoint, Project, UiAction, UiNode, Prefab } from './types'
+import type { DataSource, DeletedPrefab, HistoryCheckpoint, Project, UiAction, UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
@@ -122,7 +122,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   )
   /** My components. They belong to no project. */
   const prefabs = ref<Prefab[]>([])
-  const prefabSync = usePrefabSync(prefabs, () => setNotice('Could not save My components in this browser.'))
+  /** Deleted saved components that can be restored. */
+  const deletedPrefabs = ref<DeletedPrefab[]>([])
+  const prefabSync = usePrefabSync(prefabs, deletedPrefabs, () =>
+    setNotice('Could not save My components in this browser.'),
+  )
   /** The saved component opened for editing in place of the page, or null while a page or the layout is edited. */
   const editingPrefabId = computed(() => editedPrefabId(editTarget.value))
   const editingPrefab = computed(() => prefabs.value.find(prefab => prefab.prefabId === editingPrefabId.value) ?? null)
@@ -164,10 +168,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   // Anything that was removed can be brought back from the message that says so.
   const offerUndo = (entry: HistoryEntry) => {
     // Something was edited since a component was deleted, so Undo takes that back now.
-    if (entry.label !== OUTSIDE_CHANGE_LABEL) deletedPrefab.forget()
+    if (entry.label !== OUTSIDE_CHANGE_LABEL) deletion.forget()
     if (/^(Deleted|Removed)/.test(entry.label)) setNotice(`${entry.label}.`, true)
   }
-  const deletedPrefab = useDeletedPrefab(prefabs, prefabId => prefabSync.readHistory(prefabId))
+  const deletion = useDeletedPrefabs(prefabs, deletedPrefabs)
   const history = createHistory({
     serialize: () => JSON.stringify(project.value),
     applySnapshot: applyProjectSnapshot,
@@ -194,8 +198,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const shown = <T>(ofComponent: { readonly value: T }, ofProject: { readonly value: T }) =>
     computed(() => (editingPrefab.value ? ofComponent.value : ofProject.value))
   const shownCanUndo = shown(componentHistory.canUndo, history.canUndo)
-  const canUndo = computed(() => !!deletedPrefab.deleted.value || shownCanUndo.value)
-  const canRedo = shown(componentHistory.canRedo, history.canRedo)
+  const canUndo = computed(() => !!deletion.undoableId.value || shownCanUndo.value)
+  const shownCanRedo = shown(componentHistory.canRedo, history.canRedo)
+  const canRedo = computed(() => !!deletion.redoableId.value || shownCanRedo.value)
   const historyVersions = shown(componentHistory.versions, history.versions)
   const historyPending = shown(componentHistory.pending, history.pending)
   const commitProject = () => {
@@ -242,31 +247,37 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       commit()
     }
   }
-  /** Brings back the component deleted last, unless something was edited after it. */
-  const restoreDeletedPrefab = () => {
-    // Changes not recorded yet are newer than the deletion.
+  const restorePrefab = (prefabId: string) => {
+    // Changes not recorded yet come before the restoring.
     commit()
-    const restored = deletedPrefab.bringBack()
-    if (!restored) return false
-    void componentHistory.revive(restored.prefab.prefabId, restored.history)
-    setNotice(`Restored ${restored.prefab.name} to My components.`)
-    return true
+    const prefab = deletion.restore(prefabId)
+    if (prefab) setNotice(`Restored ${prefab.name} to My components.`)
+    return !!prefab
   }
   const deletePrefab = (prefabId: string) => {
     const name = prefabs.value.find(prefab => prefab.prefabId === prefabId)?.name
     if (name === undefined) return
     commit()
-    deletedPrefab.remember(prefabId)
+    deletion.remember(prefabId)
     deletePrefabMutation(mutationContext, prefabId)
     setNotice(`Deleted component ${name}.`, true)
   }
   const undo = () => {
-    if (restoreDeletedPrefab()) return
+    // Changes not recorded yet are newer than a deletion.
+    if (deletion.undoableId.value) commit()
+    const deletedId = deletion.undoableId.value
+    if (deletedId && restorePrefab(deletedId)) {
+      deletion.redoableId.value = deletedId
+      return
+    }
     if (editingPrefab.value) return componentHistory.undo()
     clearTimeout(historyTimer)
     history.undo()
   }
   const redo = () => {
+    if (deletion.redoableId.value) commit()
+    const restoredId = deletion.redoableId.value
+    if (restoredId) return deletePrefab(restoredId)
     if (editingPrefab.value) return componentHistory.redo()
     clearTimeout(historyTimer)
     history.redo()
@@ -667,7 +678,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       activePageId.value = (next.pages.find(page => page.id === opened.activePageId) ?? next.pages[0]).id
       checkpoints.value = [...opened.checkpoints]
       history.reset()
-      deletedPrefab.forget()
+      deletion.forget()
     } finally {
       isOpening = false
     }
@@ -888,6 +899,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     setInstanceProps: instances.setInstanceProps,
     detachInstance: instances.detachInstance,
     deletePrefab,
+    deletedPrefabs,
+    restorePrefab,
     selectNode,
     renameNode,
     updateSlotChildren,

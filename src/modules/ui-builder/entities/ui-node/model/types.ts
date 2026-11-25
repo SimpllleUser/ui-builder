@@ -44,6 +44,8 @@ export interface InstanceLink {
   prefabId: string
   /** Parameter values chosen for this instance; the ones left out follow the component's defaults. */
   values: Record<string, string>
+  /** What the instance held when it was last built from the original, to notice edits made while that was gone. */
+  stamp?: string
 }
 
 export interface UiNode {
@@ -100,6 +102,14 @@ export interface Prefab {
   node: UiNode
   /** Saved before parameters existed when missing. */
   props?: PrefabProp[]
+}
+
+/** A saved component that was deleted and can still be brought back. */
+export interface DeletedPrefab {
+  prefab: Prefab
+  /** Where it stood in the list. */
+  index: number
+  deletedAt: number
 }
 
 export interface HistoryCheckpoint {

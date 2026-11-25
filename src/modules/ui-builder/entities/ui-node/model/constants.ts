@@ -18,3 +18,5 @@ export const MAX_RECENT_COMPONENTS = 6
 export const HISTORY_COMMIT_DELAY_MS = 600
 /** Joins an instance's id and an original element's id into the id of that element inside the instance. */
 export const INSTANCE_ID_SEPARATOR = '--'
+/** Deleted saved components kept for restoring; the oldest ones go first. */
+export const MAX_DELETED_PREFABS = 10

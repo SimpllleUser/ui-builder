@@ -249,3 +249,45 @@ test('a component deleted without being opened since the app started keeps its h
   await edit(reopened, prefabId)
   assert.equal(reopened.historyVersions.length, 2)
 })
+
+test('deleted components can be restored after closing the app, to their place and with their history', async () => {
+  const first = await openTab()
+  save(first, 'First')
+  save(first, 'Second')
+  const [{ prefabId }] = first.prefabs
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+  first.deletePrefab(prefabId)
+  await first.flushPrefabs()
+
+  const reopened = await openTab()
+  assert.deepEqual(
+    reopened.deletedPrefabs.map(entry => entry.prefab.name),
+    ['First'],
+  )
+  assert.equal(reopened.restorePrefab(prefabId), true)
+  await reopened.flushPrefabs()
+
+  const again = await openTab()
+  assert.deepEqual(names(again.prefabs), ['First', 'Second'])
+  assert.deepEqual(again.deletedPrefabs, [])
+  await edit(again, prefabId)
+  assert.equal(again.historyVersions.length, 2)
+})
+
+test('another tab sees what was deleted, and only the latest deletions are kept', async () => {
+  const first = await openTab()
+  const second = await openTab()
+  for (let index = 0; index < 12; index++) save(first, `Card ${index}`)
+  await first.flushPrefabs()
+  for (const { prefabId } of [...first.prefabs]) {
+    first.deletePrefab(prefabId)
+    await first.flushPrefabs()
+    await new Promise(resolve => setTimeout(resolve, 2))
+  }
+  await settle()
+  assert.equal(second.deletedPrefabs.length, 10)
+  assert.equal(second.deletedPrefabs[0].prefab.name, 'Card 11')
+  assert.equal((await openTab()).deletedPrefabs.length, 10)
+})

@@ -156,13 +156,6 @@ export function useComponentHistory(sources: ComponentHistorySources) {
   return {
     commit,
     load,
-    /** Stores the history of a component that was brought back after being deleted. */
-    revive: async (prefabId: string, saved: Promise<SavedHistory | null>) => {
-      // What this editor holds is newer than what was stored.
-      if (histories.has(prefabId)) return store(prefabId)
-      const history = await saved
-      if (history) write(prefabId, history)
-    },
     undo: () => move(history => history.undo()),
     redo: () => move(history => history.redo()),
     restoreVersion: (index: number) => move(history => history.restore(index)),

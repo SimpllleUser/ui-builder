@@ -1,15 +1,17 @@
 import { ref, watch, type Ref } from 'vue'
 import type { HeldLock } from '../../../../../shared/lib/webLocks'
 import type { SavedHistory } from './history'
-import type { Prefab } from './types'
+import type { DeletedPrefab, Prefab } from './types'
 
 const SAVE_DELAY_MS = 250
 
 export interface PrefabLibrary {
   list(): Promise<Prefab[]>
   put(prefab: Prefab): Promise<unknown>
+  /** Keeps the component among the deleted ones: putting it again brings it back with its history. */
   remove(prefabId: string): Promise<unknown>
-  /** The undo history of a component, or null when none was stored. It goes when the component is removed. */
+  listDeleted(): Promise<DeletedPrefab[]>
+  /** The undo history of a component, or null when none was stored or the component is deleted. */
   readHistory(prefabId: string): Promise<SavedHistory | null>
   writeHistory(prefabId: string, history: SavedHistory): Promise<unknown>
   /** Calls `listener` when another tab changed the library. */
@@ -22,7 +24,7 @@ export interface PrefabLibrary {
  * Keeps the list of saved components in step with the library: only what changed here is written, and changes
  * from other tabs are taken in without losing what is not written yet.
  */
-export function usePrefabSync(prefabs: Ref<Prefab[]>, onError: () => void) {
+export function usePrefabSync(prefabs: Ref<Prefab[]>, deleted: Ref<DeletedPrefab[]>, onError: () => void) {
   let library: PrefabLibrary | null = null
   /** Each component as the library has it, as text. */
   let stored = new Map<string, string>()
@@ -72,6 +74,7 @@ export function usePrefabSync(prefabs: Ref<Prefab[]>, onError: () => void) {
   const takeIn = async (target: PrefabLibrary) => {
     await writeChanges(target)
     const list = await target.list()
+    const theirDeleted = await target.listDeleted()
     const local = new Map(prefabs.value.map(prefab => [prefab.prefabId, prefab]))
     const merged = list.flatMap(theirs => {
       const mine = local.get(theirs.prefabId)
@@ -82,8 +85,15 @@ export function usePrefabSync(prefabs: Ref<Prefab[]>, onError: () => void) {
       return [isUnwritten || mineText === JSON.stringify(theirs) ? mine : theirs]
     })
     const addedMeanwhile = prefabs.value.filter(prefab => !stored.has(prefab.prefabId))
+    // Removed here and not written yet.
+    const unwritten = deleted.value.filter(entry => stored.has(entry.prefab.prefabId))
     stored = new Map(list.map(prefab => [prefab.prefabId, JSON.stringify(prefab)]))
     prefabs.value = [...merged, ...addedMeanwhile]
+    const present = new Set(prefabs.value.map(prefab => prefab.prefabId))
+    const known = new Set(unwritten.map(entry => entry.prefab.prefabId))
+    deleted.value = [...unwritten, ...theirDeleted.filter(entry => !known.has(entry.prefab.prefabId))].filter(
+      entry => !present.has(entry.prefab.prefabId),
+    )
   }
 
   watch(
@@ -101,6 +111,7 @@ export function usePrefabSync(prefabs: Ref<Prefab[]>, onError: () => void) {
     const list = await target.list()
     stored = new Map(list.map(prefab => [prefab.prefabId, JSON.stringify(prefab)]))
     prefabs.value = list
+    deleted.value = await target.listDeleted()
     library = target
     target.subscribe(() => void enqueue(takeIn))
   }

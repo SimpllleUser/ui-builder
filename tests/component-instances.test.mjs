@@ -28,7 +28,7 @@ test('instances follow their original, each with its own parameters', () => {
   const prefab = saveAndInsert()
   store.insertPrefab(prefab.prefabId, 'root-canvas', null, { title: 'Order' })
   const [first, second] = store.rootNode.children
-  assert.deepEqual(first.instance, { prefabId: prefab.prefabId, values: {} })
+  assert.deepEqual([first.instance.prefabId, first.instance.values], [prefab.prefabId, {}])
   assert.deepEqual([textOf(first), textOf(second)], ['Buy', 'Order'])
 
   editOriginal(prefab, node => {
@@ -293,4 +293,34 @@ test('a failed group of changes is put back in the component too', () => {
   )
   assert.equal(store.rootNode.props.variant, undefined)
   assert.equal(store.canUndo, false)
+})
+
+test('Redo deletes the restored component again', () => {
+  const prefab = saveAndInsert()
+  store.commit()
+  store.deletePrefab(prefab.prefabId)
+  store.undo()
+  assert.equal(store.canRedo, true)
+  store.redo()
+  assert.equal(store.prefabs.length, 0)
+  store.undo()
+  assert.equal(store.prefabs.length, 1)
+})
+
+test('a component can be restored after other edits, and a copy edited meanwhile stays a copy', () => {
+  const prefab = saveAndInsert()
+  store.insertPrefab(prefab.prefabId, 'root-canvas')
+  const [edited, untouched] = store.rootNode.children
+  store.deletePrefab(prefab.prefabId)
+  store.updateNodeProp(edited.id, 'color', 'error')
+  store.renameNode(untouched.id, 'Renamed')
+  store.commit()
+
+  assert.equal(store.restorePrefab(prefab.prefabId), true)
+  assert.equal(store.deletedPrefabs.length, 0)
+  const [first, second] = store.rootNode.children
+  assert.equal(first.props.color, 'error', 'the edit is not overwritten')
+  assert.equal(first.instance, undefined)
+  assert.equal(second.instance.prefabId, prefab.prefabId, 'a renamed copy is still the same content')
+  assert.equal(second.name, 'Renamed')
 })
