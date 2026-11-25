@@ -4,7 +4,10 @@ import { buildBlog } from './templates/blog'
 import { buildContact } from './templates/contact'
 import { buildFaq } from './templates/faq'
 import { buildFooter } from './templates/footer'
+import { buildLanding } from './templates/landing'
 import { buildOnboarding } from './templates/onboarding'
+import { buildPricing } from './templates/pricing'
+import { buildSettingsPage } from './templates/settingsPage'
 import {
   element,
   type Builder,
@@ -14,6 +17,7 @@ import {
 } from './templates/templateElement'
 import { resolveTemplateProps } from './templates/templatePresets'
 import { buildTestimonials } from './templates/testimonials'
+import { buildWizard } from './templates/wizard'
 import type { UiNode } from './types'
 
 export type { TemplateContext, TemplateProps }
@@ -74,6 +78,25 @@ export const TEMPLATES: TemplateInfo[] = [
     description: 'Brand, link columns, copyright',
     icon: 'mdi-page-layout-footer',
   },
+  {
+    kind: TemplateKind.Landing,
+    label: 'Landing page',
+    description: 'Hero, features and a call to action',
+    icon: 'mdi-rocket-launch-outline',
+  },
+  {
+    kind: TemplateKind.Settings,
+    label: 'Settings page',
+    description: 'Profile, notifications and Save',
+    icon: 'mdi-cog-outline',
+  },
+  {
+    kind: TemplateKind.Wizard,
+    label: 'Wizard',
+    description: 'A form in several checked steps',
+    icon: 'mdi-wizard-hat',
+  },
+  { kind: TemplateKind.Pricing, label: 'Pricing', description: 'Plans side by side', icon: 'mdi-tag-outline' },
 ]
 
 /** Every starter builds one element. Each reads its settings from the props and has a default for all of them. */
@@ -90,6 +113,10 @@ const BUILDERS: Record<TemplateKind, Builder> = {
   [TemplateKind.Onboarding]: buildOnboarding,
   [TemplateKind.Blog]: buildBlog,
   [TemplateKind.Contact]: buildContact,
+  [TemplateKind.Landing]: buildLanding,
+  [TemplateKind.Settings]: buildSettingsPage,
+  [TemplateKind.Wizard]: buildWizard,
+  [TemplateKind.Pricing]: buildPricing,
 }
 
 /** `props` customizes the template (texts, lists of entries, or a `preset` id); what is not given keeps its default. */

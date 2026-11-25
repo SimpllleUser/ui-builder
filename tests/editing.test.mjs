@@ -35,6 +35,19 @@ test('unwrap refuses named slot content without losing data; regular unwrap and 
   assert.ok(store.findNodeById(id))
 })
 
+test('the display control keeps responsive and print display classes', () => {
+  const classes = ['d-md-none', 'd-print-block', 'd-block', 'pa-2']
+  assert.equal(readFlex(classes), 'd-block')
+  assert.deepEqual(writeFlex(classes, 'd-flex flex-column'), [
+    'd-md-none',
+    'd-print-block',
+    'pa-2',
+    'd-flex',
+    'flex-column',
+  ])
+  assert.equal(readFlex(['d-sm-flex']), null)
+})
+
 test('prefab selected on a leaf inserts into the nearest container and selects the new copy', () => {
   store.addComponent('VBtn')
   const button = store.selectedNodeId
@@ -258,7 +271,7 @@ test('a saved component can be edited in place of the page, and its parameters f
   assert.equal(store.editPrefab(prefabId), true)
   assert.equal(store.rootNode, store.editingPrefab.node)
   assert.deepEqual(store.selectedNodeIds, [store.rootNode.id], 'its settings open in the properties panel')
-  assert.equal(store.canUndo, false, 'history only covers the project')
+  assert.equal(store.canUndo, false, 'a component just opened has nothing to take back')
 
   store.updateNodeProp(store.rootNode.id, 'color', '{{props.tone}}')
   assert.deepEqual(store.prefabs[0].props, [{ name: 'tone', defaultValue: '' }])

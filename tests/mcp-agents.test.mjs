@@ -22,6 +22,43 @@ test('set_style writes values that beat utility classes and understands theme co
   assert.throws(() => run(store, 'set_style', { id, style: { color: 'red; x: y' } }), /not allowed/)
 })
 
+test('set_style styles one Vuetify breakpoint without touching the others', async () => {
+  const { executeMcpCommand: run } = await load()
+  const { id } = run(store, 'add_component', { type: 'div' })
+  run(store, 'set_style', { id, style: { width: 100 } })
+  const answer = run(store, 'set_style', { id, style: { width: 300, color: 'red' }, breakpoint: 'md' })
+  assert.deepEqual(answer.style, { width: '100px' })
+  assert.deepEqual(answer.responsive, { md: { width: '300px', color: 'red' } })
+  assert.equal(run(store, 'get_node', { id }).responsive.md.width, '300px !important')
+  run(store, 'set_style', { id, style: { color: null }, breakpoint: 'md' })
+  assert.deepEqual(Object.keys(store.findNodeById(id).responsive.md), ['width'])
+  run(store, 'set_style', { id, style: { height: 5 }, breakpoint: 'xs' })
+  assert.equal(store.findNodeById(id).props.style.height, '5px !important')
+  assert.throws(() => run(store, 'set_style', { id, style: { width: 1 }, breakpoint: 'xxl' }), /Unknown breakpoint/)
+})
+
+test('a null style clears the named breakpoint, or every style when none is named', async () => {
+  const { executeMcpCommand: run } = await load()
+  const { id } = run(store, 'add_component', { type: 'div' })
+  const style = () => store.findNodeById(id)
+  const fill = () => {
+    run(store, 'set_style', { id, style: { width: 1 } })
+    run(store, 'set_style', { id, style: { width: 2 }, breakpoint: 'sm' })
+  }
+  fill()
+  run(store, 'set_style', { id, style: null, breakpoint: 'sm' })
+  assert.equal(style().responsive, undefined)
+  assert.ok(style().props.style)
+  fill()
+  run(store, 'set_style', { id, style: null, breakpoint: 'xs' })
+  assert.equal(style().props.style, undefined)
+  assert.ok(style().responsive.sm)
+  fill()
+  run(store, 'set_style', { id, style: null })
+  assert.equal(style().props.style, undefined)
+  assert.equal(style().responsive, undefined)
+})
+
 test('add_subtree builds a tree in one undo step and rejects a bad tree whole', async () => {
   const { executeMcpCommand: run } = await load()
   const before = JSON.stringify(store.project)

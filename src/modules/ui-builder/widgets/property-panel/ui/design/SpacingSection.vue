@@ -3,10 +3,12 @@ import { ref } from 'vue'
 import { readSpacing, SpacingType, type UiNode } from '../../../../entities/ui-node'
 import { Side, SpacingBox, spacingProperty } from '../../model/designStyle'
 import { parsePx, toPx } from '../../../../../../shared/lib/inlineStyle'
+import { parseSpaceToken, SpaceToken, spaceValue } from '../../../../../../shared/lib/themeTokens'
 import { useNodeStyle } from '../../model/useNodeStyle'
 import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
 import NumberField from './NumberField.vue'
+import TokenChips from './TokenChips.vue'
 
 // Listed as they sit in the 2 × 2 grid: top and bottom, then left and right.
 const SIDES = [
@@ -20,6 +22,7 @@ const BOXES = [
   { box: SpacingBox.Padding, name: 'Padding', type: SpacingType.Padding, min: 0 },
 ]
 const SPACING_UNIT_PX = 4
+const SPACE_TOKENS = Object.values(SpaceToken)
 
 /** Margin (outside the element) and padding (inside it), with a field for each side. */
 const props = defineProps<{ node: UiNode }>()
@@ -42,6 +45,16 @@ const setSide = (box: SpacingBox, side: Side, amount: number | null) => {
   const sides = linked.value.has(box) ? SIDES.map(item => item.side) : [side]
   apply(Object.fromEntries(sides.map(item => [spacingProperty(box, item), toPx(amount)])))
 }
+
+const sideToken = (box: SpacingBox, side: Side) => parseSpaceToken(style.value[spacingProperty(box, side)])
+/** The token all four sides use, or null. */
+const boxToken = (box: SpacingBox) => {
+  const tokens = SIDES.map(({ side }) => sideToken(box, side))
+  return tokens.every(token => token === tokens[0]) ? tokens[0] : null
+}
+// A preset sets all four sides at once.
+const setBoxToken = (box: SpacingBox, token: SpaceToken | null) =>
+  apply(Object.fromEntries(SIDES.map(({ side }) => [spacingProperty(box, side), token && spaceValue(token)])))
 
 // A side set by a class (`pa-4`) is shown faintly, so the fields never look empty when the element does have spacing.
 const fromClasses = (type: SpacingType, letter: string) => {
@@ -71,10 +84,16 @@ const fromClasses = (type: SpacingType, letter: string) => {
           :title="`${group.name} ${item.side.toLowerCase()}`"
           :model-value="value(group.box, item.side)"
           :min="group.min"
-          :placeholder="fromClasses(group.type, item.letter)"
+          :placeholder="sideToken(group.box, item.side) ?? fromClasses(group.type, item.letter)"
           @update:model-value="amount => setSide(group.box, item.side, amount)"
         />
       </div>
+      <TokenChips
+        :label="group.name"
+        :tokens="SPACE_TOKENS"
+        :selected="boxToken(group.box)"
+        @pick="token => setBoxToken(group.box, token)"
+      />
     </div>
   </DesignSection>
 </template>

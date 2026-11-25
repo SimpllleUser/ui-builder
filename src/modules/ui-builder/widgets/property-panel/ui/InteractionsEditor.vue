@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import {
-  actionLabel,
-  ActionType,
   ClickEvent,
   clickEventOf,
-  createAction,
-  isActionType,
-  lacksVariable,
-  newVariableValue,
+  EVENT_LABELS,
+  EventName,
+  eventsFor,
+  hasValidation,
   useUiTreeStore,
-  type UiAction,
+  withActions,
+  actionsOf,
   type UiNode,
 } from '../../../entities/ui-node'
-import { BehaviorKind } from '../model/behaviorKinds'
+import { BehaviorKind, EVENT_OF_KIND } from '../model/behaviorKinds'
 import { computed, ref, watch } from 'vue'
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
+import ActionChain from './ActionChain.vue'
 import ConditionField from './ConditionField.vue'
+import RulesEditor from './RulesEditor.vue'
 import VariableField from './VariableField.vue'
 import { useEnsureVariable } from '../model/useEnsureVariable'
 
@@ -23,12 +24,24 @@ const props = defineProps<{ node: UiNode }>()
 const store = useUiTreeStore()
 
 const isTable = computed(() => clickEventOf(props.node.type) === ClickEvent.Row)
-const behaviors: Record<BehaviorKind, { title: () => string; description: string; hint: string }> = {
+interface BehaviorView {
+  title: () => string
+  description: string
+  hint: string
+}
+const eventView = (event: EventName, description: string): BehaviorView => ({
+  title: () => EVENT_LABELS[event],
+  description,
+  hint: `on ${event}`,
+})
+const behaviors: Record<BehaviorKind, BehaviorView> = {
   [BehaviorKind.Click]: {
-    title: () => (isTable.value ? 'When a row is clicked' : 'When clicked'),
-    description: 'Go to a page or change a variable',
-    hint: 'on click',
+    ...eventView(EventName.Click, 'Go to a page, change a variable, show a message'),
+    title: () => (isTable.value ? 'When a row is clicked' : EVENT_LABELS[EventName.Click]),
   },
+  [BehaviorKind.Change]: eventView(EventName.Change, 'Act when the person changes the value'),
+  [BehaviorKind.Submit]: eventView(EventName.Submit, 'Act once every field passes its rules'),
+  [BehaviorKind.Mounted]: eventView(EventName.Mounted, 'Act when the element shows up'),
   [BehaviorKind.VIf]: {
     title: () => 'Show only when…',
     description: 'Hide it until a condition is true',
@@ -44,19 +57,36 @@ const behaviors: Record<BehaviorKind, { title: () => string; description: string
     description: 'One copy for every item of a list',
     hint: 'v-for',
   },
+  [BehaviorKind.Rules]: {
+    title: () => 'Validate the value',
+    description: 'Required, email, length and number limits',
+    hint: 'rules',
+  },
 }
-const kinds = Object.values(BehaviorKind)
+/** The events and rules this kind of element has; the other behaviors fit any element. */
+const kinds = computed(() => {
+  const events: string[] = eventsFor(props.node.type)
+  return Object.values(BehaviorKind).filter(kind => {
+    const event = EVENT_OF_KIND[kind]
+    if (event) return events.includes(event)
+    return kind !== BehaviorKind.Rules || hasValidation(props.node.type)
+  })
+})
 
-const action = computed<UiAction | undefined>(() => props.node.events?.click)
-const isSet = (kind: BehaviorKind) => (kind === BehaviorKind.Click ? !!action.value : !!props.node[kind])
+const isSet = (kind: BehaviorKind) => {
+  const event = EVENT_OF_KIND[kind]
+  if (event) return actionsOf(props.node.events, event).length > 0
+  return kind === BehaviorKind.Rules ? !!props.node.rules?.length : !!props.node[kind as keyof UiNode]
+}
 // A behavior that was just added stays visible even though it is still empty.
 const added = ref<BehaviorKind[]>([])
 watch(
   () => props.node.id,
   () => (added.value = []),
 )
-const active = computed(() => kinds.filter(kind => isSet(kind) || added.value.includes(kind)))
-const available = computed(() => kinds.filter(kind => !active.value.includes(kind)))
+// An event set from outside (a template, an agent) stays visible even when the element would not offer it.
+const active = computed(() => Object.values(BehaviorKind).filter(kind => isSet(kind) || added.value.includes(kind)))
+const available = computed(() => kinds.value.filter(kind => !active.value.includes(kind)))
 
 const setLogic = (patch: Parameters<typeof store.updateNodeLogic>[1]) => store.updateNodeLogic(props.node.id, patch)
 const addBehavior = (kind: BehaviorKind) => {
@@ -64,7 +94,9 @@ const addBehavior = (kind: BehaviorKind) => {
 }
 const removeBehavior = (kind: BehaviorKind) => {
   added.value = added.value.filter(item => item !== kind)
-  if (kind === BehaviorKind.Click) setLogic({ events: undefined })
+  const event = EVENT_OF_KIND[kind]
+  if (event) setLogic({ events: withActions(props.node.events, event, []) })
+  else if (kind === BehaviorKind.Rules) setLogic({ rules: [] })
   else setLogic({ [kind]: '' })
 }
 
@@ -73,36 +105,9 @@ const setVariableLogic = (kind: BehaviorKind.Model | BehaviorKind.VFor, name: st
   ensureVariable(name, kind === BehaviorKind.VFor ? [] : '')
   setLogic({ [kind]: name })
 }
-const stateKeys = computed(() => Object.keys(store.project.state))
-// The field keeps the item's title, so the title must be the route itself; the page name goes in the subtitle.
-const pageItems = computed(() => store.pages.map(page => ({ title: page.path, subtitle: page.name, value: page.path })))
-// Going to a route no page has would do nothing in Preview; say so next to the field.
-const routeProblem = computed(() => {
-  const to = action.value?.type === ActionType.Navigate ? action.value.to.trim() : ''
-  if (!to || to.includes('{{') || store.pages.some(page => page.path === to)) return null
-  return 'No page has this route yet. Pick a page from the list or add one.'
-})
-const variableProblem = computed(() =>
-  action.value && lacksVariable(action.value) ? 'Choose a variable. Until then the click does nothing.' : undefined,
-)
-const NO_ACTION = 'none'
-const actionType = computed(() => action.value?.type ?? NO_ACTION)
-const actionTypes = [
-  { title: 'Nothing', value: NO_ACTION },
-  ...Object.values(ActionType).map(type => ({ title: actionLabel(type), value: type })),
-]
-const setClick = (click: UiAction | undefined) => setLogic({ events: click ? { click } : undefined })
-const changeType = (type: unknown) => {
-  const defaults = { path: store.pages[0]?.path ?? '/', variable: stateKeys.value[0] ?? '' }
-  setClick(isActionType(type) ? createAction(type, defaults) : undefined)
-}
-const patchAction = (patch: Partial<UiAction>) => {
-  if (action.value) setClick({ ...action.value, ...patch } as UiAction)
-}
-const setActionVariable = (name: string) => {
-  if (!action.value) return
-  ensureVariable(name, newVariableValue(action.value.type))
-  patchAction({ key: name })
+const valueHint = (kind: BehaviorKind) => {
+  if (kind === BehaviorKind.Change) return '{{ value }} is the new value'
+  return kind === BehaviorKind.Click && isTable.value ? '{{ item.id }} is the clicked row' : undefined
 }
 </script>
 
@@ -155,50 +160,12 @@ const setActionVariable = (name: string) => {
         />
       </div>
 
-      <template v-if="kind === BehaviorKind.Click">
-        <VSelect
-          :model-value="actionType"
-          :items="actionTypes"
-          label="Then"
-          variant="outlined"
-          density="compact"
-          hide-details
-          class="mb-3"
-          @update:model-value="changeType"
-        />
-        <VCombobox
-          v-if="action?.type === ActionType.Navigate"
-          :model-value="action.to"
-          :items="pageItems"
-          item-title="title"
-          item-value="value"
-          :return-object="false"
-          label="Page"
-          :error-messages="routeProblem ?? []"
-          variant="outlined"
-          density="compact"
-          hide-details="auto"
-          @update:model-value="value => patchAction({ to: String(value ?? '') })"
-        />
-        <template v-else-if="action">
-          <VariableField
-            label="Variable"
-            :model-value="action.key"
-            :problem="variableProblem"
-            @update:model-value="setActionVariable"
-          />
-          <VTextField
-            v-if="action.type === ActionType.Set"
-            :model-value="action.value"
-            :label="isTable ? 'New value — {{ item.id }} is the clicked row' : 'New value (true, 3, text)'"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="mt-3"
-            @update:model-value="value => patchAction({ value: value ?? '' })"
-          />
-        </template>
-      </template>
+      <ActionChain
+        v-if="EVENT_OF_KIND[kind]"
+        :node="node"
+        :event="EVENT_OF_KIND[kind]!"
+        :value-hint="valueHint(kind)"
+      />
 
       <ConditionField v-else-if="kind === BehaviorKind.VIf" :node="node" />
 
@@ -208,6 +175,8 @@ const setActionVariable = (name: string) => {
         :model-value="node.model"
         @update:model-value="name => setVariableLogic(BehaviorKind.Model, name)"
       />
+
+      <RulesEditor v-else-if="kind === BehaviorKind.Rules" :node="node" />
 
       <VariableField
         v-else-if="kind === BehaviorKind.VFor"

@@ -160,15 +160,22 @@ tool('update_node', 'Change a node. props are merged; a null prop value removes 
 })
 tool(
   'set_style',
-  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, and every value wins over utility classes. A property set to null is removed; style null clears all. Returns the resulting style.',
-  { id, style: z.union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()]) },
+  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, theme tokens follow the theme (space-xs, space-sm, space-md, space-lg, space-xl, space-2xl for margin, padding and gap; radius-sm, radius-md, radius-lg, radius-full for borderRadius; textStyle: h1-h6, body or caption), and every value wins over utility classes. Screen sizes follow Vuetify, mobile first: without breakpoint (or with xs) it is the base style; sm, md, lg or xl change only what differs from that width up. A property set to null is removed; style null clears the named breakpoint, or every style when none is named. Returns the base style and the per-breakpoint changes.',
+  {
+    id,
+    style: z.union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()]),
+    breakpoint: z
+      .enum(['xs', 'sm', 'md', 'lg', 'xl'])
+      .optional()
+      .describe('Vuetify breakpoint: sm from 600px, md 960, lg 1280, xl 1920. Omit or xs for the base style.'),
+  },
 )
 tool('delete_node', 'Delete a node and its subtree.', { id })
 tool('move_node', 'Move a node into another container.', { id, parentId: z.string(), slot })
 tool('duplicate_node', 'Duplicate a node next to the original.', { id })
 tool(
   'add_template',
-  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. What is not given keeps its default.',
+  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. landing { title, text, primaryLabel, secondaryLabel, features: [{ title, text, icon }], ctaTitle, ctaLabel }; settings (a settings form; adds variables settingsName, settingsEmail, settingsNewsletter, settingsAlerts, settingsLanguage) { title, text, saveLabel, savedMessage }; wizard (three checked steps; adds wizardStep, wizardName, wizardEmail, wizardPlan) { title, accountTitle, planTitle, reviewTitle, finishLabel, successMessage, plans: [text] }; pricing { title, subtitle, featured, plans: [{ name, price, period, description, features, button }] } with features separated by ;. What is not given keeps its default.',
   {
     kind: z.enum([
       'card',
@@ -183,6 +190,10 @@ tool(
       'blog',
       'contact',
       'footer',
+      'landing',
+      'settings',
+      'wizard',
+      'pricing',
     ]),
     props: z.record(z.string(), z.unknown()).optional().describe('Settings of the template, see the description'),
   },
@@ -246,16 +257,52 @@ tool(
     vFor: z.string().optional(),
   },
 )
-tool('set_event', 'Set what a click does in preview, or null to clear.', {
-  id,
-  click: z.union([
-    z.object({ type: z.literal('navigate'), to: z.string().describe('Page path') }),
-    z.object({ type: z.literal('set'), key: z.string(), value: z.string().describe('JSON or text') }),
-    z.object({ type: z.literal('toggle'), key: z.string() }),
-    z.null(),
-  ]),
-})
-
+const action = z.union([
+  z.object({ type: z.literal('navigate'), to: z.string().describe('Page path') }),
+  z.object({ type: z.literal('set'), key: z.string(), value: z.string().describe('JSON or text') }),
+  z.object({ type: z.literal('toggle'), key: z.string() }),
+  z.object({ type: z.literal('append'), key: z.string().describe('List variable'), value: z.string() }),
+  z.object({ type: z.literal('remove'), key: z.string().describe('List variable'), value: z.string() }),
+  z.object({ type: z.literal('notify'), message: z.string() }),
+  z.object({ type: z.literal('resetForm') }),
+])
+const actions = z.union([action, z.array(action), z.null()]).optional()
+tool(
+  'set_event',
+  'Set what events of an element do in preview. Each is one action, a list that runs in order, or null to clear; events not given stay. click: any element (a table row gives {{item}}). change: form fields and controls ({{value}}). submit: VForm, only when its rules pass; the button needs props type "submit". mounted: when the element appears. resetForm resets the surrounding form.',
+  { id, click: actions, change: actions, submit: actions, mounted: actions },
+)
+const rules = z.union([
+  z.array(
+    z.object({
+      type: z.enum(['required', 'email', 'minLength', 'maxLength', 'min', 'max']),
+      value: z.union([z.string(), z.number()]).optional(),
+      message: z.string().optional(),
+    }),
+  ),
+  z.null(),
+])
+tool(
+  'set_rules',
+  'Set the validation rules of a form field (replaces them; null clears). value is the number a length or min/max rule compares with.',
+  { id, rules },
+)
+tool(
+  'set_computed',
+  'Define a variable worked out from others, e.g. total = length(rows) or fullName = first + " " + last. Operators of conditions and length, empty, contains. null removes it.',
+  { name: z.string(), expression: z.union([z.string(), z.null()]) },
+)
+tool(
+  'set_data_source',
+  'Load a variable from a mock REST endpoint: its starting value (set_state) is the answer. Preview starts empty, waits delayMs, then fills it without sending a request; loadingVariable is true meanwhile. Exported code uses fetch(url). url null removes it.',
+  {
+    name: z.string().describe('Existing variable'),
+    url: z.union([z.string(), z.null()]).describe('Path such as /api/orders, or an http(s) address'),
+    delayMs: z.number().optional(),
+    loadingVariable: z.string().optional(),
+  },
+)
+tool('preview_submit', 'Submit a form in Preview. Returns the broken rules, or runs the submit actions.', { id })
 const subtree = z.lazy(() =>
   z.object({
     type: z.string().describe('Component type, e.g. VCard, VBtn, div'),
@@ -269,13 +316,11 @@ const subtree = z.lazy(() =>
     vIf: z.string().optional(),
     vFor: z.string().optional(),
     click: z
-      .object({
-        type: z.enum(['navigate', 'set', 'toggle']),
-        to: z.string().optional(),
-        key: z.string().optional(),
-        value: z.string().optional(),
-      })
-      .optional(),
+      .union([action, z.array(action)])
+      .optional()
+      .describe('Short for events.click'),
+    events: z.object({ click: actions, change: actions, submit: actions, mounted: actions }).optional(),
+    rules: rules.optional().describe('Validation rules of a form field'),
     children: z.array(subtree).optional(),
     slots: z.record(z.string(), z.array(subtree)).optional(),
   }),
@@ -287,7 +332,7 @@ tool(
 )
 tool(
   'batch',
-  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document and the project tools.',
+  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document, edit_saved_component, close_saved_component, the theme tools and the project tools.',
   {
     steps: z
       .array(z.object({ tool: z.string(), args: z.record(z.string(), z.unknown()).optional() }))
@@ -307,7 +352,7 @@ tool(
 )
 tool(
   'get_history',
-  'The named steps of the history (newest first, with index) and the checkpoints. Use before a risky change, or to see what was done.',
+  "The named steps of the history (newest first, with index) and the checkpoints. Use before a risky change, or to see what was done. While the person edits a saved component, the steps are that component's (see scope), and undo, redo and restore_version act on them.",
   {},
 )
 tool(
@@ -331,10 +376,42 @@ tool(
 )
 tool(
   'insert_saved_component',
-  'Insert a saved component into a container (defaults to where the editor would insert). `props` sets its parameters (see list_saved_components); missing ones use their defaults.',
+  'Insert an instance of a saved component into a container (defaults to where the editor would insert). It follows the original: when the saved component changes, every instance changes, and its content cannot be edited. `props` sets its parameters (see list_saved_components); missing ones use their defaults.',
   { prefabId: z.string(), parentId: z.string().optional(), slot, props: propValues },
 )
-tool('delete_saved_component', 'Delete a saved component.', { prefabId: z.string() })
+tool(
+  'update_instance',
+  'Change parameter values of a component instance; the parameters not given keep their values.',
+  { id, props: z.record(z.string(), z.string()) },
+)
+tool('detach_instance', 'Turn a component instance into an ordinary copy that no longer follows its original.', { id })
+tool(
+  'get_theme',
+  'The theme of the open project (mode, colours, corner radius, spacing, typography, fonts…), what every setting accepts, and the design presets. Spacing, radius and typography decide what the theme tokens (space-md, radius-lg, textStyle) stand for.',
+  {},
+)
+tool(
+  'set_theme',
+  "Change theme settings of the open project; settings not named stay. { preset } applies a whole design preset first. Giving customPrimary or customSecondary switches to custom colours. radius null keeps each component's own. An unknown name or value changes nothing. Not an undo step and not allowed in batch: read get_theme first to be able to put it back.",
+  { settings: z.record(z.string(), z.union([z.string(), z.number(), z.null()])) },
+)
+tool(
+  'edit_saved_component',
+  'Open the original of a saved component. Until close_saved_component, the editing tools (add, update, style, events, undo, get_history, preview…) work on it, and every instance follows each change. Its root is what get_document returns. Write {{props.name}} to add a parameter. Refused while another tab edits it. Cannot be used in batch.',
+  { prefabId: z.string() },
+)
+tool('close_saved_component', 'Leave the saved component and return to the page or layout.', {})
+tool(
+  'delete_saved_component',
+  'Delete a saved component. Its instances stay as ordinary copies. undo right after brings it back, restore_saved_component later.',
+  { prefabId: z.string() },
+)
+tool('list_deleted_components', 'Saved components deleted lately (up to 10), newest first.', {})
+tool(
+  'restore_saved_component',
+  'Bring a deleted saved component back with its history. Its instances follow it again; copies edited meanwhile stay copies.',
+  { prefabId: z.string() },
+)
 tool(
   'wrap_nodes',
   'Put sibling elements into a new container (for example VContainer, VRow, VCard, div). Returns the container id.',

@@ -6,4 +6,6 @@ export const BEHAVIOR_ICONS: Record<BehaviorBadge, string> = {
   [BehaviorBadge.Condition]: 'mdi-eye-outline',
   [BehaviorBadge.Link]: 'mdi-link-variant',
   [BehaviorBadge.Click]: 'mdi-cursor-default-click-outline',
+  [BehaviorBadge.Event]: 'mdi-lightning-bolt-outline',
+  [BehaviorBadge.Rules]: 'mdi-check-decagram-outline',
 }

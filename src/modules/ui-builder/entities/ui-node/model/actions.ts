@@ -2,37 +2,48 @@
  * Everything that depends on the kind of a click action. A new `ActionType` does not compile until it has a handler,
  * so none of Preview, export, the audit, the validator or the editor can silently skip it.
  */
-import { ActionType, IssueKind } from './enums'
+import { ActionType, EventName, IssueKind } from './enums'
 import { addHelper, HelperName } from './expressionToJs'
 import { jsLiteral } from './jsLiteral'
-import { interpolate, parseLiteral, type Scope } from './runtime'
+import { interpolate, interpolateDeep, parseLiteral, type Scope } from './runtime'
 import type { UiAction } from './types'
 import { bindText, textToJsExpression } from './vueBindings'
 
 type ActionOf<K extends ActionType> = Extract<UiAction, { type: K }>
 
-/** An action whose `{{ }}` values were filled in. A `set` value that was a single binding keeps its type (e.g. a whole row). */
+type ValueAction = ActionType.Set | ActionType.Append | ActionType.Remove
+type BoundValue<K extends ValueAction> = { type: K; key: string; value: unknown }
+
+/** An action whose `{{ }}` values were filled in. A value that was a single binding keeps its type (e.g. a whole row). */
 export type BoundAction =
-  Exclude<UiAction, { type: ActionType.Set }> | { type: ActionType.Set; key: string; value: unknown }
+  | Exclude<UiAction, { type: ValueAction }>
+  | BoundValue<ActionType.Set>
+  | BoundValue<ActionType.Append>
+  | BoundValue<ActionType.Remove>
 type BoundActionOf<K extends ActionType> = Extract<BoundAction, { type: K }>
 
 export interface RuntimeHost {
   state: Record<string, unknown>
   navigate: (path: string) => void
+  notify: (message: string) => void
+  resetForm: () => void
 }
 
 /** What exported code needs besides the statement itself. */
 export interface CodeContext {
   helpers: Set<HelperName>
-  usage: { router: boolean }
+  usage: { router: boolean; messages: boolean }
+  /** The function that resets the form being written, when the element is inside one. */
+  resetFormCall?: string
 }
 
-/** A click action as an agent or a file describes it, before it is known to be valid. */
+/** An action as an agent or a file describes it, before it is known to be valid. */
 export interface ActionInput {
   type?: unknown
   to?: unknown
   key?: unknown
   value?: unknown
+  message?: unknown
 }
 
 /** Starting values offered when a person picks a kind of action. */
@@ -57,7 +68,7 @@ interface ActionHandler<A extends UiAction, B extends BoundAction> {
   /** The variable the action writes, and the text whose `{{ }}` values it reads. */
   references(action: A): { variable?: string; text?: string }
   /** Why the action would not work among these routes, or null. */
-  problem(action: A, routes: ReadonlySet<string>): { kind: IssueKind; predicate: string } | null
+  problem(action: A, routes: ReadonlySet<string>, event: EventName): { kind: IssueKind; predicate: string } | null
   describe(action: A): string
   bind(action: A, scope: Scope): B
   run(action: B, host: RuntimeHost): void
@@ -66,10 +77,71 @@ interface ActionHandler<A extends UiAction, B extends BoundAction> {
 
 const SINGLE_BINDING = /^\s*\{\{[^{}]+\}\}\s*$/
 
-const missingVariable = (key: string) =>
+const missingVariable = (key: string, event: EventName) =>
   key.trim()
     ? null
-    : { kind: IssueKind.MissingVariable, predicate: 'has a click action with no variable chosen, so it does nothing.' }
+    : {
+        kind: IssueKind.MissingVariable,
+        predicate: `has a ${event} action with no variable chosen, so it does nothing.`,
+      }
+
+const copyOfValue = (value: unknown) =>
+  value !== null && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value
+
+/** The value a list action adds or removes: a single binding keeps its type, JSON may hold bindings inside. */
+const bindEntry = (value: string, scope: Scope) =>
+  SINGLE_BINDING.test(value) ? copyOfValue(interpolate(value, scope)) : interpolateDeep(parseLiteral(value), scope)
+
+function entryToCode(value: unknown, context: CodeContext): string {
+  if (typeof value === 'string') {
+    const bound = bindText(value)
+    if (!bound.dynamic) return jsLiteral(value)
+    if (!SINGLE_BINDING.test(value)) return bound.code
+    addHelper(context.helpers, HelperName.CopyOf)
+    return `copyOf(${bound.code})`
+  }
+  if (Array.isArray(value)) return `[${value.map(item => entryToCode(item, context)).join(', ')}]`
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value).map(([key, item]) => `${jsLiteral(key)}: ${entryToCode(item, context)}`)
+    return `{ ${entries.join(', ')} }`
+  }
+  return jsLiteral(value)
+}
+
+type ListAction = ActionType.Append | ActionType.Remove
+
+/** What adding to a list and removing from it share. */
+const listHandler = <K extends ListAction>(
+  type: K,
+  texts: { label: string; verb: string },
+  change: (list: unknown[], value: unknown) => unknown[],
+  toCode: (key: string, value: string, context: CodeContext) => string,
+) => ({
+  label: texts.label,
+  example: `{ type: "${type}", key, value }`,
+  create: ({ variable }: ActionDefaults) => ({ type, key: variable, value: '' }),
+  newVariableValue: [],
+  isValid: ({ key, value }: ActionInput) => typeof key === 'string' && typeof value === 'string',
+  fromInput: ({ key, value }: ActionInput) =>
+    typeof key === 'string'
+      ? { type, key, value: typeof value === 'string' ? value : JSON.stringify(value ?? '') }
+      : null,
+  references: ({ key, value }: { key: string; value: string }) => ({ variable: key, text: value }),
+  problem: ({ key }: { key: string }, _: ReadonlySet<string>, event: EventName) => missingVariable(key, event),
+  describe: ({ key, value }: { key: string; value: string }) => `${texts.verb} ${key || 'a list'}: ${value}`,
+  bind: (action: { type: K; key: string; value: string }, scope: Scope) => ({
+    ...action,
+    value: bindEntry(action.value, scope),
+  }),
+  run: ({ key, value }: { key: string; value: unknown }, host: RuntimeHost) => {
+    const list = host.state[key]
+    if (key) host.state[key] = change(Array.isArray(list) ? list : [], value)
+  },
+  toCode: ({ key, value }: { key: string; value: string }, context: CodeContext) =>
+    toCode(key, entryToCode(SINGLE_BINDING.test(value) ? value : parseLiteral(value), context), context),
+})
+
+const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 const ACTION_HANDLERS: { [K in ActionType]: ActionHandler<ActionOf<K>, BoundActionOf<K>> } = {
   [ActionType.Navigate]: {
@@ -101,7 +173,7 @@ const ACTION_HANDLERS: { [K in ActionType]: ActionHandler<ActionOf<K>, BoundActi
     fromInput: ({ key, value }) =>
       typeof key === 'string' ? { type: ActionType.Set, key, value: String(value ?? '') } : null,
     references: ({ key, value }) => ({ variable: key, text: value }),
-    problem: ({ key }) => missingVariable(key),
+    problem: ({ key }, _, event) => missingVariable(key, event),
     describe: ({ key, value }) => `set ${key || 'a variable'} to ${value}`,
     bind: (action, scope) => {
       const value = interpolate(action.value, scope)
@@ -133,13 +205,62 @@ const ACTION_HANDLERS: { [K in ActionType]: ActionHandler<ActionOf<K>, BoundActi
     isValid: ({ key }) => typeof key === 'string',
     fromInput: ({ key }) => (typeof key === 'string' ? { type: ActionType.Toggle, key } : null),
     references: ({ key }) => ({ variable: key }),
-    problem: ({ key }) => missingVariable(key),
+    problem: ({ key }, _, event) => missingVariable(key, event),
     describe: ({ key }) => `switch ${key || 'a variable'} on or off`,
     bind: action => action,
     run: ({ key }, host) => {
       if (key) host.state[key] = !host.state[key]
     },
     toCode: ({ key }) => `${key} = !${key}`,
+  },
+  [ActionType.Append]: listHandler(
+    ActionType.Append,
+    { label: 'Add to a list', verb: 'add to' },
+    (list, value) => [...list, value],
+    (key, value) => `${key} = [...${key}, ${value}]`,
+  ),
+  [ActionType.Remove]: listHandler(
+    ActionType.Remove,
+    { label: 'Remove from a list', verb: 'remove from' },
+    (list, value) => {
+      const index = list.findIndex(entry => sameValue(entry, value))
+      return index < 0 ? list : list.filter((_, position) => position !== index)
+    },
+    (key, value, context) => {
+      addHelper(context.helpers, HelperName.WithoutFirst)
+      return `${key} = withoutFirst(${key}, ${value})`
+    },
+  ),
+  [ActionType.Notify]: {
+    label: 'Show a message',
+    example: '{ type: "notify", message }',
+    create: () => ({ type: ActionType.Notify, message: 'Saved' }),
+    newVariableValue: '',
+    isValid: ({ message }) => typeof message === 'string',
+    fromInput: ({ message }) => (typeof message === 'string' ? { type: ActionType.Notify, message } : null),
+    references: ({ message }) => ({ text: message }),
+    problem: () => null,
+    describe: ({ message }) => `show “${message}”`,
+    bind: (action, scope) => ({ ...action, message: String(interpolate(action.message, scope) ?? '') }),
+    run: ({ message }, host) => host.notify(message),
+    toCode: ({ message }, context) => {
+      context.usage.messages = true
+      return `showMessage(${textToJsExpression(message)})`
+    },
+  },
+  [ActionType.ResetForm]: {
+    label: 'Reset the form',
+    example: '{ type: "resetForm" }',
+    create: () => ({ type: ActionType.ResetForm }),
+    newVariableValue: '',
+    isValid: () => true,
+    fromInput: () => ({ type: ActionType.ResetForm }),
+    references: () => ({}),
+    problem: () => null,
+    describe: () => 'reset the form',
+    bind: action => action,
+    run: (_, host) => host.resetForm(),
+    toCode: (_, context) => context.resetFormCall ?? '',
   },
 }
 
@@ -159,8 +280,8 @@ export const actionFromInput = (input: ActionInput): UiAction | null =>
   isActionType(input.type) ? handlerOf(input.type).fromInput(input) : null
 
 export const actionReferences = (action: UiAction) => handlerOf(action.type).references(action)
-export const actionProblem = (action: UiAction, routes: ReadonlySet<string>) =>
-  handlerOf(action.type).problem(action, routes)
+export const actionProblem = (action: UiAction, routes: ReadonlySet<string>, event = EventName.Click) =>
+  handlerOf(action.type).problem(action, routes, event)
 /** Whether the action still has no variable to write; it does nothing then, and there is no code to export for it. */
 export const lacksVariable = (action: UiAction) => {
   const { variable } = actionReferences(action)

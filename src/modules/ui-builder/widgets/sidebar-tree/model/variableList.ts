@@ -26,6 +26,7 @@ export const USAGE_LABELS: Record<UsageKind, string> = {
   [UsageKind.Repeat]: 'repeated over',
   [UsageKind.Condition]: 'used in a condition',
   [UsageKind.Click]: 'used by a click',
+  [UsageKind.Event]: 'used by an event',
 }
 
 export function variableTypeOf(value: unknown): VariableType {

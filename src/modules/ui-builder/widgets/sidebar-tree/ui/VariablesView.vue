@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
+import ComputedVariables from './ComputedVariables.vue'
+import DataSourceFields from './DataSourceFields.vue'
 import { computed, ref } from 'vue'
 import {
   findVariableUsages,
+  isComputed,
   parseLiteral,
   useUiTreeStore,
   variableNameError,
@@ -23,12 +26,15 @@ const store = useUiTreeStore()
 
 const rows = computed(() => buildVariableRows(store.project.state, findVariableUsages(store.project)))
 const expanded = ref<string | null>(null)
+const dataOpen = ref<string | null>(null)
+const toggleData = (name: string) => (dataOpen.value = dataOpen.value === name ? null : name)
 const newName = ref('')
 const newValue = ref('')
 const newNameError = computed(() => {
   const name = newName.value.trim()
   if (!name) return null
-  return variableNameError(name) ?? (name in store.project.state ? 'A variable with this name already exists.' : null)
+  const taken = name in store.project.state || isComputed(store.project, name)
+  return variableNameError(name) ?? (taken ? 'A variable with this name already exists.' : null)
 })
 
 const addVariable = () => {
@@ -146,6 +152,20 @@ const remove = (row: VariableRow) => store.removeStateVariable(row.name)
         />
 
         <button
+          class="variable__toggle text-caption"
+          :aria-expanded="dataOpen === row.name"
+          @click="toggleData(row.name)"
+        >
+          <VIcon
+            :icon="dataOpen === row.name ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+            size="14"
+            aria-hidden="true"
+          />
+          {{ store.project.sources?.[row.name] ? `Data from ${store.project.sources[row.name].url}` : 'Data' }}
+        </button>
+        <DataSourceFields v-if="dataOpen === row.name" :name="row.name" />
+
+        <button
           v-if="row.elementCount"
           class="variable__toggle text-caption"
           :aria-expanded="expanded === row.name"
@@ -168,6 +188,8 @@ const remove = (row: VariableRow) => store.removeStateVariable(row.name)
         </ul>
       </li>
     </ul>
+
+    <ComputedVariables />
   </div>
 </template>
 

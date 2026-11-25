@@ -1,12 +1,6 @@
-import {
-  actionExamples,
-  actionFromInput,
-  TEXT_NODE_TYPE,
-  getNodeSlots,
-  type UiAction,
-  type UiNode,
-} from '../../../entities/ui-node'
+import { TEXT_NODE_TYPE, getNodeSlots, type UiNode } from '../../../entities/ui-node'
 import { applyStyleInput } from './mcpStyle'
+import { eventsFromInput, rulesFromInput } from './mcpLogic'
 import type { Store } from './mcpCommandUtils'
 import type { StyleInput } from '../../../../../shared/lib/inlineStyle'
 
@@ -22,7 +16,11 @@ export interface SubtreeSpec {
   model?: string
   vIf?: string
   vFor?: string
-  click?: { type: string; to?: string; key?: string; value?: string }
+  /** Short for `events.click`. */
+  click?: unknown
+  /** `click`, `change`, `submit`, `mounted`: one action or a list. */
+  events?: Record<string, unknown>
+  rules?: unknown
   /** A name for this element; the answer maps it to the element's id, so later calls can refer to it. */
   ref?: string
   children?: SubtreeSpec[]
@@ -30,13 +28,6 @@ export interface SubtreeSpec {
 }
 
 export const MAX_SUBTREE_NODES = 500
-
-const toAction = (click: NonNullable<SubtreeSpec['click']>): UiAction => {
-  const action = actionFromInput(click)
-  if (action) return action
-  const shapes = new Intl.ListFormat('en', { type: 'disjunction' }).format(actionExamples())
-  throw new Error(`Invalid click action: ${JSON.stringify(click)}. Use ${shapes}.`)
-}
 
 /**
  * Builds the elements a spec describes, without touching the page: nothing is added unless the whole tree is valid.
@@ -61,7 +52,10 @@ export function buildSubtree(store: Store, root: SubtreeSpec): { node: UiNode; r
     if (spec.model) node.model = spec.model
     if (spec.vIf) node.vIf = spec.vIf
     if (spec.vFor) node.vFor = spec.vFor
-    if (spec.click) node.events = { click: toAction(spec.click) }
+    const events = eventsFromInput(undefined, { ...(spec.click ? { click: spec.click } : {}), ...spec.events })
+    if (events) node.events = events
+    const rules = spec.rules === undefined ? [] : rulesFromInput(spec.rules)
+    if (rules.length) node.rules = rules
 
     if (spec.children) {
       if (!store.canContain(node)) throw new Error(`${path}: ${spec.type} cannot contain children.`)

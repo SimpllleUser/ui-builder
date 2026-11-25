@@ -61,12 +61,12 @@ export interface StyleInput {
 
 /**
  * Turns a loose style description into a patch for `withStyle`: names may be kebab-case, lengths may be numbers,
- * colours may be theme colour names, and every value is marked `!important` so it wins over utility classes.
+ * theme colours and tokens may be given by name, and every value is marked `!important` so it wins over utility classes.
  * Throws a readable message for a name or value that is not plain CSS.
  */
 export function normalizeStyleInput(
   input: StyleInput,
-  themeColor: (value: string) => string | null,
+  themeValue: (value: string) => string | null,
 ): Record<string, string | null> {
   const patch: Record<string, string | null> = {}
   for (const [rawName, rawValue] of Object.entries(input)) {
@@ -83,7 +83,7 @@ export function normalizeStyleInput(
           : String(rawValue)
         : rawValue.trim()
     if (UNSAFE_VALUE.test(value)) throw new Error(`The value for ${name} contains characters that are not allowed.`)
-    value = themeColor(value) ?? value
+    value = themeValue(value) ?? value
     patch[name] = markImportant(value)
   }
   return patch

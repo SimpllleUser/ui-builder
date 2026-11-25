@@ -34,16 +34,21 @@ export function writeSpacing(
     if (v !== null) result.push(`${type}${s}-${typeof v === 'number' && v < 0 ? `n${-v}` : v}`)
   return result
 }
+/**
+ * The classes the display control owns. Responsive and print ones (`d-md-none`, `d-print-none`) are not among them:
+ * the control does not show them, so it must not remove them.
+ */
+const DISPLAY_CLASS = /^d-(none|inline|inline-block|block|table|table-row|table-cell|flex|inline-flex)$/
+const FLEX_DIRECTION_CLASSES = ['flex-row', 'flex-column', 'flex-row-reverse', 'flex-column-reverse']
+
 export function readFlex(classes: string[]): string | null {
-  const display = classes.find(c => c.startsWith('d-'))
+  const display = classes.find(c => DISPLAY_CLASS.test(c))
   if (display !== 'd-flex') return display ?? null
-  return `d-flex ${classes.find(c => ['flex-row', 'flex-column', 'flex-row-reverse', 'flex-column-reverse'].includes(c)) ?? 'flex-row'}`
+  return `d-flex ${classes.find(c => FLEX_DIRECTION_CLASSES.includes(c)) ?? 'flex-row'}`
 }
 export function writeFlex(classes: string[], value: string): string[] {
   return [
-    ...classes.filter(
-      c => !c.startsWith('d-') && !['flex-row', 'flex-column', 'flex-row-reverse', 'flex-column-reverse'].includes(c),
-    ),
+    ...classes.filter(c => !DISPLAY_CLASS.test(c) && !FLEX_DIRECTION_CLASSES.includes(c)),
     ...value.split(' ').filter(Boolean),
   ]
 }

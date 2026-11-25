@@ -6,7 +6,7 @@ import { useUiTreeStore, getComponentDef, type Prefab, type PrefabPropValues } f
 
 /** Elements saved to reuse: insert one into the page or remove it from the library. */
 const store = useUiTreeStore()
-const { prefabs, editingPrefab } = storeToRefs(store)
+const { prefabs, editingPrefab, deletedPrefabs } = storeToRefs(store)
 
 // The canvas shows the chosen component for editing: the first one until another is clicked.
 onMounted(() => {
@@ -33,6 +33,10 @@ const updatePropValue = (propName: string, value: unknown) => {
   if (typeof value === 'string') propValues.value[propName] = value
 }
 
+const restore = (prefabId: string) => {
+  if (store.restorePrefab(prefabId)) store.editPrefab(prefabId)
+}
+
 const deleting = ref<string | null>(null)
 const confirmDelete = () => {
   if (deleting.value) store.deletePrefab(deleting.value)
@@ -47,7 +51,7 @@ const confirmDelete = () => {
       v-if="prefabs.length === 0"
       icon="mdi-puzzle-outline"
       title="No saved components yet"
-      description="Select an element, then press the save icon at the top of the inspector to keep it here and reuse it. Write props.name in double curly braces inside it to make a parameter."
+      description="Select an element, then press the save icon at the top of the inspector to keep it here and reuse it. Inserted components follow the original when you change it. Write props.name in double curly braces inside it to make a parameter."
     />
     <div v-else class="prefabs-list">
       <div
@@ -87,6 +91,22 @@ const confirmDelete = () => {
       </div>
     </div>
 
+    <section v-if="deletedPrefabs.length" class="deleted" aria-label="Recently deleted components">
+      <h3 class="deleted__title">Recently deleted</h3>
+      <div v-for="entry in deletedPrefabs" :key="entry.prefab.prefabId" class="prefab-row prefab-row--deleted">
+        <VIcon icon="mdi-delete-clock-outline" size="15" class="prefab-icon" aria-hidden="true" />
+        <span class="prefab-name">{{ entry.prefab.name }}</span>
+        <VBtn
+          icon="mdi-restore"
+          :aria-label="`Restore ${entry.prefab.name}`"
+          :title="`Restore ${entry.prefab.name}`"
+          variant="text"
+          size="x-small"
+          @click="restore(entry.prefab.prefabId)"
+        />
+      </div>
+    </section>
+
     <VDialog :model-value="!!configuring" max-width="420" @update:model-value="configuring = null">
       <VCard v-if="configuring" :title="`Insert ${configuring.name}`">
         <VCardText>
@@ -114,7 +134,7 @@ const confirmDelete = () => {
     <VDialog :model-value="!!deleting" max-width="400" @update:model-value="deleting = null">
       <VCard
         title="Delete saved component?"
-        text="Existing copies on your page will remain. This removes the component from your library."
+        text="Instances on your pages stay as ordinary copies. You can restore it from Recently deleted."
       >
         <VCardActions
           ><VSpacer /><VBtn @click="deleting = null">Cancel</VBtn
@@ -140,6 +160,24 @@ const confirmDelete = () => {
   border-radius: 6px;
   cursor: pointer;
   min-height: 30px;
+}
+
+.deleted {
+  margin-top: 16px;
+}
+
+.deleted__title {
+  margin: 0 6px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.prefab-row--deleted {
+  cursor: default;
+  opacity: 0.7;
 }
 
 .prefab-row--active {

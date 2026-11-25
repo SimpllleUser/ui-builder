@@ -147,3 +147,147 @@ test('the old library key is removed after it was moved', async () => {
   })
   assert.equal(value, null)
 })
+
+const variantOf = store => store.rootNode.props.variant
+const changeVariant = (store, variant) => {
+  store.updateNodeProp(store.rootNode.id, 'variant', variant)
+  store.commit()
+}
+/** Opens the component and waits until the tab holds it and has read its history. */
+const edit = async (store, prefabId) => {
+  store.editPrefab(prefabId)
+  await settle()
+}
+const leave = async store => {
+  store.stopEditingPrefab()
+  await store.flushPrefabs()
+  await settle()
+}
+
+test('the history of a component survives closing the app', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  const [{ prefabId }] = first.prefabs
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+
+  const reopened = await openTab()
+  await edit(reopened, prefabId)
+  assert.equal(reopened.historyVersions.length, 2)
+  reopened.undo()
+  assert.equal(variantOf(reopened), undefined)
+  await leave(reopened)
+
+  const again = await openTab()
+  await edit(again, prefabId)
+  assert.equal(variantOf(again), undefined)
+  again.redo()
+  assert.equal(variantOf(again), 'tonal', 'where the history stood is stored too')
+})
+
+test('tabs share the history of a component', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  await first.flushPrefabs()
+  const second = await openTab()
+  const [{ prefabId }] = second.prefabs
+
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+  await edit(second, prefabId)
+  changeVariant(second, 'outlined')
+  await leave(second)
+
+  await edit(first, prefabId)
+  assert.equal(first.historyVersions.length, 3)
+  first.undo()
+  assert.equal(variantOf(first), 'tonal', 'the step of the other tab is taken back as a step')
+  first.undo()
+  assert.equal(variantOf(first), undefined)
+})
+
+test('a deleted component comes back with its history, and removing it clears what was stored', async () => {
+  const store = await openTab()
+  save(store, 'Card')
+  const [{ prefabId }] = store.prefabs
+  await edit(store, prefabId)
+  changeVariant(store, 'tonal')
+  await leave(store)
+
+  store.deletePrefab(prefabId)
+  await store.flushPrefabs()
+  assert.equal(await (await repository()).readHistory(prefabId), null)
+
+  store.undo()
+  await store.flushPrefabs()
+  const reopened = await openTab()
+  assert.deepEqual(names(reopened.prefabs), ['Card'])
+  await edit(reopened, prefabId)
+  assert.equal(reopened.historyVersions.length, 2)
+  reopened.undo()
+  assert.equal(variantOf(reopened), undefined)
+})
+
+test('a component deleted without being opened since the app started keeps its history', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  const [{ prefabId }] = first.prefabs
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+
+  const store = await openTab()
+  store.deletePrefab(prefabId)
+  await store.flushPrefabs()
+  store.undo()
+  await settle()
+  await store.flushPrefabs()
+
+  const reopened = await openTab()
+  await edit(reopened, prefabId)
+  assert.equal(reopened.historyVersions.length, 2)
+})
+
+test('deleted components can be restored after closing the app, to their place and with their history', async () => {
+  const first = await openTab()
+  save(first, 'First')
+  save(first, 'Second')
+  const [{ prefabId }] = first.prefabs
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+  first.deletePrefab(prefabId)
+  await first.flushPrefabs()
+
+  const reopened = await openTab()
+  assert.deepEqual(
+    reopened.deletedPrefabs.map(entry => entry.prefab.name),
+    ['First'],
+  )
+  assert.equal(reopened.restorePrefab(prefabId), true)
+  await reopened.flushPrefabs()
+
+  const again = await openTab()
+  assert.deepEqual(names(again.prefabs), ['First', 'Second'])
+  assert.deepEqual(again.deletedPrefabs, [])
+  await edit(again, prefabId)
+  assert.equal(again.historyVersions.length, 2)
+})
+
+test('another tab sees what was deleted, and only the latest deletions are kept', async () => {
+  const first = await openTab()
+  const second = await openTab()
+  for (let index = 0; index < 12; index++) save(first, `Card ${index}`)
+  await first.flushPrefabs()
+  for (const { prefabId } of [...first.prefabs]) {
+    first.deletePrefab(prefabId)
+    await first.flushPrefabs()
+    await new Promise(resolve => setTimeout(resolve, 2))
+  }
+  await settle()
+  assert.equal(second.deletedPrefabs.length, 10)
+  assert.equal(second.deletedPrefabs[0].prefab.name, 'Card 11')
+  assert.equal((await openTab()).deletedPrefabs.length, 10)
+})

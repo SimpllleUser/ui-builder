@@ -14,10 +14,19 @@ const emit = defineEmits<{ close: []; openGraph: [] }>()
 const store = useUiTreeStore()
 const activeView = ref<SidebarView>(SidebarView.Layers)
 // A saved component stays open on the canvas (and in Preview) until the person leaves its tab or closes the panel.
+// History keeps it open too, and shows its versions.
 // The panel itself disappears while Preview runs, so leaving is decided here and not when it is removed.
 watch(activeView, view => {
-  if (view !== SidebarView.Prefabs) store.stopEditingPrefab()
+  if (view !== SidebarView.Prefabs && view !== SidebarView.History) store.stopEditingPrefab()
 })
+// “Edit original” opens a component from elsewhere: show its tab, which is also the way back.
+watch(
+  () => store.editingPrefab?.prefabId,
+  prefabId => {
+    if (prefabId) activeView.value = SidebarView.Prefabs
+  },
+  { immediate: true },
+)
 const closePanel = () => {
   store.stopEditingPrefab()
   emit('close')

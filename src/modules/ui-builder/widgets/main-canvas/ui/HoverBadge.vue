@@ -7,7 +7,7 @@ import {
   ROOT_NODE_ID,
   TEXT_NODE_TYPE,
 } from '../../../entities/ui-node'
-import { elementBox, findCanvasElement, labelTop, type ElementBox } from '../model/canvasGeometry'
+import { elementBox, findCanvasElement, labelTop, nodeIdAt, type ElementBox } from '../model/canvasGeometry'
 
 /** Names the element under the pointer and outlines it, so similar elements can be told apart without a click. */
 const props = defineProps<{ container?: HTMLElement }>()
@@ -23,15 +23,14 @@ const badgeTop = ref(0)
 let showTimer: ReturnType<typeof setTimeout> | undefined
 let frame = 0
 
-/** The element the pointer is over. Text inside a button counts as the button. */
-const elementAt = (target: EventTarget | null): string | null => {
-  let element = target instanceof HTMLElement ? target.closest<HTMLElement>('[data-node-id]') : null
-  while (element) {
-    const node = store.findNodeById(element.dataset.nodeId!)
-    if (node && node.type !== TEXT_NODE_TYPE) return node.id === ROOT_NODE_ID ? null : node.id
-    element = element.parentElement?.closest<HTMLElement>('[data-node-id]') ?? null
-  }
-  return null
+/** Text elements are skipped, and the page itself gets no badge. */
+const elementAt = (target: EventTarget | null) => {
+  const id = nodeIdAt(target, id => {
+    const node = store.findNodeById(id)
+    return !!node && node.type !== TEXT_NODE_TYPE
+  })
+  // Pointing inside a component instance points at the instance, which is what a click selects.
+  return !id || id === ROOT_NODE_ID ? null : store.selectableId(id)
 }
 
 const place = () => {

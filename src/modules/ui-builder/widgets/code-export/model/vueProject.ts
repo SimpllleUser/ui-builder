@@ -4,6 +4,7 @@ import {
   exportPrefab,
   exportStore,
   hasAppShell,
+  showsMessages,
   StateSource,
   unusableVariableNames,
   type Prefab,
@@ -11,7 +12,16 @@ import {
 } from '../../../entities/ui-node'
 import { toPascalCase } from '../../../../../shared/lib/pascalCase'
 import { transliterate } from '../../../../../shared/lib/transliterate'
-import { mainSource, packageJson, readme, routerSource, scaffoldFiles } from './vueProjectScaffold'
+import {
+  mainSource,
+  messagesStoreSource,
+  mockFiles,
+  packageJson,
+  readme,
+  routerSource,
+  scaffoldFiles,
+  withMessages,
+} from './vueProjectScaffold'
 
 export interface VueProjectSources {
   name: string
@@ -45,7 +55,7 @@ const rootsOf = (project: Project, prefabs: Prefab[]) => [
 
 /** What to rename before the exported code can run, or null when nothing. */
 export function namingProblem(project: Project, prefabs: Prefab[]): string | null {
-  const names = unusableVariableNames(rootsOf(project, prefabs), project.state)
+  const names = unusableVariableNames(rootsOf(project, prefabs), project.state, project)
   if (!names.length) return null
   const listed = names.map(name => `“${name}”`).join(', ')
   return `Rename these variables, code cannot use their names: ${listed}.`
@@ -86,13 +96,15 @@ export function buildVueProject(sources: VueProjectSources): ExportedProject {
   const problem = namingProblem(project, prefabs)
   if (problem) throw new ExportBlockedError(problem)
   const roots = rootsOf(project, prefabs)
-  const store = exportStore(roots, project.state)
+  const store = exportStore(roots, project.state, project)
+  const messages = showsMessages(roots)
+  const usesPinia = store !== null || messages
   const files: Record<string, string> = {}
 
   const pageName = fileNamer('Page')
   const routes = project.pages.map(page => {
     const file = pageName(page.name)
-    files[`src/pages/${file}`] = exportPage(page, project.state, file, StateSource.Shared).code
+    files[`src/pages/${file}`] = exportPage(page, project.state, file, StateSource.Shared, project).code
     return { path: page.path, file }
   })
   if (project.layout) {
@@ -101,12 +113,13 @@ export function buildVueProject(sources: VueProjectSources): ExportedProject {
       project.state,
       LAYOUT_FILE,
       StateSource.Shared,
+      project,
     ).code
   }
   const componentName = fileNamer('Component')
   for (const prefab of prefabs) {
     const file = componentName(prefab.name)
-    files[`src/components/${file}`] = exportPrefab(prefab, project.state, file, StateSource.Shared).code
+    files[`src/components/${file}`] = exportPrefab(prefab, project.state, file, StateSource.Shared, project).code
   }
 
   const styles = [...(themeCss ? ['theme.css'] : []), 'tables.css']
@@ -115,9 +128,12 @@ export function buildVueProject(sources: VueProjectSources): ExportedProject {
   if (store) files['src/stores/project.js'] = store
   files['src/plugins/vuetify.js'] = vuetifyConfig
   files['src/router/index.js'] = routerSource(routes)
-  files['src/App.vue'] = appComponent(project)
-  files['src/main.js'] = mainSource(styles, store !== null)
-  files['package.json'] = packageJson(name, themeCss, store !== null)
+  files['src/App.vue'] = messages ? withMessages(appComponent(project)) : appComponent(project)
+  if (messages) files['src/stores/messages.js'] = messagesStoreSource
+  for (const [name, source] of Object.entries(project.sources ?? {}))
+    Object.assign(files, mockFiles(source.url, project.state[name]))
+  files['src/main.js'] = mainSource(styles, usesPinia)
+  files['package.json'] = packageJson(name, themeCss, usesPinia)
   files['README.md'] = readme(sources.name)
   Object.assign(files, scaffoldFiles(sources.name))
   return { name, files }

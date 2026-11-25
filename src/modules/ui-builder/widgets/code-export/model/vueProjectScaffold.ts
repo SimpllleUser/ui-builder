@@ -65,6 +65,48 @@ export function mainSource(styles: string[], usesStore: boolean): string {
   ].join('\n')
 }
 
+export const messagesStoreSource = [
+  "import { defineStore } from 'pinia'",
+  "import { ref } from 'vue'",
+  '',
+  '/** The message the application shows at the bottom of the screen. */',
+  "export const useMessagesStore = defineStore('messages', () => {",
+  "  const text = ref('')",
+  '  const show = message => (text.value = message)',
+  '  return { text, show }',
+  '})',
+  '',
+].join('\n')
+
+const MESSAGES_IMPORT = "import { useMessagesStore } from './stores/messages'"
+const MESSAGES_SETUP = 'const messages = useMessagesStore()'
+const SNACKBAR = [
+  '  <VSnackbar :model-value="!!messages.text" @update:model-value="messages.text = \'\'">',
+  '    {{ messages.text }}',
+  '  </VSnackbar>',
+  '</template>',
+  '',
+].join('\n')
+
+/** The application component with the place where messages appear. It outlives the pages, so a message survives navigation. */
+export function withMessages(app: string): string {
+  const body = app.replace(/<\/template>\n$/, SNACKBAR)
+  if (!body.startsWith('<script setup>'))
+    return `<script setup>\n${MESSAGES_IMPORT}\n\n${MESSAGES_SETUP}\n</script>\n\n${body}`
+  return body
+    .replace('<script setup>\n', `<script setup>\n${MESSAGES_IMPORT}\n`)
+    .replace('\n</script>', `\n\n${MESSAGES_SETUP}\n</script>`)
+}
+
+/**
+ * The mock answer of a data source as a file the development server serves, so the exported application has data
+ * before there is a backend. Web addresses and paths that name no file get none.
+ */
+export function mockFiles(url: string, data: unknown): Record<string, string> {
+  const isFile = url.startsWith('/') && !url.endsWith('/') && !url.includes('..')
+  return isFile ? { [`public${url}`]: json(data) } : {}
+}
+
 export const readme = (title: string) =>
   [
     `# ${title}`,
@@ -80,6 +122,7 @@ export const readme = (title: string) =>
     '- `src/stores/project.js` holds the variables the pages share.',
     '- `src/components` holds the saved components. Copies placed on pages are written into the pages themselves.',
     '- Input masks are not exported.',
+    '- Files in `public` answer the mock data sources; point the `fetch` calls at your backend when there is one.',
     '',
     'Changes made here do not go back into the editor.',
     '',

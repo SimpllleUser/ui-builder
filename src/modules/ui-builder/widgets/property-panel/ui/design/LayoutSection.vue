@@ -11,13 +11,16 @@ import {
   readAxis,
 } from '../../model/designStyle'
 import { parsePx, toPx } from '../../../../../../shared/lib/inlineStyle'
+import { parseSpaceToken, SpaceToken, spaceValue } from '../../../../../../shared/lib/themeTokens'
 import { useNodeStyle } from '../../model/useNodeStyle'
 import { type UiNode } from '../../../../entities/ui-node'
 import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
 import IconToggleGroup from './IconToggleGroup.vue'
 import NumberField from './NumberField.vue'
+import TokenChips from './TokenChips.vue'
 
+const SPACE_TOKENS = Object.values(SpaceToken)
 const GRID: Position[] = [Position.Start, Position.Center, Position.End]
 const DIRECTIONS = [
   { axis: Axis.Row, icon: 'mdi-arrow-right', title: 'Children in a row' },
@@ -39,9 +42,14 @@ const axis = computed(() => readAxis(style.value))
 const alignment = computed(() => readAlignment(style.value))
 const wraps = computed(() => style.value.flexWrap === 'wrap')
 
+const gapToken = computed(() => parseSpaceToken(style.value.gap))
+
 const turnOn = () => apply({ display: CssValue.Flex })
-const turnOff = () =>
+const turnOff = () => {
   apply({ display: null, flexDirection: null, justifyContent: null, alignItems: null, gap: null, flexWrap: null })
+  // On a smaller screen the layout may still be inherited from a larger one, which only an override can end.
+  if (flex.value) apply({ display: CssValue.Block })
+}
 const setAxis = (next: Axis) => {
   // Keep the same corner of the box when the direction flips.
   const current = alignment.value
@@ -103,11 +111,17 @@ const place = (horizontal: Position, vertical: Position) => apply(alignmentStyle
             title="Gap between children"
             :model-value="parsePx(style.gap)"
             :min="0"
-            placeholder="0"
+            :placeholder="gapToken ?? '0'"
             @update:model-value="value => apply({ gap: toPx(value) })"
           />
         </div>
       </div>
+      <TokenChips
+        label="Gap"
+        :tokens="SPACE_TOKENS"
+        :selected="gapToken"
+        @pick="token => apply({ gap: token && spaceValue(token) })"
+      />
       <VBtn size="x-small" variant="text" class="mt-2" @click="turnOff">Turn off auto layout</VBtn>
     </template>
 

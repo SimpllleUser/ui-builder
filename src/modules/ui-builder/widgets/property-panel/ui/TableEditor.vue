@@ -8,6 +8,7 @@ import {
   tableColumns,
   tableRows,
   type UiNode,
+  variableNames,
 } from '../../../entities/ui-node'
 import { TableEditorTab } from '../model/tableEditorTab'
 import { computed, ref, watch } from 'vue'
@@ -21,7 +22,7 @@ const rows = computed(() => tableRows(props.node))
 // A string value ({{orders}}) means the data comes from project state.
 const boundRows = computed(() => (typeof props.node.props.items === 'string' ? props.node.props.items : ''))
 const boundColumns = computed(() => (typeof props.node.props.headers === 'string' ? props.node.props.headers : ''))
-const stateKeys = computed(() => Object.keys(store.project.state))
+const stateKeys = computed(() => variableNames(store.project))
 const tab = ref<TableEditorTab>(TableEditorTab.Columns)
 
 const id = computed(() => props.node.id)

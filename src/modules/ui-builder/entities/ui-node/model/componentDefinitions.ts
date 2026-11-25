@@ -244,6 +244,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
       { kind: FieldKind.Switch, prop: 'rounded', label: 'Rounded' },
       { kind: FieldKind.Switch, prop: 'icon', label: 'Icon Button' },
       { kind: FieldKind.Text, prop: 'value', label: 'Value (for button toggle)' },
+      { kind: FieldKind.Select, prop: 'type', label: 'Type (submit sends a form)', options: ['button', 'submit'] },
     ])
     .section('Icons', [
       {
@@ -320,7 +321,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
     defaultChildren: [
       { type: 'VTextField', name: 'Name', props: { label: 'Name' } },
       { type: 'VTextField', name: 'Email', props: { label: 'Email', type: 'email' } },
-      { type: 'VBtn', name: 'Submit', props: { color: 'primary' } },
+      { type: 'VBtn', name: 'Submit', props: { color: 'primary', type: 'submit' } },
     ],
     showInPalette: true,
   })
@@ -705,6 +706,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
       { kind: FieldKind.Slider, prop: 'sm', label: 'Width SM', min: 1, max: 12, step: 1 },
       { kind: FieldKind.Slider, prop: 'md', label: 'Width MD', min: 1, max: 12, step: 1 },
       { kind: FieldKind.Slider, prop: 'lg', label: 'Width LG', min: 1, max: 12, step: 1 },
+      { kind: FieldKind.Slider, prop: 'xl', label: 'Width XL', min: 1, max: 12, step: 1 },
     ])
     .spacing(true)
     .classes()

@@ -1,4 +1,4 @@
-import { exportLayout, exportPage, exportPrefab, type VueFile } from '../../../entities/ui-node'
+import { exportLayout, exportPage, exportPrefab, StateSource, type VueFile } from '../../../entities/ui-node'
 import type { Page, Prefab, Project, UiNode } from '../../../entities/ui-node'
 import { toPascalCase } from '../../../../../shared/lib/pascalCase'
 
@@ -39,13 +39,19 @@ export function buildExportTargets(project: Project, prefabs: Prefab[]): ExportT
     targets.push({ id, kind, title, file: build(uniqueFileName(title, kind, taken)) })
 
   for (const page of project.pages)
-    add(page.id, ExportTargetKind.Page, page.name, name => exportPage(page, project.state, name))
+    add(page.id, ExportTargetKind.Page, page.name, name =>
+      exportPage(page, project.state, name, StateSource.Local, project),
+    )
   if (project.layout) {
     const layout: UiNode = project.layout
-    add('layout', ExportTargetKind.Layout, 'Shared layout', name => exportLayout(layout, project.state, name))
+    add('layout', ExportTargetKind.Layout, 'Shared layout', name =>
+      exportLayout(layout, project.state, name, StateSource.Local, project),
+    )
   }
   for (const prefab of prefabs)
-    add(prefab.prefabId, ExportTargetKind.Component, prefab.name, name => exportPrefab(prefab, project.state, name))
+    add(prefab.prefabId, ExportTargetKind.Component, prefab.name, name =>
+      exportPrefab(prefab, project.state, name, StateSource.Local, project),
+    )
   return targets
 }
 

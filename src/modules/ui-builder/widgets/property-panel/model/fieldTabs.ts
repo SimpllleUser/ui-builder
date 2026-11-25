@@ -63,7 +63,7 @@ export const INSPECTOR_TABS: InspectorTabDefinition[] = [
     id: InspectorTab.Behavior,
     label: 'Behavior',
     icon: 'mdi-lightning-bolt-outline',
-    description: 'What it does in Preview: click, condition, repeat, link',
+    description: 'What it does in Preview: events, condition, repeat, link, checks',
     group: InspectorTabGroup.Main,
   },
   {

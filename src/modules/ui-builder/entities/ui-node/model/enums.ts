@@ -3,6 +3,28 @@ export enum ActionType {
   Navigate = 'navigate',
   Set = 'set',
   Toggle = 'toggle',
+  Append = 'append',
+  Remove = 'remove',
+  Notify = 'notify',
+  ResetForm = 'resetForm',
+}
+
+/** When an element's actions run. The values are saved in project files. */
+export enum EventName {
+  Click = 'click',
+  Change = 'change',
+  Submit = 'submit',
+  Mounted = 'mounted',
+}
+
+/** A check of what a form field holds. The values are saved in project files. */
+export enum RuleType {
+  Required = 'required',
+  Email = 'email',
+  MinLength = 'minLength',
+  MaxLength = 'maxLength',
+  Min = 'min',
+  Max = 'max',
 }
 
 /** How a click on an element reaches its action; the values are the events listened to. */
@@ -57,6 +79,10 @@ export enum TemplateKind {
   Onboarding = 'onboarding',
   Blog = 'blog',
   Contact = 'contact',
+  Landing = 'landing',
+  Settings = 'settings',
+  Wizard = 'wizard',
+  Pricing = 'pricing',
 }
 
 /** Margin or padding. The values are the prefixes of the utility classes (`mt-2`, `pa-4`). */
@@ -83,6 +109,18 @@ export enum SaveState {
   Error = 'error',
 }
 
+/**
+ * Vuetify's grid breakpoints, mobile first: what is set for one applies to it and every larger screen.
+ * The values are Vuetify's names and are saved in project files.
+ */
+export enum Breakpoint {
+  Xs = 'xs',
+  Sm = 'sm',
+  Md = 'md',
+  Lg = 'lg',
+  Xl = 'xl',
+}
+
 /** Which way an element or page moves in its list; the value is the step in the list. */
 export enum StepDirection {
   Back = -1,
@@ -100,6 +138,10 @@ export enum IssueKind {
   EmptyTable = 'empty-table',
   MissingOutlet = 'missing-outlet',
   EmptyPage = 'empty-page',
+  ReadOnlyVariable = 'read-only-variable',
+  MissingForm = 'missing-form',
+  InvalidRule = 'invalid-rule',
+  InvalidFormula = 'invalid-formula',
 }
 
 /** How serious a problem is: an error breaks what the person built, a warning probably does, info is advice. */

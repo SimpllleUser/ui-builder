@@ -1,11 +1,19 @@
-import { need, ok, type Args, type McpCommand, type Store } from './mcpCommandUtils'
+import { needEditable, ok, type Args, type McpCommand, type Store } from './mcpCommandUtils'
 import { buildSubtree, type SubtreeSpec } from './mcpSubtree'
 
 /**
  * Commands that cannot run inside a batch: a batch is one undo step, and these work on history or replace everything.
  * The project commands are not in the command table at all, so a batch refuses them too.
  */
-const NOT_IN_BATCH = new Set(['batch', 'undo', 'redo', 'import_document'])
+const NOT_IN_BATCH = new Set([
+  'batch',
+  'undo',
+  'redo',
+  'import_document',
+  // They change what the other steps work on, and opening waits for other tabs.
+  'edit_saved_component',
+  'close_saved_component',
+])
 const REFERENCE = /^\$(\d+)((?:\.[A-Za-z_$][\w$-]*)*)$/
 
 /** Replaces `"$2.id"` in a value with that field of the result of step 2, so a step can use what an earlier one made. */
@@ -31,7 +39,7 @@ export function resolveReferences(value: unknown, results: unknown[]): unknown {
 
 export const createBuildCommands = (commands: Record<string, McpCommand>): Record<string, McpCommand> => ({
   add_subtree(store: Store, a: Args) {
-    const parent = need(store, a.parentId ?? store.rootNode.id)
+    const parent = needEditable(store, a.parentId ?? store.rootNode.id)
     const { node, refs } = buildSubtree(store, a.tree as SubtreeSpec)
     store.transaction(() => {
       ok(

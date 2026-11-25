@@ -42,6 +42,7 @@ export enum SpacingBox {
 /** CSS words the design controls write or recognise. */
 export enum CssValue {
   Flex = 'flex',
+  Block = 'block',
   Column = 'column',
   Wrap = 'wrap',
   Solid = 'solid',

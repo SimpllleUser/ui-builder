@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useUiTreeStore, parseLiteral, variableNameError } from '../../../entities/ui-node'
+import { isComputed, parseLiteral, useUiTreeStore, variableNameError, variableNames } from '../../../entities/ui-node'
 
 /**
  * Picks a variable by name. A name that does not exist yet is accepted and the parent creates the variable,
@@ -17,7 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [name: string] }>()
 const store = useUiTreeStore()
 
-const names = computed(() => Object.keys(store.project.state))
+const names = computed(() => variableNames(store.project))
 const draft = ref(props.modelValue ?? '')
 const menu = ref(false)
 watch(
@@ -47,6 +47,9 @@ const onInput = (value: string | null) => {
 }
 
 const exists = computed(() => !!props.modelValue && props.modelValue in store.project.state)
+const formula = computed(() =>
+  props.modelValue && isComputed(store.project, props.modelValue) ? store.project.computed![props.modelValue] : null,
+)
 const startValue = computed(() => {
   const value = props.modelValue ? store.project.state[props.modelValue] : undefined
   return typeof value === 'string' ? value : JSON.stringify(value)
@@ -75,6 +78,7 @@ const setStartValue = (text: string) => {
       @blur="commit"
       @keydown.enter="commitAndClose"
     />
+    <p v-if="formula" class="variable-field__start text-medium-emphasis">Computed: {{ formula }}</p>
     <VTextField
       v-if="exists"
       :model-value="startValue"

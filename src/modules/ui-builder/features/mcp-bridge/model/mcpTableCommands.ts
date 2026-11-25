@@ -1,11 +1,14 @@
 import { COMPONENT_DEFS, cellSlotName, describeFields, tableColumns, tableRows } from '../../../entities/ui-node'
-import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
+import { need, needEditable, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 const needTable = (store: Store, id: unknown) => {
   const node = need(store, id)
   if (node.type !== 'VDataTable') throw new Error(`${node.name} is not a data table`)
   return node
 }
+
+/** The id of a table whose columns, rows and cells may be changed. */
+const editableTable = (store: Store, id: unknown) => needEditable(store, id).id
 
 const tableState = (store: Store, id: string) => {
   const node = needTable(store, id)
@@ -45,30 +48,30 @@ export const MCP_TABLE_COMMANDS: Record<string, McpCommand> = {
   },
   add_table_column(store, a) {
     const { id, ...column } = a
-    const created = store.table.addColumn(need(store, id).id, column)
+    const created = store.table.addColumn(editableTable(store, id), column)
     ok(!!created, store.notice || 'Could not add column')
     return { column: created, ...tableState(store, id) }
   },
   update_table_column(store, a) {
     const { id, column, ...patch } = a
-    ok(store.table.updateColumn(need(store, id).id, column, patch), store.notice || 'Could not update column')
+    ok(store.table.updateColumn(editableTable(store, id), column, patch), store.notice || 'Could not update column')
     return tableState(store, id)
   },
   remove_table_column(store, a) {
-    ok(store.table.removeColumn(need(store, a.id).id, a.column), store.notice || 'Could not remove column')
+    ok(store.table.removeColumn(editableTable(store, a.id), a.column), store.notice || 'Could not remove column')
     return tableState(store, a.id)
   },
   add_table_row(store, a) {
-    const index = store.table.addRow(need(store, a.id).id, a.values, a.index)
+    const index = store.table.addRow(editableTable(store, a.id), a.values, a.index)
     ok(index !== null, store.notice || 'Could not add row')
     return { index, ...tableState(store, a.id) }
   },
   update_table_row(store, a) {
-    ok(store.table.updateRow(need(store, a.id).id, a.index, a.values), store.notice || 'Could not update row')
+    ok(store.table.updateRow(editableTable(store, a.id), a.index, a.values), store.notice || 'Could not update row')
     return tableState(store, a.id)
   },
   remove_table_row(store, a) {
-    ok(store.table.removeRow(need(store, a.id).id, a.index), store.notice || 'Could not remove row')
+    ok(store.table.removeRow(editableTable(store, a.id), a.index), store.notice || 'Could not remove row')
     return tableState(store, a.id)
   },
 }

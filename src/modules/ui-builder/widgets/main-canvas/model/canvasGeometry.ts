@@ -6,6 +6,16 @@ export interface ElementBox {
   height: number
 }
 
+/** The element under an event target. Text inside a button counts as the button; the page itself counts as nothing. */
+export function nodeIdAt(target: EventTarget | null, isElement: (id: string) => boolean): string | null {
+  let element = target instanceof Element ? target.closest<HTMLElement>('[data-node-id]') : null
+  while (element) {
+    if (isElement(element.dataset.nodeId!)) return element.dataset.nodeId!
+    element = element.parentElement?.closest<HTMLElement>('[data-node-id]') ?? null
+  }
+  return null
+}
+
 export const findCanvasElement = (container: HTMLElement, id: string) =>
   container.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`)
 

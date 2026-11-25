@@ -9,6 +9,7 @@ import {
   startingOutcome,
   useUiTreeStore,
   type UiNode,
+  variableNames,
 } from '../../../entities/ui-node'
 import { OPEN_CONDITIONS_HELP } from '../../../../../shared/lib/conditionsHelp'
 import { useCheckedDrafts } from '../../../../../shared/lib/useCheckedDrafts'
@@ -41,13 +42,13 @@ const settled = refDebounced(typed, HINT_DELAY_MS)
 const unfinishedReason = computed(() =>
   drafts.errorOf(FIELD).length || !conditionError(typed.value) ? null : conditionError(settled.value),
 )
-const outcome = computed(() => startingOutcome(typed.value, store.project.state))
+const outcome = computed(() => startingOutcome(typed.value, store.startingState))
 
 const snippets = computed<ConditionSnippet[]>(() => [
   ...repeatScopeNames(props.node, store.findParentAndIndex).map(name =>
     variableSnippet(name, 'Exists inside this repeat or table cell'),
   ),
-  ...Object.keys(store.project.state).map(name => variableSnippet(name, 'Project variable')),
+  ...variableNames(store.project).map(name => variableSnippet(name, 'Project variable')),
 ])
 
 const field = ref<{ $el: HTMLElement } | null>(null)

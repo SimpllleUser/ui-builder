@@ -20,8 +20,17 @@ export interface McpProjects {
   rename(id: string, name: string): Promise<void>
 }
 
+/** The theme of the open project, also provided by the application. */
+export interface McpTheme {
+  /** The settings in use and what each of them accepts. */
+  describe(): unknown
+  /** Changes the settings named; throws for one the theme does not have. */
+  change(patch: Record<string, unknown>): unknown
+}
+
 export interface McpHost {
   projects: McpProjects
+  theme: McpTheme
   /** The open project as a file, theme included. */
   exportFile(): Promise<string>
   /** Takes over the theme of an imported file, when it has one. */
@@ -57,6 +66,8 @@ export async function runMcpCommand(store: Store, host: McpHost, command: string
   const reason = host.refusal()
   if (reason) throw new Error(reason)
   if (command === 'export_document') return host.exportFile()
+  if (command === 'get_theme') return host.theme.describe()
+  if (command === 'set_theme') return host.theme.change(args.settings ?? {})
   const result = executeMcpCommand(store, command, args)
   if (command === 'import_document') host.applyFileTheme(String(args.json))
   return command === 'get_status' ? { project: host.projects.current(), ...(result as object) } : result

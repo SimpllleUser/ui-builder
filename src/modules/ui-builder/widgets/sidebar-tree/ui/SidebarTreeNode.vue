@@ -27,6 +27,8 @@ const selected = computed(() => store.selectedNodeIds.includes(props.node.id))
 const componentLabel = computed(() =>
   props.node.id === ROOT_NODE_ID ? 'Page canvas' : (getComponentDef(props.node.type)?.label ?? props.node.type),
 )
+// An instance is one thing in the tree: what is inside comes from its original.
+const isInstance = computed(() => store.isLocked(props.node.id))
 const behaviors = computed(() => describeBehaviors(props.node))
 const slots = computed(() =>
   getNodeSlots(props.node).filter(
@@ -37,6 +39,7 @@ const slots = computed(() =>
 // A data table's cell content is added from its Content settings.
 const hasEmptySlots = computed(
   () =>
+    !isInstance.value &&
     !behaviorOf(props.node.type).slotsAddedInInspector &&
     slots.value.some(slot => !props.node.slots[slot.name]?.length),
 )
@@ -52,7 +55,7 @@ const canMove = (event: { draggedContext: { element: UiNode }; to: HTMLElement }
 }
 const depth = computed(() => props.depth ?? 0)
 const hasContent = computed(
-  () => store.canContain(props.node) || props.node.children.length > 0 || slots.value.length > 0,
+  () => !isInstance.value && (store.canContain(props.node) || props.node.children.length > 0 || slots.value.length > 0),
 )
 const select = (e: MouseEvent | KeyboardEvent) => {
   setActiveTreeId(props.node.id)
@@ -160,6 +163,9 @@ const keydown = (e: KeyboardEvent) => {
         @blur="finishRename"
       />
       <span v-else class="node-label" :title="label">{{ label }}</span>
+      <span v-if="isInstance" class="node-behaviors" title="Component instance" aria-label="Component instance">
+        <VIcon icon="mdi-puzzle-outline" size="14" />
+      </span>
       <span v-if="behaviors.length" class="node-behaviors" aria-hidden="true">
         <span v-for="note in behaviors" :key="note.badge" :title="note.description">
           <VIcon :icon="BEHAVIOR_ICONS[note.badge]" size="14" />

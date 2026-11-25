@@ -7,6 +7,7 @@ interface Flat {
   type: string
   props: Record<string, unknown>
   classes: string
+  responsive: string | undefined
   behavior: string
   /** Where it sits: parent, slot and position. */
   place: string
@@ -16,7 +17,7 @@ interface Flat {
 
 const PROP_NAMES: Record<string, string> = { headers: 'columns', items: 'rows' }
 const MAX_PROPS_LISTED = 2
-const NO_BEHAVIOR = JSON.stringify([undefined, undefined, undefined, undefined])
+const NO_BEHAVIOR = JSON.stringify([undefined, undefined, undefined, undefined, undefined])
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 const quote = (text: string) => `“${text}”`
@@ -30,7 +31,8 @@ const flatten = (project: Project): Map<string, Flat> => {
       type: node.type,
       props: node.props,
       classes: node.classes.join(' '),
-      behavior: JSON.stringify([node.model, node.vIf, node.vFor, node.events]),
+      responsive: JSON.stringify(node.responsive),
+      behavior: JSON.stringify([node.model, node.vIf, node.vFor, node.events, node.rules]),
       place: `${parent}|${slot}|${index}`,
       parent,
       slot,
@@ -93,6 +95,18 @@ function describePages(before: Project, after: Project): string | null {
 
 /** Variables are named last: an element that was added together with its variables is named after the element. */
 function describeState(before: Project, after: Project): string | null {
+  for (const [table, what] of [
+    ['computed', 'computed variable'],
+    ['sources', 'data source of'],
+  ] as const) {
+    const was: Record<string, unknown> = before[table] ?? {}
+    const now: Record<string, unknown> = after[table] ?? {}
+    for (const name of new Set([...Object.keys(was), ...Object.keys(now)])) {
+      if (!(name in was)) return `Added ${what} ${name}`
+      if (!(name in now)) return `Removed ${what} ${name}`
+      if (JSON.stringify(was[name]) !== JSON.stringify(now[name])) return `Changed ${what} ${name}`
+    }
+  }
   const names = new Set([...Object.keys(before.state), ...Object.keys(after.state)])
   for (const name of names) {
     if (!(name in before.state)) return `Added variable ${name}`
@@ -120,7 +134,7 @@ function describeElement(old: Flat, now: Flat, parent: Flat | undefined): string
     const listed = keys.slice(0, MAX_PROPS_LISTED).map(key => PROP_NAMES[key] ?? key)
     return `Changed ${now.name}: ${listed.join(', ')}${keys.length > MAX_PROPS_LISTED ? '…' : ''}`
   }
-  if (old.classes !== now.classes) return `Changed the style of ${now.name}`
+  if (old.classes !== now.classes || old.responsive !== now.responsive) return `Changed the style of ${now.name}`
   if (old.behavior !== now.behavior) {
     return now.behavior === NO_BEHAVIOR ? `Removed the behavior of ${now.name}` : `Changed the behavior of ${now.name}`
   }

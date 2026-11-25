@@ -1,10 +1,10 @@
-import type { McpHost, McpProjects } from '../../modules/ui-builder/features/mcp-bridge'
+import type { McpHost, McpProjects, McpTheme } from '../../modules/ui-builder/features/mcp-bridge'
 import type { ProjectSession } from '../../modules/projects/features/manage-projects'
 
 const LOCKED = 'This tab does not edit the project: it is open in another tab. Open another project with open_project.'
 
 /** Gives the MCP bridge the projects of this tab. */
-export function createMcpHost(session: ProjectSession, lastNotice: () => string): McpHost {
+export function createMcpHost(session: ProjectSession, lastNotice: () => string, theme: McpTheme): McpHost {
   const current = () => {
     const project = session.currentProject.value
     return project ? { id: project.id, name: project.name } : null
@@ -26,6 +26,7 @@ export function createMcpHost(session: ProjectSession, lastNotice: () => string)
   }
   return {
     projects,
+    theme,
     refusal: () => (session.isLocked.value ? LOCKED : null),
     exportFile: () => session.exportFile(session.currentProjectId.value ?? ''),
     applyFileTheme: session.applyFileTheme,

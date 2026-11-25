@@ -6,7 +6,8 @@ import { shortDateTime, timeAgo } from '../model/timeAgo'
 
 /** Every named change that can be restored, and checkpoints the person saved on purpose. */
 const store = useUiTreeStore()
-const { historyVersions, historyPending, checkpoints } = storeToRefs(store)
+// While a saved component is edited, the versions are its own; checkpoints hold the project, so they wait.
+const { historyVersions, historyPending, checkpoints, editingPrefab } = storeToRefs(store)
 
 const dialog = ref(false)
 const name = ref('')
@@ -21,11 +22,15 @@ const save = () => {
 
 <template>
   <div class="sidebar-view__scroll history-list" aria-label="Document history">
+    <p v-if="editingPrefab" class="history-help">
+      Versions of the component <strong>{{ editingPrefab.name }}</strong>. Every instance follows the one you select.
+    </p>
     <p class="history-help">
       Select a version to restore it. <span v-if="historyPending">Unsaved changes will be saved first.</span
       ><span v-else>Older versions remain available until the history limit is reached.</span>
     </p>
     <VBtn
+      v-if="!editingPrefab"
       block
       size="small"
       color="primary"
@@ -36,7 +41,7 @@ const save = () => {
       >Save checkpoint</VBtn
     >
 
-    <div v-if="checkpoints.length" class="history-section">
+    <div v-if="!editingPrefab && checkpoints.length" class="history-section">
       <h3 class="history-section__title">Checkpoints</h3>
       <div v-for="checkpoint in checkpoints" :key="checkpoint.checkpointId" class="checkpoint-item">
         <button class="checkpoint-restore" @click="store.restoreCheckpoint(checkpoint.checkpointId)">

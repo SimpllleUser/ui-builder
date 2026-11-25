@@ -10,7 +10,7 @@ export {
   WRAP_CONTAINER_TYPES,
 } from './model/componentDefinitions'
 export type { ComponentDef, PropertySection, PropField } from './model/componentDefinitions'
-export { behaviorOf, clickEventOf } from './model/componentBehaviors'
+export { behaviorOf, clickEventOf, hasValidation } from './model/componentBehaviors'
 export {
   actionExamples,
   actionFromInput,
@@ -21,12 +21,19 @@ export {
   newVariableValue,
 } from './model/actions'
 export { ROOT_NODE_ID, TEXT_NODE_TYPE } from './model/constants'
+export { actionsOf, EVENT_LABELS, eventsFor, MAX_ACTIONS_PER_EVENT, withActions } from './model/events'
+export { isRuleType, ruleError, ruleLabel, ruleNeedsValue } from './model/validationRules'
+export { formulaError, isComputed, variableNames } from './model/computedVariables'
+export { DEFAULT_DELAY_MS, endpointError, MAX_DELAY_MS } from './model/dataSources'
 export {
   ActionType,
+  Breakpoint,
   ClickEvent,
   IssueKind,
   IssueSeverity,
   ColumnAlign,
+  EventName,
+  RuleType,
   FieldKind,
   SaveState,
   SpacingType,
@@ -55,11 +62,22 @@ export {
   exportPrefab,
   exportStore,
   hasAppShell,
+  showsMessages,
   StateSource,
   unusableVariableNames,
 } from './model/vueExport'
 export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
+export {
+  effectiveStyle,
+  hasOverrides,
+  patchNodeStyle,
+  responsiveStylesheet,
+  setOverride,
+} from './model/responsiveStyle'
+export { BREAKPOINT_MIN_WIDTHS, BREAKPOINT_WIDTHS, BREAKPOINTS, overrideTarget } from './model/breakpoints'
+export { COLUMN_PROPS, columnPropFor, columnsForWidth, GRID_COLUMN_TYPE, GRID_COLUMNS } from './model/grid'
+export type { ResponsiveStyles } from './model/types'
 export { openPrefabRepository } from './api/prefabRepository'
 export type { PrefabLibrary } from './model/prefabSync'
 export { countPages, emptyProjectDocument, normalizeDocument } from './model/document'
@@ -81,7 +99,18 @@ export type { TemplateProps } from './model/templateFactory'
 export type { TextRecord } from './model/templates/templateProps'
 export { applyPrefabProps, declarePrefabProps, findPrefabPropNames } from './model/prefabProps'
 export type { PrefabPropValues } from './model/prefabProps'
-export type { Page, Prefab, PrefabProp, Project, UiAction, UiNode } from './model/types'
+export type {
+  DataSource,
+  InstanceLink,
+  Page,
+  Prefab,
+  PrefabProp,
+  Project,
+  UiAction,
+  UiNode,
+  UiNodeEvents,
+  ValidationRule,
+} from './model/types'
 export { canvasDragTargetId, default as NodeRenderer } from './ui/NodeRenderer'
 export { auditProject } from './model/projectAudit'
 export { bindingRoots, findVariableUsages, UsageKind } from './model/variableUsage'

@@ -1,21 +1,45 @@
 // src/modules/ui-builder/entities/ui-node/ui/NodeRenderer.ts
-import { defineComponent, h, type Component, type PropType, resolveDynamicComponent, type Slot, type VNode } from 'vue'
+import {
+  defineComponent,
+  h,
+  inject,
+  nextTick,
+  provide,
+  ref,
+  resolveDynamicComponent,
+  type Component,
+  type InjectionKey,
+  type PropType,
+  type Slot,
+  type VNode,
+} from 'vue'
 import * as Components from 'vuetify/components'
 import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../model/store'
 import { getComponentDef } from '../model/componentDefinitions'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from '../model/constants'
 import { applyMask, evaluateCondition, interpolate, interpolateProps, repeatItems, type Scope } from '../model/runtime'
-import { bindAction } from '../model/actions'
+import { actionsOf } from '../model/events'
+import { isForm } from '../model/forms'
+import { vuetifyRules } from '../model/validationRules'
 import type { UiNode } from '../model/types'
 import { childNodes } from '../model/treeUtils'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
 import { behaviorMarker } from '../model/behaviorSummary'
 import { behaviorOf, clickEventOf, componentProps } from '../model/componentBehaviors'
-import { ClickEvent } from '../model/enums'
+import { ClickEvent, EventName } from '../model/enums'
 import { generatedSlots } from './generatedSlots'
+import { effectiveStyle, hasOverrides, responsiveRules } from '../model/responsiveStyle'
+import { GRID_COLUMN_TYPE, gridPropsAt } from '../model/grid'
 
 export { canvasDragTargetId }
+
+/** The form an element is inside, so its actions can reset it. */
+interface FormContext {
+  node: UiNode
+  resetValidation(): void
+}
+const FORM_CONTEXT: InjectionKey<FormContext> = Symbol('form')
 
 const NodeRenderer = defineComponent({
   name: 'NodeRenderer',
@@ -29,6 +53,12 @@ const NodeRenderer = defineComponent({
   setup(props) {
     const store = useUiTreeStore()
     const { selectedNodeIds, isPreviewMode } = storeToRefs(store)
+    const formInstance = ref<{ resetValidation?: () => void } | null>(null)
+    const ownForm: FormContext | undefined = isForm(props.node)
+      ? { node: props.node, resetValidation: () => formInstance.value?.resetValidation?.() }
+      : undefined
+    const form = ownForm ?? inject(FORM_CONTEXT, undefined)
+    if (ownForm) provide(FORM_CONTEXT, ownForm)
 
     const select = (e: MouseEvent, id: string) => {
       e.stopPropagation()
@@ -137,27 +167,48 @@ const NodeRenderer = defineComponent({
       return slots
     }
 
-    /** Preview-only props: v-model binding, masked input and the click action. */
-    const previewBindings = (node: UiNode, mask: unknown, scope: Scope): Record<string, unknown> => {
+    /** Runs the actions an element has for an event. `names` are those that exist only at that moment. */
+    const actionContext = (names: Scope = {}) => ({
+      scope: { ...props.scope, ...names },
+      form: form?.node,
+      // The fields take the new values first, and only then forget their errors.
+      onFormReset: () => void nextTick(() => form?.resetValidation()),
+    })
+    const run = (node: UiNode, event: EventName, names?: Scope) =>
+      store.runActions(actionsOf(node.events, event), actionContext(names))
+
+    /** Preview-only props: v-model binding, masked input, validation rules and events. */
+    const previewBindings = (node: UiNode, mask: unknown): Record<string, unknown> => {
       const bindings: Record<string, unknown> = {}
-      if (node.model) {
-        const key = node.model
-        bindings.modelValue = store.runtimeState[key]
+      const key = node.model
+      if (key) bindings.modelValue = store.runtimeState[key]
+      if (key || actionsOf(node.events, EventName.Change).length) {
         bindings['onUpdate:modelValue'] = (value: unknown) => {
-          store.runtimeState[key] =
-            typeof value === 'string' && typeof mask === 'string' && mask ? applyMask(value, mask) : value
+          const written = typeof value === 'string' && typeof mask === 'string' && mask ? applyMask(value, mask) : value
+          if (key) store.runtimeState[key] = written
+          run(node, EventName.Change, { value: written })
         }
       }
-      const click = node.events?.click
-      if (click) {
+      if (node.rules?.length) bindings.rules = vuetifyRules(node.rules)
+      if (isForm(node)) {
+        // Always handled, because a native submit would reload the frame.
+        bindings.onSubmit = async (event: Event & PromiseLike<{ valid: boolean }>) => {
+          event.preventDefault()
+          if ((await event).valid) run(node, EventName.Submit)
+        }
+      }
+      if (actionsOf(node.events, EventName.Mounted).length) {
+        bindings.onVnodeMounted = () =>
+          store.runAppearActions(actionsOf(node.events, EventName.Mounted), actionContext())
+      }
+      if (actionsOf(node.events, EventName.Click).length) {
         if (clickEventOf(node.type) === ClickEvent.Row) {
-          bindings['onClick:row'] = (_: Event, row: { item: unknown }) =>
-            store.dispatchAction(bindAction(click, { ...scope, item: row.item }))
+          bindings['onClick:row'] = (_: Event, row: { item: unknown }) => run(node, EventName.Click, { item: row.item })
         } else {
           // Stop here so a button inside a table cell does not also trigger the row click.
           bindings.onClick = (e: Event) => {
             e.stopPropagation()
-            store.dispatchAction(bindAction(click, scope))
+            run(node, EventName.Click)
           }
         }
       }
@@ -166,15 +217,29 @@ const NodeRenderer = defineComponent({
 
     const renderComponent = (node: UiNode, preview: boolean, scope: Scope): VNode => {
       const isLeaf = !!getComponentDef(node.type)?.isLeaf
-      const resolvedProps = preview ? interpolateProps(node.props, scope) : { ...node.props }
+      const givenNodeProps = preview ? interpolateProps(node.props, scope) : { ...node.props }
+      const resolvedProps =
+        !preview && node.type === GRID_COLUMN_TYPE && store.editingBreakpoint
+          ? gridPropsAt(givenNodeProps, store.editingBreakpoint)
+          : givenNodeProps
       // `class`/`style` set through MCP or import must not be lost when the editor adds its own classes.
-      const { class: propClass, style: propStyle, mask } = resolvedProps
+      const { class: propClass, style: ownStyle, mask } = resolvedProps
+      // Preview has a real screen width, so media queries decide. The canvas shows the screen size being edited.
+      const responsive = hasOverrides(node) ? node : null
+      const rules = preview && responsive ? responsiveRules(responsive) : null
+      const propStyle = rules
+        ? Object.keys(rules.inlineStyle).length
+          ? interpolateProps(rules.inlineStyle, scope)
+          : undefined
+        : !preview && responsive
+          ? effectiveStyle(responsive, store.editingBreakpoint)
+          : ownStyle
       const render = (nodes: UiNode[], base: Scope = props.scope) => renderNodes(nodes, base, scope, preview)
 
       const behavior = behaviorOf(node.type)
       // In the editor a binding shows the variable's starting value, so the canvas always has real data to draw.
-      const shownProps = behavior.previewProps?.(resolvedProps, preview ? scope : store.project.state) ?? resolvedProps
-      const classes = [propClass, ...node.classes, ...(behavior.editorClasses?.(shownProps) ?? [])]
+      const shownProps = behavior.previewProps?.(resolvedProps, preview ? scope : store.startingState) ?? resolvedProps
+      const classes = [propClass, ...node.classes, ...(behavior.editorClasses?.(shownProps) ?? []), rules?.className]
       const slots = { ...generatedSlots(node.type, shownProps), ...buildSlots(node, render) }
       const givenProps = componentProps(node.type, shownProps)
       const extraProps: Record<string, unknown> = {}
@@ -187,7 +252,13 @@ const NodeRenderer = defineComponent({
       if (preview)
         return h(
           VComponent,
-          { ...givenProps, ...extraProps, ...previewBindings(node, mask, scope), class: classes },
+          {
+            ...givenProps,
+            ...extraProps,
+            ...previewBindings(node, mask),
+            ...(ownForm ? { ref: formInstance } : {}),
+            class: classes,
+          },
           slots,
         )
 
@@ -205,6 +276,8 @@ const NodeRenderer = defineComponent({
             { 'is-drag-over': !isLeaf && canvasDragTargetId.value === node.id },
           ],
           onClick: (e: MouseEvent) => select(e, node.id),
+          // A submit button must not reload the editor.
+          ...(ownForm ? { onSubmit: (e: Event) => e.preventDefault() } : {}),
           ...(store.canContain(node) ? createDropHandlers(store, node) : {}),
         },
         slots,
