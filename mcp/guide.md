@@ -38,7 +38,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 
 ## Check your work
 - **`check_project`** lists problems (unknown variables, links to pages that do not exist, invalid conditions, empty tables, a layout without “Page content”). Fix every error.
-- **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_submit`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Data sources arrive after their delay and `mounted` actions run once the page is drawn, so ask `preview_state` again for them. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document.
+- **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_submit`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Data sources arrive after their delay and `mounted` actions run once the page is drawn, so ask `preview_state` again for them. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document. Like a person, you can only use what is there: clicking or typing into an element that is hidden by a condition or disabled is refused with the reason.
 - `undo` takes back your last step.
 
 ## Safety

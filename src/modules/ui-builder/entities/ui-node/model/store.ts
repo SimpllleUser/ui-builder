@@ -7,6 +7,7 @@ import {
   MAX_CHECKPOINTS,
   MAX_HISTORY_ENTRIES,
   MAX_RECENT_COMPONENTS,
+  OUTLET_NODE_TYPE,
   ROOT_NODE_ID,
   TEXT_NODE_TYPE,
 } from './constants'
@@ -25,6 +26,7 @@ import { usePrefabEditLock } from './prefabEditLock'
 import { holdsRecursion, prefabLookup } from './componentInstances'
 import { LOCKED_NOTICE, useComponentInstances } from './instanceStore'
 import { snapshotPreview } from './previewSnapshot'
+import { previewObstacle } from './previewReach'
 import { resolveTableData } from './tableBindings'
 import { actionsOf } from './events'
 import { createRuntimeState, isComputed } from './computedVariables'
@@ -46,6 +48,7 @@ import {
 } from './projectMutations'
 import {
   findNodeById as findNodeByIdInTree,
+  findPath,
   findParentAndIndex as findParentAndIndexInTree,
   getNodeList,
   walkNodes,
@@ -727,15 +730,27 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       ? [previewRoot.value]
       : [preview.page.value.root, ...(project.value.layout ? [project.value.layout] : [])],
   )
-  const findInPreview = (id: string) =>
-    previewTrees.value.map(root => findNodeByIdInTree(id, root)).find(Boolean) ?? null
-  /** The element of Preview with the form it is in. Throws when Preview does not run or has no such element. */
+  /** The elements around one of Preview, from the top of what is drawn; a page sits where the layout puts it. */
+  const pathInPreview = (id: string): UiNode[] | null => {
+    for (const root of previewTrees.value) {
+      const path = findPath(id, root)
+      if (!path) continue
+      const layout = project.value.layout
+      if (!layout || editingPrefab.value || root === layout) return path
+      const outlet = [...walkNodes(layout)].find(node => node.type === OUTLET_NODE_TYPE)
+      return [...((outlet && findPath(outlet.id, layout)) ?? []), ...path]
+    }
+    return null
+  }
+  /** The element of Preview with the form it is in. Throws when a person could not use it now. */
   const needInPreview = (id: string) => {
     if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
-    const node = findInPreview(id)
-    if (!node) throw new Error(`Node not found on the preview page: ${id}`)
+    const path = pathInPreview(id)
+    if (!path) throw new Error(`Node not found on the preview page: ${id}`)
+    const obstacle = previewObstacle(path, preview.state.value)
+    if (obstacle) throw new Error(obstacle)
     const root = previewTrees.value.find(tree => findNodeByIdInTree(id, tree))!
-    return { node, form: enclosingForm(root, id) }
+    return { node: path[path.length - 1], form: enclosingForm(root, id) }
   }
   /** Submits a form as a person would: its actions run only when every rule is satisfied. */
   const submitForm = (form: UiNode) => {

@@ -10,6 +10,7 @@ import { z } from 'zod'
 
 const PORT = Number(process.env.UI_BUILDER_MCP_PORT ?? 3002)
 const TIMEOUT_MS = 10_000
+const RETRY_LISTEN_MS = 3_000
 // Open editor tabs, each with the time its page was loaded.
 const clients = new Map()
 const pending = new Map()
@@ -46,10 +47,27 @@ const bridge = http.createServer((req, res) => {
   }
   res.writeHead(404).end()
 })
-bridge.on('error', e => console.error(`[ui-builder-mcp] bridge failed: ${e.message}`))
-bridge.listen(PORT, '127.0.0.1', () => console.error(`[ui-builder-mcp] bridge on http://127.0.0.1:${PORT}`))
+/** Why the editor cannot connect to this server, or null when it can. */
+let bridgeProblem = null
+const listen = () => bridge.listen(PORT, '127.0.0.1')
+bridge.on('listening', () => {
+  bridgeProblem = null
+  console.error(`[ui-builder-mcp] bridge on http://127.0.0.1:${PORT}`)
+})
+bridge.on('error', e => {
+  console.error(`[ui-builder-mcp] bridge failed: ${e.message}`)
+  if (e.code !== 'EADDRINUSE') {
+    bridgeProblem = `The bridge to the editor failed: ${e.message}`
+    return
+  }
+  bridgeProblem = `Port ${PORT} is held by another process, most likely the MCP server of another session, so the editor is connected to that one. Close it and this server takes the port over within a few seconds.`
+  // Unref: waiting for the port must not keep a finished session's server alive.
+  setTimeout(listen, RETRY_LISTEN_MS).unref()
+})
+listen()
 
 function call(command, args = {}) {
+  if (bridgeProblem) return Promise.reject(new Error(bridgeProblem))
   // The most recently loaded tab is the one the person has just opened or reloaded. An old tab left open must not take
   // the commands, and tabs reconnect in any order after the server restarts, so the order of connecting says nothing.
   const [client] = [...clients].sort(([, loadedA], [, loadedB]) => loadedB - loadedA)[0] ?? []
@@ -175,7 +193,7 @@ tool('move_node', 'Move a node into another container.', { id, parentId: z.strin
 tool('duplicate_node', 'Duplicate a node next to the original.', { id })
 tool(
   'add_template',
-  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. landing { title, text, primaryLabel, secondaryLabel, features: [{ title, text, icon }], ctaTitle, ctaLabel }; settings (a settings form; adds variables settingsName, settingsEmail, settingsNewsletter, settingsAlerts, settingsLanguage) { title, text, saveLabel, savedMessage }; wizard (three checked steps; adds wizardStep, wizardName, wizardEmail, wizardPlan) { title, accountTitle, planTitle, reviewTitle, finishLabel, successMessage, plans: [text] }; pricing { title, subtitle, featured, plans: [{ name, price, period, description, features, button }] } with features separated by ;. What is not given keeps its default.',
+  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. landing { title, text, primaryLabel, secondaryLabel, features: [{ title, text, icon }], ctaTitle, ctaLabel }; settings (a settings form; adds variables settingsName, settingsEmail, settingsNewsletter, settingsAlerts, settingsLanguage) { title, text, saveLabel, savedMessage }; wizard (three checked steps; adds wizardStep, wizardName, wizardEmail, wizardPlan) { title, accountTitle, planTitle, reviewTitle, finishLabel, successMessage, plans: [text], stepLabel (with {number} and {total}), nameLabel, emailLabel, planLabel, backLabel, nextLabel, restartLabel }; pricing { title, subtitle, featured, plans: [{ name, price, period, description, features, button }] } with features separated by ;. What is not given keeps its default.',
   {
     kind: z.enum([
       'card',
@@ -424,10 +442,14 @@ tool(
   {},
 )
 tool('preview_state', 'What Preview shows now: variables, texts, hidden elements, inputs, table rows.', {})
-tool('preview_click', 'Click an element in Preview. For a table with a row click action pass row (0-based).', {
-  id,
-  row: z.number().optional(),
-})
+tool(
+  'preview_click',
+  'Click an element in Preview. For a table with a row click action pass row (0-based). Refused for an element a person could not click: hidden by a condition or disabled.',
+  {
+    id,
+    row: z.number().optional(),
+  },
+)
 tool('preview_input', 'Type into an input in Preview (sets the variable it is linked to).', { id, value: z.unknown() })
 tool('preview_navigate', 'Go to a page by route in Preview.', { path: z.string() })
 tool('preview_reset', 'Put every variable back to its starting value and return to the first page.', {})

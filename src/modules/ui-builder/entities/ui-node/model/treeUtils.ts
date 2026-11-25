@@ -48,3 +48,13 @@ export function* walkNodes(node: UiNode): Generator<UiNode> {
   yield node
   for (const child of childNodes(node)) yield* walkNodes(child)
 }
+
+/** The elements from `root` down to the one with the id, both included, or null when it is not there. */
+export function findPath(id: string, root: UiNode): UiNode[] | null {
+  if (root.id === id) return [root]
+  for (const child of childNodes(root)) {
+    const path = findPath(id, child)
+    if (path) return [root, ...path]
+  }
+  return null
+}
