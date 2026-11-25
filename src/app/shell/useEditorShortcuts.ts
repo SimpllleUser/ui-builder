@@ -1,4 +1,4 @@
-import { StepDirection, type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
+import { SaveState, StepDirection, type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 
 // Open menus and dialogs, but not messages and tooltips: those should not swallow Escape.
@@ -69,13 +69,21 @@ export function useEditorShortcuts({
     }
   }
 
+  // Writing takes a moment: ask before the page is closed while something is not written yet.
+  const onBeforeUnload = (event: BeforeUnloadEvent) => {
+    flushSave()
+    if (store.saveState !== SaveState.Saved) event.preventDefault()
+  }
+
   onMounted(() => {
+    window.addEventListener('beforeunload', onBeforeUnload)
     window.addEventListener('keydown', onKey)
     window.addEventListener('pagehide', flushSave)
     document.addEventListener('visibilitychange', flushSave)
   })
   onBeforeUnmount(() => {
     flushSave()
+    window.removeEventListener('beforeunload', onBeforeUnload)
     window.removeEventListener('keydown', onKey)
     window.removeEventListener('pagehide', flushSave)
     document.removeEventListener('visibilitychange', flushSave)

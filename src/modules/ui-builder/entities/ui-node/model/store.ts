@@ -10,7 +10,8 @@ import {
   ROOT_NODE_ID,
   TEXT_NODE_TYPE,
 } from './constants'
-import { DOCUMENT_KEY, emptyProject, parseProject, serializeProject } from './document'
+import { emptyProject, parseProject, serializeProject } from './document'
+import type { OpenedProject, ProjectStorage } from './persistence'
 import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
@@ -66,19 +67,6 @@ import { SaveState, type StepDirection, type TemplateKind } from './enums'
 import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
-const ACTIVE_PAGE_KEY = 'ui-builder:active-page'
-
-/** Reopening the editor returns to the page that was being edited. */
-function restoreActivePageId(project: Project): string {
-  try {
-    const saved = typeof window === 'undefined' ? null : window.localStorage.getItem(ACTIVE_PAGE_KEY)
-    if (saved && project.pages.some(page => page.id === saved)) return saved
-  } catch {
-    /* storage unavailable: start on the first page */
-  }
-  return project.pages[0].id
-}
-
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
   /** Whether the message offers an Undo button, and a counter so the same message shows again. */
@@ -90,27 +78,33 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     noticeSerial.value++
   }
   const saveState = ref<SaveState>(SaveState.Saved)
-  let initial: Project = emptyProject()
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = window.localStorage.getItem(DOCUMENT_KEY)
-      if (saved) initial = parseProject(saved)
-    } catch {
-      setNotice('Could not restore this page. The saved copy has not been changed. Import a backup to recover it.')
-      saveState.value = SaveState.Error
-    }
+  /** Null until a project is opened: changes then stay in memory. */
+  let storage: ProjectStorage | null = null
+  /** True while another project replaces the current one, which must not count as an edit. */
+  let isOpening = false
+  /** Counts changes, so a finished write knows whether it was the latest one. */
+  let revision = 0
+  /** Writes run one after another, in the order they were asked for. */
+  let writes: Promise<void> = Promise.resolve()
+  const enqueueWrite = (write: () => Promise<unknown>) => {
+    writes = writes.then(async () => {
+      try {
+        await write()
+      } catch {
+        saveState.value = SaveState.Error
+        setNotice('Could not save in this browser. Export your page to keep a backup.')
+      }
+    })
+    return writes
   }
-  const project = ref<Project>(initial)
-  const activePageId = ref(restoreActivePageId(initial))
+  const project = ref<Project>(emptyProject())
+  const activePageId = ref(project.value.pages[0].id)
   const editingLayout = ref(false)
   watch(
     activePageId,
     id => {
-      try {
-        window.localStorage.setItem(ACTIVE_PAGE_KEY, id)
-      } catch {
-        /* not remembered: the editor starts on the first page next time */
-      }
+      const target = storage
+      if (target && !isOpening) enqueueWrite(() => target.saveActivePageId(id))
     },
     { flush: 'sync' },
   )
@@ -135,21 +129,27 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const isPreviewMode = ref(false)
   /** Component types added lately, newest first. The library lists them up front. */
   const recentComponentTypes = useStorage<string[]>('ui-builder:recent-components', [])
-  const checkpoints = useStorage<HistoryCheckpoint[]>('ui-builder:history-checkpoints', [])
+  const checkpoints = ref<HistoryCheckpoint[]>([])
   let historyTimer: ReturnType<typeof setTimeout> | undefined
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
   const saveDocument = () => {
     clearTimeout(saveTimer)
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(DOCUMENT_KEY, serializeProject(project.value))
+    const target = storage
+    if (!target) {
       saveState.value = SaveState.Saved
-    } catch {
-      saveState.value = SaveState.Error
-      setNotice('Could not save in this browser. Export your page to keep a backup.')
+      return writes
     }
+    // Taken now, not when the write runs: by then another project may be open.
+    const document = serializeProject(project.value)
+    const savedRevision = revision
+    return enqueueWrite(async () => {
+      await target.saveDocument(document)
+      if (savedRevision === revision) saveState.value = SaveState.Saved
+    })
   }
+  /** Resolves when everything changed so far has been written, or has failed to be (see `saveState`). */
+  const flush = () => (saveState.value === SaveState.Saved ? writes : saveDocument())
   const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => findNodeByIdInTree(id, node)
 
   const applyProjectSnapshot = (snapshot: string) => {
@@ -218,15 +218,21 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const trimmedName = name.trim()
     if (!trimmedName) return false
     commit()
-    checkpoints.value = [
-      {
-        checkpointId: createNodeId('checkpoint'),
-        name: trimmedName,
-        createdAt: Date.now(),
-        snapshot: JSON.stringify(project.value),
-      },
-      ...checkpoints.value,
-    ].slice(0, MAX_CHECKPOINTS)
+    const checkpoint: HistoryCheckpoint = {
+      checkpointId: createNodeId('checkpoint'),
+      name: trimmedName,
+      createdAt: Date.now(),
+      snapshot: JSON.stringify(project.value),
+    }
+    const all = [checkpoint, ...checkpoints.value]
+    checkpoints.value = all.slice(0, MAX_CHECKPOINTS)
+    const target = storage
+    if (target) {
+      enqueueWrite(() => target.saveCheckpoint(checkpoint))
+      for (const dropped of all.slice(MAX_CHECKPOINTS)) {
+        enqueueWrite(() => target.deleteCheckpoint(dropped.checkpointId))
+      }
+    }
     return true
   }
   const restoreCheckpoint = (checkpointId: string) => {
@@ -243,11 +249,15 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const deleteCheckpoint = (checkpointId: string) => {
     checkpoints.value = checkpoints.value.filter(item => item.checkpointId !== checkpointId)
+    const target = storage
+    if (target) enqueueWrite(() => target.deleteCheckpoint(checkpointId))
   }
 
   watch(
     project,
     () => {
+      if (isOpening) return
+      revision++
       saveState.value = SaveState.Saving
       clearTimeout(saveTimer)
       saveTimer = setTimeout(saveDocument, 250)
@@ -474,6 +484,33 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     setNotice('Page imported. Undo returns to the previous page.', true)
   }
 
+  /**
+   * Replaces everything with another project. A damaged document throws before anything changes.
+   * Unsaved changes of the project being left are written to its own storage first.
+   */
+  const openProject = (opened: OpenedProject) => {
+    const next = parseProject(opened.document)
+    if (saveState.value !== SaveState.Saved) saveDocument()
+    clearTimeout(historyTimer)
+    clearTimeout(saveTimer)
+    isOpening = true
+    try {
+      revision++
+      storage = opened.storage
+      isPreviewMode.value = false
+      editingLayout.value = false
+      editingPrefabId.value = null
+      selectedNodeIds.value = []
+      project.value = next
+      activePageId.value = (next.pages.find(page => page.id === opened.activePageId) ?? next.pages[0]).id
+      checkpoints.value = [...opened.checkpoints]
+      history.reset()
+      saveState.value = SaveState.Saved
+    } finally {
+      isOpening = false
+    }
+  }
+
   // ─── Pages, shared layout and project state ──────────────────────────────
   const pages = computed(() => project.value.pages)
   const projectContext: ProjectMutationContext = {
@@ -579,6 +616,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     deleteCheckpoint,
     commit,
     saveDocument,
+    flush,
+    openProject,
     importDocument,
     exportDocument: () => serializeProject(project.value),
     selectPage: (id: string) => selectPageMutation(projectContext, id),

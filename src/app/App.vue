@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AppView } from './appView'
-import { ref, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
+import { ref, defineAsyncComponent, onBeforeUnmount } from 'vue'
+import { StartupState, useProjectStartup } from './shell/useProjectStartup'
 import { useUiTreeStore } from '../modules/ui-builder/entities/ui-node'
 import { useApplyTheme } from '../modules/theme/entities/theme-settings'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
@@ -15,11 +16,14 @@ const store = useUiTreeStore()
 // Colours, mode, corners and shadows change the whole app; density and button style only the page being built.
 useApplyTheme()
 let disconnectMcp = () => {}
-onMounted(async () => {
+// Agents are let in only after a project is open: before that their changes would be lost.
+const connectAgents = async () => {
   if (!import.meta.env.DEV) return
   const { connectMcpBridge } = await import('../modules/ui-builder/features/mcp-bridge')
   disconnectMcp = connectMcpBridge(store)
-})
+}
+const { startup } = useProjectStartup(store, connectAgents)
+const reload = () => window.location.reload()
 onBeforeUnmount(() => disconnectMcp())
 </script>
 
@@ -31,7 +35,16 @@ onBeforeUnmount(() => disconnectMcp())
         <VBtn prepend-icon="mdi-arrow-left" @click="leaveClassic">Back to editor</VBtn>
       </template>
     </VToolbar>
-    <BuilderApp v-if="view === AppView.Current" />
+    <template v-if="view === AppView.Current">
+      <BuilderApp v-if="startup === StartupState.Ready" />
+      <div v-else-if="startup === StartupState.Failed" class="pa-4">
+        <VAlert type="error" variant="tonal" title="Could not open your projects">
+          The browser's storage did not answer. Nothing was changed.
+          <template #append><VBtn variant="text" @click="reload">Try again</VBtn></template>
+        </VAlert>
+      </div>
+      <VProgressLinear v-else indeterminate aria-label="Opening your project" />
+    </template>
     <div v-else class="legacy-workspace pa-4">
       <VAlert type="info" variant="tonal" class="mb-4"
         >Classic is the previous editor. Its document is separate and is not saved automatically.</VAlert

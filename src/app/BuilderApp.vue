@@ -113,9 +113,7 @@ useEditorShortcuts({
   narrow,
   toggleFocus,
   closePanels,
-  flushSave: () => {
-    if (store.saveState === SaveState.Saving) store.saveDocument()
-  },
+  flushSave: () => void store.flush(),
 })
 </script>
 

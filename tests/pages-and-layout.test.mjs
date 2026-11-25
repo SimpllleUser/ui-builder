@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createPinia } from 'pinia'
-import { useStore, store } from './support.mjs'
+import { useStore, store, memoryProject } from './support.mjs'
 
 test('pages: add, route validation, switching, delete and undo', () => {
   const home = store.activePage.id
@@ -21,7 +21,9 @@ test('pages: add, route validation, switching, delete and undo', () => {
   assert.equal(store.pages.length, 2, 'deleting a page can be undone')
 })
 
-test('shared layout is created with an outlet, edited separately and survives save and reload', () => {
+test('shared layout is created with an outlet, edited separately and survives save and reload', async () => {
+  const project = memoryProject(store.exportDocument())
+  store.openProject(project.opened())
   store.addComponent('VBtn')
   store.editLayout(true)
   assert.equal(store.editingLayout, true)
@@ -35,13 +37,16 @@ test('shared layout is created with an outlet, edited separately and survives sa
     assert.ok(types.includes(type), type)
   store.editLayout(false)
   assert.equal(store.rootNode.children[0].type, 'VBtn')
-  store.saveDocument()
+  await store.saveDocument()
   const next = useStore(createPinia())
+  next.openProject(project.opened())
   assert.ok(next.project.layout)
   next.$dispose()
 })
 
-test('pages can be duplicated with fresh ids, reordered, and the last page is remembered', () => {
+test('pages can be duplicated with fresh ids, reordered, and the last page is remembered', async () => {
+  const project = memoryProject(store.exportDocument())
+  store.openProject(project.opened())
   store.addComponent('VBtn')
   store.addComponent('VCard', 'root-canvas')
   const home = store.activePage
@@ -64,8 +69,9 @@ test('pages can be duplicated with fresh ids, reordered, and the last page is re
   )
   assert.equal(store.movePage(copy.id, -1), false, 'cannot move past the first tab')
   store.selectPage(home.id)
-  store.saveDocument()
+  await store.saveDocument()
   const next = useStore(createPinia())
+  next.openProject(project.opened())
   assert.equal(next.activePage.id, home.id, 'reopening returns to the last page')
   next.$dispose()
   store.deletePage(copy.id)

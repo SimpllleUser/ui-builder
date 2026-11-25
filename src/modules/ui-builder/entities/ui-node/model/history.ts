@@ -92,5 +92,11 @@ export function createHistory({ serialize, applySnapshot, maxEntries, describe, 
     commit()
   }
 
-  return { isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore, restoreSnapshot }
+  /** Forgets every version and starts from what is there now. */
+  const reset = () => {
+    entries.value = [{ snapshot: serialize(), label: 'Opened', at: Date.now() }]
+    currentIndex.value = 0
+  }
+
+  return { reset, isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore, restoreSnapshot }
 }

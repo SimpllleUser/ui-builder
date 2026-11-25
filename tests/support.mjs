@@ -35,6 +35,26 @@ export let server,
   pascalCase,
   store
 const storage = new Map()
+/** A project saved in memory. `saved` holds what the store has written to it. */
+export function memoryProject(document, activePageId = null) {
+  const saved = { document, activePageId, checkpoints: [] }
+  const projectStorage = {
+    saveDocument: async text => {
+      saved.document = text
+    },
+    saveActivePageId: async id => {
+      saved.activePageId = id
+    },
+    saveCheckpoint: async checkpoint => {
+      saved.checkpoints.unshift(checkpoint)
+    },
+    deleteCheckpoint: async id => {
+      saved.checkpoints = saved.checkpoints.filter(item => item.checkpointId !== id)
+    },
+  }
+  const opened = () => ({ ...saved, checkpoints: [...saved.checkpoints], storage: projectStorage })
+  return { saved, storage: projectStorage, opened }
+}
 before(async () => {
   server = await createServer({
     configFile: false,

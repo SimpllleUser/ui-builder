@@ -6,6 +6,8 @@ const STORAGE_KEY = 'ui-builder-theme-settings'
 // One shared state: the dialog edits it and the app's theme follows it.
 const settings = useStorage<ThemeSettings>(STORAGE_KEY, DEFAULT_THEME_SETTINGS, undefined, {
   mergeDefaults: false,
+  // Each tab shows the theme of its own project, so another tab's change must not arrive here.
+  listenToStorageChanges: false,
   serializer: {
     read: text => sanitizeThemeSettings(JSON.parse(text)),
     write: value => JSON.stringify(value),

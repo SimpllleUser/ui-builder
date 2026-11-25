@@ -40,6 +40,8 @@ export type { BehaviorNote } from './model/behaviorSummary'
 export { exportLayout, exportPage, exportPrefab } from './model/vueExport'
 export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
+export { emptyProjectDocument } from './model/document'
+export type { OpenedProject, ProjectStorage } from './model/persistence'
 export { columnKeyError, tableColumns, tableRows } from './model/tableMutations'
 export { TEMPLATES } from './model/templateFactory'
 export {
