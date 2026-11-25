@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { type UiNode } from '../../../../entities/ui-node'
+import { GRID_COLUMN_TYPE, type UiNode } from '../../../../entities/ui-node'
+import BreakpointNotice from './BreakpointNotice.vue'
+import GridSection from './GridSection.vue'
 import AppearanceSection from './AppearanceSection.vue'
 import LayoutSection from './LayoutSection.vue'
 import RadiusSection from './RadiusSection.vue'
@@ -15,6 +17,8 @@ defineProps<{ node: UiNode }>()
 
 <template>
   <div class="design-tab">
+    <BreakpointNotice :node="node" />
+    <GridSection v-if="node.type === GRID_COLUMN_TYPE" :node="node" />
     <SizeSection :node="node" />
     <LayoutSection :node="node" />
     <SpacingSection :node="node" />

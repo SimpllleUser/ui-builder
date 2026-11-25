@@ -3,6 +3,7 @@ import { CELL_SLOT_PREFIX, cellSlotName } from './componentDefinitions'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { actionToCode, lacksVariable, type CodeContext } from './actions'
 import { ClickEvent } from './enums'
+import { responsiveRules } from './responsiveStyle'
 import { addHelper, expressionToJs, HelperName } from './expressionToJs'
 import { jsLiteral, jsString } from './jsLiteral'
 import { chipColumnKeys, STATUS_CHIP_PROPS } from './statusChips'
@@ -16,6 +17,8 @@ const DEFAULT_SLOT = 'default'
 export interface TemplateContext extends CodeContext {
   /** Names of variables; a word that is not one next to `==` is read as text. */
   known: ReadonlySet<string>
+  /** Style rules the template needs, for elements that look different on smaller screens. */
+  styles: Set<string>
 }
 
 const jsLiteralInline = (texts: string[]) => `[${texts.map(jsString).join(', ')}]`
@@ -29,7 +32,9 @@ function propToAttribute(key: string, value: unknown): string {
   return `:${key}="${jsLiteral(value)}"`
 }
 
-function propsToAttributes(node: UiNode): string[] {
+function propsToAttributes(node: UiNode, context: TemplateContext): string[] {
+  const responsive = responsiveRules(node)
+  if (responsive) context.styles.add(responsive.css)
   const attributes = Object.entries(componentProps(node.type, node.props)).map(([key, value]) =>
     propToAttribute(key, value),
   )
@@ -37,11 +42,13 @@ function propsToAttributes(node: UiNode): string[] {
     ...(typeof node.props.class === 'string' ? [node.props.class] : []),
     ...node.classes,
     ...(behaviorOf(node.type).editorClasses?.(node.props) ?? []),
+    ...(responsive ? [responsive.className] : []),
   ].filter(Boolean)
   if (classes.length) attributes.push(`class="${escapeAttribute(classes.join(' '))}"`)
-  const { style } = node.props
+  const style = responsive ? responsive.inlineStyle : node.props.style
   if (typeof style === 'string' && style.trim()) attributes.push(`style="${escapeAttribute(style)}"`)
-  else if (style !== null && typeof style === 'object') attributes.push(`:style="${jsLiteral(style)}"`)
+  else if (style !== null && typeof style === 'object' && Object.keys(style).length)
+    attributes.push(`:style="${jsLiteral(style)}"`)
   return attributes
 }
 
@@ -175,7 +182,7 @@ function renderElement(node: UiNode, context: TemplateContext, depth: number, wi
     ...(withRepeat ? repeatAttributes(node) : []),
     ...conditionAttributes(node, context),
     ...modelAttributes(node, context),
-    ...propsToAttributes(node),
+    ...propsToAttributes(node, context),
     ...eventAttributes(node, context),
   ]
   const children = renderChildren(node, context, depth + 1)

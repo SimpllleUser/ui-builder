@@ -23,6 +23,7 @@ export {
 export { ROOT_NODE_ID, TEXT_NODE_TYPE } from './model/constants'
 export {
   ActionType,
+  Breakpoint,
   ClickEvent,
   IssueKind,
   IssueSeverity,
@@ -60,6 +61,10 @@ export {
 } from './model/vueExport'
 export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
+export { effectiveStyle, hasOverrides, responsiveStylesheet } from './model/responsiveStyle'
+export { BREAKPOINT_MIN_WIDTHS, BREAKPOINT_WIDTHS, BREAKPOINTS, overrideTarget } from './model/breakpoints'
+export { COLUMN_PROPS, columnPropFor, columnsForWidth, GRID_COLUMN_TYPE, GRID_COLUMNS } from './model/grid'
+export type { ResponsiveStyles } from './model/types'
 export { openPrefabRepository } from './api/prefabRepository'
 export type { PrefabLibrary } from './model/prefabSync'
 export { countPages, emptyProjectDocument, normalizeDocument } from './model/document'

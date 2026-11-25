@@ -83,6 +83,18 @@ export enum SaveState {
   Error = 'error',
 }
 
+/**
+ * Vuetify's grid breakpoints, mobile first: what is set for one applies to it and every larger screen.
+ * The values are Vuetify's names and are saved in project files.
+ */
+export enum Breakpoint {
+  Xs = 'xs',
+  Sm = 'sm',
+  Md = 'md',
+  Lg = 'lg',
+  Xl = 'xl',
+}
+
 /** Which way an element or page moves in its list; the value is the step in the list. */
 export enum StepDirection {
   Back = -1,

@@ -7,6 +7,7 @@ interface Flat {
   type: string
   props: Record<string, unknown>
   classes: string
+  responsive: string | undefined
   behavior: string
   /** Where it sits: parent, slot and position. */
   place: string
@@ -30,6 +31,7 @@ const flatten = (project: Project): Map<string, Flat> => {
       type: node.type,
       props: node.props,
       classes: node.classes.join(' '),
+      responsive: JSON.stringify(node.responsive),
       behavior: JSON.stringify([node.model, node.vIf, node.vFor, node.events]),
       place: `${parent}|${slot}|${index}`,
       parent,
@@ -120,7 +122,7 @@ function describeElement(old: Flat, now: Flat, parent: Flat | undefined): string
     const listed = keys.slice(0, MAX_PROPS_LISTED).map(key => PROP_NAMES[key] ?? key)
     return `Changed ${now.name}: ${listed.join(', ')}${keys.length > MAX_PROPS_LISTED ? '…' : ''}`
   }
-  if (old.classes !== now.classes) return `Changed the style of ${now.name}`
+  if (old.classes !== now.classes || old.responsive !== now.responsive) return `Changed the style of ${now.name}`
   if (old.behavior !== now.behavior) {
     return now.behavior === NO_BEHAVIOR ? `Removed the behavior of ${now.name}` : `Changed the behavior of ${now.name}`
   }

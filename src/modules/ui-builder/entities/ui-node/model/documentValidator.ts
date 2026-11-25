@@ -2,6 +2,8 @@ import { isValidAction } from './actions'
 import { behaviorOf } from './componentBehaviors'
 import { getComponentDef, getNodeSlots } from './componentDefinitions'
 import { DOCUMENT_VERSION, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_NODES, MAX_PAGES, ROOT_NODE_ID } from './constants'
+import { OVERRIDE_BREAKPOINTS } from './breakpoints'
+import { isCssDeclaration } from './responsiveStyle'
 import type { Page, Project, UiNode, UiNodeEvents } from './types'
 
 export function validateProject(value: unknown): Project {
@@ -44,6 +46,13 @@ export function validateProject(value: unknown): Project {
   }
 }
 
+/** Checks elements that come from outside the project, such as the clipboard. Throws when one of them is not valid. */
+export function validateElements(values: unknown[]): UiNode[] {
+  const ids = new Set<string>()
+  let nodeCount = 0
+  return values.map(value => validateNode(value, ids, () => ++nodeCount, 0))
+}
+
 export const isValidPagePath = (path: string) => /^\/[A-Za-z0-9_\-/]*$/.test(path) && path.length <= 100
 
 function validateTree(value: unknown): UiNode {
@@ -75,6 +84,7 @@ function validateNode(value: unknown, ids: Set<string>, countNode: () => number,
   }
 
   validateLogic(value)
+  validateResponsive(value.responsive)
   ids.add(id)
   const definition = getComponentDef(type)!
   if (children.length && (definition.isLeaf || !definition.slots.some(slot => slot.name === 'default'))) {
@@ -103,6 +113,19 @@ function validateNode(value: unknown, ids: Set<string>, countNode: () => number,
   } as UiNode
 }
 
+function validateResponsive(responsive: unknown) {
+  if (responsive === undefined) return
+  const valid =
+    isRecord(responsive) &&
+    Object.entries(responsive).every(
+      ([breakpoint, style]) =>
+        OVERRIDE_BREAKPOINTS.some(known => known === breakpoint) &&
+        isRecord(style) &&
+        Object.entries(style).every(([name, item]) => isCssDeclaration(name, item)),
+    )
+  if (!valid) throw new Error('Invalid responsive style in document.')
+}
+
 function validateLogic({ model, vIf, vFor, events }: Record<string, unknown>) {
   const optionalString = (item: unknown) => item === undefined || (typeof item === 'string' && item.length <= 200)
   if (!optionalString(model) || !optionalString(vIf) || !optionalString(vFor))
@@ -116,7 +139,7 @@ function validateLogic({ model, vIf, vFor, events }: Record<string, unknown>) {
   if (!valid) throw new Error('Invalid event in document.')
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 

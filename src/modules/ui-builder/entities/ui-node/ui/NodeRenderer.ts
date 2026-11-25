@@ -14,6 +14,8 @@ import { behaviorMarker } from '../model/behaviorSummary'
 import { behaviorOf, clickEventOf, componentProps } from '../model/componentBehaviors'
 import { ClickEvent } from '../model/enums'
 import { generatedSlots } from './generatedSlots'
+import { effectiveStyle, hasOverrides, responsiveRules } from '../model/responsiveStyle'
+import { GRID_COLUMN_TYPE, gridPropsAt } from '../model/grid'
 
 export { canvasDragTargetId }
 
@@ -166,15 +168,34 @@ const NodeRenderer = defineComponent({
 
     const renderComponent = (node: UiNode, preview: boolean, scope: Scope): VNode => {
       const isLeaf = !!getComponentDef(node.type)?.isLeaf
-      const resolvedProps = preview ? interpolateProps(node.props, scope) : { ...node.props }
+      const givenNodeProps = preview ? interpolateProps(node.props, scope) : { ...node.props }
+      const resolvedProps =
+        !preview && node.type === GRID_COLUMN_TYPE && store.editingBreakpoint
+          ? gridPropsAt(givenNodeProps, store.editingBreakpoint)
+          : givenNodeProps
       // `class`/`style` set through MCP or import must not be lost when the editor adds its own classes.
-      const { class: propClass, style: propStyle, mask } = resolvedProps
+      const { class: propClass, style: ownStyle, mask } = resolvedProps
+      // Preview has a real screen width, so media queries decide. The canvas shows the screen size being edited.
+      const responsive = hasOverrides(node) ? node : null
+      const rules = preview && responsive ? responsiveRules(responsive) : null
+      const propStyle = rules
+        ? Object.keys(rules.inlineStyle).length
+          ? interpolateProps(rules.inlineStyle, scope)
+          : undefined
+        : !preview && responsive
+          ? effectiveStyle(responsive, store.editingBreakpoint)
+          : ownStyle
       const render = (nodes: UiNode[], base: Scope = props.scope) => renderNodes(nodes, base, scope, preview)
 
       const behavior = behaviorOf(node.type)
       // In the editor a binding shows the variable's starting value, so the canvas always has real data to draw.
       const shownProps = behavior.previewProps?.(resolvedProps, preview ? scope : store.project.state) ?? resolvedProps
-      const classes = [propClass, ...node.classes, ...(behavior.editorClasses?.(shownProps) ?? [])]
+      const classes = [
+        propClass,
+        ...node.classes,
+        ...(behavior.editorClasses?.(shownProps) ?? []),
+        rules?.className,
+      ]
       const slots = { ...generatedSlots(node.type, shownProps), ...buildSlots(node, render) }
       const givenProps = componentProps(node.type, shownProps)
       const extraProps: Record<string, unknown> = {}

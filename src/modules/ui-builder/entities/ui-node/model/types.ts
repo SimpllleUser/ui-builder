@@ -1,4 +1,8 @@
-import type { ActionType } from './enums'
+import type { StyleMap } from '../../../../../shared/lib/inlineStyle'
+import type { ActionType, Breakpoint } from './enums'
+
+/** What a larger screen changes in the element's style; everything else is inherited. `xs` is the style itself. */
+export type ResponsiveStyles = Partial<Record<Exclude<Breakpoint, Breakpoint.Xs>, StyleMap>>
 
 /** What happens when an element is clicked in preview. `set` values are parsed as JSON, falling back to text. */
 export type UiAction =
@@ -26,6 +30,7 @@ export interface UiNode {
   /** State key holding an array (or a number) to repeat this element for; exposes `item` and `index`. */
   vFor?: string
   events?: UiNodeEvents
+  responsive?: ResponsiveStyles
 }
 
 export interface Page {

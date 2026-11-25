@@ -15,6 +15,9 @@ import { UnsavedChanges, type OpenedProject } from './persistence'
 import { useDocumentPersistence } from './documentPersistence'
 import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
+import { pasteElements as pasteElementsMutation, pickedElements, serializeElements } from './clipboard'
+import type { ClipboardMutationContext } from './clipboard'
+import { patchNodeStyle, setOverride } from './responsiveStyle'
 import * as tableMutations from './tableMutations'
 import { usePreviewRuntime } from './previewRuntime'
 import { usePrefabSync } from './prefabSync'
@@ -77,7 +80,7 @@ import {
   type PrefabMutationContext,
 } from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateProps } from './templateFactory'
-import { type StepDirection, type TemplateKind } from './enums'
+import { type Breakpoint, type StepDirection, type TemplateKind } from './enums'
 import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
@@ -127,6 +130,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const selectedNodeIds = ref<string[]>([])
   const selectedNodeId = computed(() => selectedNodeIds.value[0] ?? null)
   const isPreviewMode = ref(false)
+  /**
+   * The Vuetify breakpoint being edited: the canvas has its width and style changes apply from it up.
+   * Null edits all sizes and leaves the canvas as wide as the window allows.
+   */
+  const editingBreakpoint = ref<Breakpoint | null>(null)
   /** Component types added lately, newest first. The library lists them up front. */
   const recentComponentTypes = useStorage<string[]>('ui-builder:recent-components', [])
   const checkpoints = ref<HistoryCheckpoint[]>([])
@@ -178,6 +186,21 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       applyProjectSnapshot(before)
       throw error
     } finally {
+      transactionDepth--
+      commit()
+    }
+  }
+  /**
+   * Holds back history while something is dragged, so the whole drag is one undo step.
+   * The returned function ends the gesture and records it.
+   */
+  const startGesture = () => {
+    commit()
+    transactionDepth++
+    let ended = false
+    return () => {
+      if (ended) return
+      ended = true
       transactionDepth--
       commit()
     }
@@ -327,7 +350,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     node.props[prop] = value
     return true
   }
-  const mutationContext: ContainerMutationContext & PrefabMutationContext & TemplateContext = {
+  const mutationContext: ContainerMutationContext &
+    PrefabMutationContext &
+    TemplateContext &
+    ClipboardMutationContext = {
+    getRoot: () => rootNode.value,
     findNodeById,
     findParentAndIndex,
     getNodeList,
@@ -439,6 +466,30 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     },
     { deep: true, flush: 'sync' },
   )
+  /** The selected elements as clipboard text, or null when there is nothing to copy. */
+  const copySelection = () => {
+    const picked = pickedElements(rootNode.value, selectedNodeIds.value)
+    if (!picked.length) return null
+    setNotice(`Copied ${picked.length === 1 ? picked[0].name : `${picked.length} elements`}.`)
+    return serializeElements(picked, project.value.state)
+  }
+  const pasteElements = (text: string) => pasteElementsMutation(mutationContext, text, selectedNodeIds.value)
+  /** Changes the element's style on the screen size being edited; `null` removes a property there. */
+  const updateNodeStyle = (id: string, patch: Record<string, string | null>) => {
+    const node = findNodeById(id)
+    if (!node) return false
+    patchNodeStyle(node, editingBreakpoint.value, patch)
+    return true
+  }
+  /** Drops what the screen size being edited changes, so the element looks as on larger screens again. */
+  const resetNodeOverrides = (id: string) => {
+    const node = findNodeById(id)
+    if (!node || !editingBreakpoint.value) return false
+    commit()
+    setOverride(node, editingBreakpoint.value, {})
+    commit()
+    return true
+  }
   const duplicateNode = (id: string) => duplicateNodeMutation(mutationContext, id)
   const deleteNode = (id: string) => deleteNodeMutation(mutationContext, id)
   const areNodesSiblings = (ids: string[]) => areNodesSiblingsMutation(mutationContext, ids)
@@ -478,6 +529,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     isOpening = true
     try {
       isPreviewMode.value = false
+      editingBreakpoint.value = null
       editTarget.value = PAGE_TARGET
       selectedNodeIds.value = []
       project.value = next
@@ -578,6 +630,12 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     selectedNodeIds,
     selectedNodeId,
     isPreviewMode,
+    editingBreakpoint,
+    startGesture,
+    copySelection,
+    pasteElements,
+    updateNodeStyle,
+    resetNodeOverrides,
     prefabs,
     recentComponentTypes,
     notice,

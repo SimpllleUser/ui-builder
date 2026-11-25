@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { describeBehaviors, useUiTreeStore, getComponentDef, TEXT_NODE_TYPE } from '../../../entities/ui-node'
+import { describeBehaviors, overrideTarget, useUiTreeStore, getComponentDef, TEXT_NODE_TYPE } from '../../../entities/ui-node'
 import { Icons } from '../../../../../shared/icons'
 import { useSettingsGroups } from '../model/useSettingsGroups'
 import { useClassEditor } from '../model/useClassEditor'
@@ -191,6 +191,12 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
             <p class="inspector__description">{{ activeTabInfo.description }}</p>
           </template>
 
+          <p
+            v-if="overrideTarget(store.editingBreakpoint) && !showsDesign"
+            class="text-caption text-medium-emphasis mt-2"
+          >
+            Per-size styles are in the Design tab. Settings here apply to every size, except a column's SM–XL widths.
+          </p>
           <div class="pt-4">
             <VTextarea
               v-if="!query && activeTab === InspectorTab.Content && textChild"

@@ -71,6 +71,7 @@ function exportTree(root: UiNode, state: Record<string, unknown>, source: StateS
     known: new Set([...Object.keys(state), ...variables, ...AMBIENT_NAMES]),
     helpers: new Set(),
     usage: { router: false },
+    styles: new Set(),
   }
   const template = renderNodes([root], context, 1).join('\n')
   const script = renderScript({
@@ -81,7 +82,8 @@ function exportTree(root: UiNode, state: Record<string, unknown>, source: StateS
     source,
     prefab,
   })
-  return `${script}<template>\n${template}\n</template>\n`
+  const styles = context.styles.size ? `\n<style>\n${[...context.styles].join('\n')}\n</style>\n` : ''
+  return `${script}<template>\n${template}\n</template>\n${styles}`
 }
 
 /** The page as a Vue single-file component. Variables become `ref`s starting from the project's values. */
