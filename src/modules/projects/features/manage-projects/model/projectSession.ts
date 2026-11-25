@@ -21,6 +21,7 @@ import {
   type ProjectMeta,
   type ProjectRepository,
 } from '../../../entities/project'
+import { themeOfProjectFile, toProjectFile } from './projectFile'
 import { ProjectEvent, type ProjectChannel, type ProjectMessage } from './projectChannel'
 
 export const LAST_PROJECT_KEY = 'ui-builder:last-project'
@@ -211,7 +212,8 @@ export function createProjectSession(sources: SessionSources) {
     const document = normalizeDocument(text)
     if (!(await allSaved())) return null
     const name = uniqueProjectName(await repository.listProjects(), projectNameFromFile(fileName))
-    const created = await repository.createProject({ name, document })
+    const preferences = { theme: themeOfProjectFile(text) }
+    const created = await repository.createProject({ name, document, preferences })
     const opened = await open(created.id)
     await announce(created.id)
     return opened ? name : null
@@ -284,9 +286,12 @@ export function createProjectSession(sources: SessionSources) {
     )
   }
 
-  /** The saved text of a project, also of a damaged one, so it can always be taken out. */
-  const readDocument = async (id: string) =>
-    id === currentProjectId.value ? store.exportDocument() : ((await repository.readDocument(id)) ?? '')
+  /** The content of a project's backup file. A damaged project gives its saved text, so it can be taken out. */
+  const exportFile = async (id: string) => {
+    if (id === currentProjectId.value) return toProjectFile(store.exportDocument(), theme.value)
+    const [document, preferences] = await Promise.all([repository.readDocument(id), repository.readPreferences(id)])
+    return toProjectFile(document ?? '', preferences.theme)
+  }
 
   /** Opens the project used last, moving the old single project over first. */
   const start = async () => {
@@ -313,7 +318,7 @@ export function createProjectSession(sources: SessionSources) {
     leaveDeleted: replaceCurrent,
     refresh,
     listDetails,
-    readDocument,
+    exportFile,
     open,
     create,
     importProject,

@@ -60,7 +60,7 @@ const duplicate = (project: ProjectDetails) =>
   })
 const exportProject = (project: ProjectDetails) =>
   attempt(async () => {
-    const text = await props.session.readDocument(project.id)
+    const text = await props.session.exportFile(project.id)
     downloadTextFile(projectFileName(project.name), text, 'application/json')
   })
 const remove = () => {

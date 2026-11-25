@@ -7,9 +7,14 @@ const MAX_IMPORT_BYTES = 5_000_000
 
 /** Saving the open project as a JSON file, and adding a project from one. */
 export function useProjectFiles(store: ReturnType<typeof useUiTreeStore>, session: ProjectSession) {
-  const exportProject = () => {
-    const fileName = projectFileName(session.currentProject.value?.name ?? '')
-    downloadTextFile(fileName, store.exportDocument(), 'application/json')
+  const exportProject = async () => {
+    const project = session.currentProject.value
+    if (!project) return
+    try {
+      downloadTextFile(projectFileName(project.name), await session.exportFile(project.id), 'application/json')
+    } catch {
+      store.setNotice('Could not export the project. Try again.')
+    }
   }
 
   /** Handles the file chosen in an `<input type="file">`. */

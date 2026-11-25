@@ -175,7 +175,7 @@ test('the list counts pages and marks a damaged project, whose text can still be
   const broken = await create('Broken', '{oops')
   const details = await session.listDetails()
   assert.deepEqual(Object.fromEntries(details.map(item => [item.name, item.pageCount])), { Shop: 1, Broken: null })
-  assert.equal(await session.readDocument(broken.id), '{oops')
+  assert.equal(await session.exportFile(broken.id), '{oops')
   assert.equal(projects.projectFileName('a/b: c?'), 'a-b- c-.json')
 })
 
@@ -276,4 +276,30 @@ test('a project deleted in another tab is not written back', async () => {
   assert.equal(session.conflict.value, null)
   assert.equal(store.saveState, 'saved')
   editor.$dispose()
+})
+
+test('the exported file carries the theme, and importing it brings the theme back', async () => {
+  await session.start()
+  const first = session.currentProjectId.value
+  store.addComponent('VBtn')
+  theme.value = '{"mode":"dark"}'
+  const file = await session.exportFile(first)
+  assert.deepEqual(JSON.parse(file).theme, { mode: 'dark' })
+
+  await session.create('Other')
+  assert.equal(theme.value, null)
+  assert.equal(await session.exportFile(first), file, 'the same for a project that is not open')
+
+  await session.importProject('Copy.json', file)
+  assert.equal(theme.value, '{"mode":"dark"}')
+  assert.equal(store.rootNode.children.length, 1)
+  assert.equal('theme' in JSON.parse(await repository.readDocument(session.currentProjectId.value)), false)
+
+  await session.importProject('Plain.json', store.exportDocument())
+  assert.equal(theme.value, null)
+})
+
+test('a damaged project is exported as it was saved', async () => {
+  const broken = await repository.createProject({ name: 'Broken', document: '{oops', preferences: { theme: '{}' } })
+  assert.equal(await session.exportFile(broken.id), '{oops')
 })
