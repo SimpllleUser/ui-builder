@@ -5,6 +5,7 @@ import {
   exportStore,
   hasAppShell,
   StateSource,
+  unusableVariableNames,
   type Prefab,
   type Project,
 } from '../../../entities/ui-node'
@@ -32,6 +33,23 @@ export interface ExportedProject {
 }
 
 const LAYOUT_FILE = 'AppLayout.vue'
+
+/** Why the project cannot be exported yet; the message is for the person. */
+export class ExportBlockedError extends Error {}
+
+const rootsOf = (project: Project, prefabs: Prefab[]) => [
+  ...project.pages.map(page => page.root),
+  ...(project.layout ? [project.layout] : []),
+  ...prefabs.map(prefab => prefab.node),
+]
+
+/** What to rename before the exported code can run, or null when nothing. */
+export function namingProblem(project: Project, prefabs: Prefab[]): string | null {
+  const names = unusableVariableNames(rootsOf(project, prefabs), project.state)
+  if (!names.length) return null
+  const listed = names.map(name => `“${name}”`).join(', ')
+  return `Rename these variables, code cannot use their names: ${listed}.`
+}
 
 const packageName = (name: string) =>
   transliterate(name)
@@ -65,11 +83,9 @@ function appComponent(project: Project): string {
 export function buildVueProject(sources: VueProjectSources): ExportedProject {
   const { project, prefabs, vuetifyConfig, themeCss, tableCss } = sources
   const name = packageName(sources.name)
-  const roots = [
-    ...project.pages.map(page => page.root),
-    ...(project.layout ? [project.layout] : []),
-    ...prefabs.map(prefab => prefab.node),
-  ]
+  const problem = namingProblem(project, prefabs)
+  if (problem) throw new ExportBlockedError(problem)
+  const roots = rootsOf(project, prefabs)
   const store = exportStore(roots, project.state)
   const files: Record<string, string> = {}
 

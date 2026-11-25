@@ -2,7 +2,6 @@ import { computed, ref, shallowRef, watch, type Ref } from 'vue'
 import {
   countPages,
   emptyProjectDocument,
-  normalizeDocument,
   SaveRejectedError,
   SaveState,
   UnsavedChanges,
@@ -15,29 +14,18 @@ import {
   migrateLegacyProject,
   ProjectChangedError,
   ProjectMissingError,
-  projectNameFromFile,
   uniqueProjectName,
   type LegacyStorage,
   type ProjectMeta,
   type ProjectRepository,
 } from '../../../entities/project'
-import type { HeldLock, TabLocks } from '../../../../../shared/lib/webLocks'
-import { themeOfProjectFile, toProjectFile } from './projectFile'
+import type { TabLocks } from '../../../../../shared/lib/webLocks'
+import { createProjectBackups } from './projectBackups'
+import { createProjectOwnership, Takeover } from './projectOwnership'
 import { ProjectEvent, type ProjectChannel, type ProjectMessage } from './projectChannel'
 
 export const LAST_PROJECT_KEY = 'ui-builder:last-project'
-const HAND_OVER_TIMEOUT_MS = 4000
 const LOCKED_MESSAGE = 'Not saved: this project is being edited in another tab.'
-const lockName = (id: string) => `ui-builder:project:${id}`
-
-/** How to take over a project another tab is editing. */
-export enum Takeover {
-  /** Ask that tab to save and let go. */
-  Ask = 'ask',
-  /** Take it even though that tab does not answer; what it has not saved stays only there. */
-  Force = 'force',
-}
-
 /** Why the open project can no longer be saved as it is. */
 export enum ProjectConflict {
   Changed = 'changed',
@@ -86,17 +74,10 @@ export function createProjectSession(sources: SessionSources) {
   let knownRevision = 0
   /** True while another tab edits the open project: the editor is then not shown. */
   const isLocked = ref(false)
-  let held: { id: string; lock: HeldLock } | null = null
-  const holds = (id: string) => held?.id === id
-  const onStolen = (id: string) => () => {
-    if (!holds(id)) return
-    held = null
+  const ownership = createProjectOwnership(locks, () => {
     isLocked.value = true
-  }
-  const releaseHeld = () => {
-    held?.lock.release()
-    held = null
-  }
+  })
+  const { holds } = ownership
   let latestRequest = 0
   /** Grows each time a project is put in the editor. */
   const openCount = ref(0)
@@ -152,7 +133,7 @@ export function createProjectSession(sources: SessionSources) {
     store.stopEditingPrefab()
     await store.flush()
     if (!holds(id)) return
-    if (store.saveState === SaveState.Saved) releaseHeld()
+    if (store.saveState === SaveState.Saved) ownership.release()
     else isLocked.value = false
   }
 
@@ -216,9 +197,9 @@ export function createProjectSession(sources: SessionSources) {
   const replaceOpenProject = async (id: string, request: number, { canLeave, unsaved }: Departure) => {
     if (!(await canLeave())) return false
     // The lock comes first, so what is read already includes the last write of its previous holder.
-    const lock = holds(id) ? held!.lock : await locks.tryAcquire(lockName(id), onStolen(id))
+    const claim = await ownership.claim(id)
     const giveBack = () => {
-      if (!holds(id)) lock?.release()
+      claim.giveBack()
       return false
     }
     try {
@@ -241,13 +222,12 @@ export function createProjectSession(sources: SessionSources) {
         store.setNotice('Could not open a damaged project. Its saved copy has not been changed.')
         return giveBack()
       }
-      if (!holds(id)) releaseHeld()
-      held = lock ? { id, lock } : null
+      claim.keep()
       currentProjectId.value = null
       theme.value = preferences.theme
       knownRevision = content.revision
       conflict.value = null
-      isLocked.value = !lock
+      isLocked.value = !claim.owned
       currentProjectId.value = id
       openCount.value++
       rememberLast(id)
@@ -300,21 +280,6 @@ export function createProjectSession(sources: SessionSources) {
     return opened
   }
 
-  /**
-   * Adds the file's content as a new project and opens it. An invalid document rejects and creates nothing.
-   * Resolves with the name given to the project, or null when the open one could not be saved first.
-   */
-  const importProject = async (fileName: string, text: string) => {
-    const document = normalizeDocument(text)
-    if (!(await allSaved())) return null
-    const name = uniqueProjectName(await repository.listProjects(), projectNameFromFile(fileName))
-    const preferences = { theme: themeOfProjectFile(text) }
-    const created = await repository.createProject({ name, document, preferences })
-    const opened = await open(created.id)
-    await announce(created.id)
-    return opened ? name : null
-  }
-
   const rename = async (id: string, name: string) => {
     await repository.renameProject(id, name)
     await announce(id)
@@ -349,18 +314,15 @@ export function createProjectSession(sources: SessionSources) {
     if (!id) return false
     if (holds(id)) return true
     channel.post({ event: ProjectEvent.ReleaseRequested, id })
-    const lock =
-      takeover === Takeover.Force
-        ? await locks.steal(lockName(id), onStolen(id))
-        : await locks.waitFor(lockName(id), HAND_OVER_TIMEOUT_MS, onStolen(id))
-    if (!lock) return false
+    const claim = await ownership.takeOver(id, takeover)
+    if (!claim.owned) return false
     if (id !== currentProjectId.value) {
-      lock.release()
+      claim.giveBack()
       return false
     }
-    held = { id, lock }
+    claim.keep()
     const loaded = await load(id, droppingChanges)
-    if (!loaded && isLocked.value) releaseHeld()
+    if (!loaded && isLocked.value) ownership.release()
     return loaded
   }
 
@@ -390,22 +352,10 @@ export function createProjectSession(sources: SessionSources) {
       // Writes still going to the project being deleted finish before it goes.
       await store.flush()
     }
-    const lock = await locks.tryAcquire(lockName(id), () => {})
-    if (!lock) throw openElsewhere()
-    try {
-      await repository.deleteProject(id)
-    } finally {
-      lock.release()
-    }
+    if (!(await ownership.whileFree(id, () => repository.deleteProject(id)))) throw openElsewhere()
     channel.post({ event: ProjectEvent.Removed, id })
     await refresh()
     return true
-  }
-
-  /** Applies the theme a file carries to the open project; a file without one leaves the theme as it is. */
-  const applyFileTheme = (text: string) => {
-    const carried = themeOfProjectFile(text)
-    if (carried) theme.value = carried
   }
 
   const listDetails = async (): Promise<ProjectDetails[]> => {
@@ -416,13 +366,6 @@ export function createProjectSession(sources: SessionSources) {
         pageCount: countPages((await repository.readDocument(project.id)) ?? ''),
       })),
     )
-  }
-
-  /** The content of a project's backup file. A damaged project gives its saved text, so it can be taken out. */
-  const exportFile = async (id: string) => {
-    if (id === currentProjectId.value) return toProjectFile(store.exportDocument(), theme.value)
-    const [document, preferences] = await Promise.all([repository.readDocument(id), repository.readPreferences(id)])
-    return toProjectFile(document ?? '', preferences.theme)
   }
 
   /** Opens the project used last, moving the old single project over first. */
@@ -439,7 +382,18 @@ export function createProjectSession(sources: SessionSources) {
     await refresh()
   }
 
+  const backups = createProjectBackups({
+    repository,
+    store,
+    theme,
+    currentProjectId,
+    allSaved,
+    open,
+    announce,
+  })
+
   return {
+    ...backups,
     currentProjectId,
     currentProject,
     projects,
@@ -452,11 +406,8 @@ export function createProjectSession(sources: SessionSources) {
     leaveDeleted: replaceCurrent,
     refresh,
     listDetails,
-    exportFile,
-    applyFileTheme,
     open,
     create,
-    importProject,
     rename,
     duplicate,
     remove,

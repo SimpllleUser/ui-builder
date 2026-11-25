@@ -11,7 +11,8 @@ import {
   TEXT_NODE_TYPE,
 } from './constants'
 import { emptyProject, parseProject, serializeProject } from './document'
-import { SaveRejectedError, UnsavedChanges, type OpenedProject, type ProjectStorage } from './persistence'
+import { UnsavedChanges, type OpenedProject } from './persistence'
+import { useDocumentPersistence } from './documentPersistence'
 import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
@@ -65,7 +66,7 @@ import {
   type PrefabMutationContext,
 } from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateProps } from './templateFactory'
-import { SaveState, type StepDirection, type TemplateKind } from './enums'
+import { type StepDirection, type TemplateKind } from './enums'
 import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
 import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
 
@@ -79,38 +80,17 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     noticeUndo.value = undoable
     noticeSerial.value++
   }
-  const saveState = ref<SaveState>(SaveState.Saved)
-  /** Null until a project is opened: changes then stay in memory. */
-  let storage: ProjectStorage | null = null
   /** True while another project replaces the current one, which must not count as an edit. */
   let isOpening = false
-  /** Counts changes, so a finished write knows whether it was the latest one. */
-  let revision = 0
-  /** Writes run one after another, in the order they were asked for. */
-  let writes: Promise<void> = Promise.resolve()
-  const enqueueWrite = (write: () => Promise<unknown>) => {
-    writes = writes.then(async () => {
-      try {
-        await write()
-      } catch (error) {
-        saveState.value = SaveState.Error
-        setNotice(
-          error instanceof SaveRejectedError
-            ? error.message
-            : 'Could not save in this browser. Export your page to keep a backup.',
-        )
-      }
-    })
-    return writes
-  }
   const project = ref<Project>(emptyProject())
   const activePageId = ref(project.value.pages[0].id)
   const editingLayout = ref(false)
+  const persistence = useDocumentPersistence(() => serializeProject(project.value), setNotice)
+  const { saveState, flush, save: saveDocument } = persistence
   watch(
     activePageId,
     id => {
-      const target = storage
-      if (target && !isOpening) enqueueWrite(() => target.saveActivePageId(id))
+      if (!isOpening) persistence.write(target => target.saveActivePageId(id))
     },
     { flush: 'sync' },
   )
@@ -139,25 +119,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const recentComponentTypes = useStorage<string[]>('ui-builder:recent-components', [])
   const checkpoints = ref<HistoryCheckpoint[]>([])
   let historyTimer: ReturnType<typeof setTimeout> | undefined
-  let saveTimer: ReturnType<typeof setTimeout> | undefined
 
-  const saveDocument = () => {
-    clearTimeout(saveTimer)
-    const target = storage
-    if (!target) {
-      saveState.value = SaveState.Saved
-      return writes
-    }
-    // Taken now, not when the write runs: by then another project may be open.
-    const document = serializeProject(project.value)
-    const savedRevision = revision
-    return enqueueWrite(async () => {
-      await target.saveDocument(document)
-      if (savedRevision === revision) saveState.value = SaveState.Saved
-    })
-  }
-  /** Resolves when everything changed so far has been written, or has failed to be (see `saveState`). */
-  const flush = () => (saveState.value === SaveState.Saved ? writes : saveDocument())
   const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => findNodeByIdInTree(id, node)
 
   const applyProjectSnapshot = (snapshot: string) => {
@@ -234,12 +196,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     }
     const all = [checkpoint, ...checkpoints.value]
     checkpoints.value = all.slice(0, MAX_CHECKPOINTS)
-    const target = storage
-    if (target) {
-      enqueueWrite(() => target.saveCheckpoint(checkpoint))
-      for (const dropped of all.slice(MAX_CHECKPOINTS)) {
-        enqueueWrite(() => target.deleteCheckpoint(dropped.checkpointId))
-      }
+    persistence.write(target => target.saveCheckpoint(checkpoint))
+    for (const dropped of all.slice(MAX_CHECKPOINTS)) {
+      persistence.write(target => target.deleteCheckpoint(dropped.checkpointId))
     }
     return true
   }
@@ -257,18 +216,14 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   const deleteCheckpoint = (checkpointId: string) => {
     checkpoints.value = checkpoints.value.filter(item => item.checkpointId !== checkpointId)
-    const target = storage
-    if (target) enqueueWrite(() => target.deleteCheckpoint(checkpointId))
+    persistence.write(target => target.deleteCheckpoint(checkpointId))
   }
 
   watch(
     project,
     () => {
       if (isOpening) return
-      revision++
-      saveState.value = SaveState.Saving
-      clearTimeout(saveTimer)
-      saveTimer = setTimeout(saveDocument, 250)
+      persistence.markChanged()
       if (!history.isRestoring.value) {
         clearTimeout(historyTimer)
         historyTimer = setTimeout(commit, HISTORY_COMMIT_DELAY_MS)
@@ -278,7 +233,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   )
   onScopeDispose(() => {
     clearTimeout(historyTimer)
-    clearTimeout(saveTimer)
+    persistence.stop()
     prefabSync.stop()
   })
 
@@ -512,13 +467,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
    */
   const openProject = (opened: OpenedProject, unsaved = UnsavedChanges.Write) => {
     const next = parseProject(opened.document)
-    if (unsaved === UnsavedChanges.Write && saveState.value !== SaveState.Saved) saveDocument()
+    persistence.connect(opened.storage, unsaved)
     clearTimeout(historyTimer)
-    clearTimeout(saveTimer)
     isOpening = true
     try {
-      revision++
-      storage = opened.storage
       isPreviewMode.value = false
       editingLayout.value = false
       editingPrefabId.value = null
@@ -532,7 +484,6 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       activePageId.value = (next.pages.find(page => page.id === opened.activePageId) ?? next.pages[0]).id
       checkpoints.value = [...opened.checkpoints]
       history.reset()
-      saveState.value = SaveState.Saved
     } finally {
       isOpening = false
     }

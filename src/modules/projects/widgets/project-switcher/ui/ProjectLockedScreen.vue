@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { SaveState, useUiTreeStore } from '../../../../ui-builder/entities/ui-node'
 import { Takeover, type ProjectSession } from '../../../features/manage-projects'
 import { ProjectDialog } from '../model/projectDialog'
+import { useAttempt } from '../model/useAttempt'
 
 const props = defineProps<{ session: ProjectSession }>()
 const emit = defineEmits<{ open: [dialog: ProjectDialog] }>()
@@ -10,21 +11,9 @@ const emit = defineEmits<{ open: [dialog: ProjectDialog] }>()
 const store = useUiTreeStore()
 const name = computed(() => props.session.currentProject.value?.name ?? 'This project')
 const hasUnsaved = computed(() => store.saveState !== SaveState.Saved)
-const waiting = ref(false)
 const noAnswer = ref(false)
-const failure = ref('')
+const { failure, busy: waiting, attempt } = useAttempt()
 
-const attempt = async (action: () => Promise<unknown>) => {
-  waiting.value = true
-  failure.value = ''
-  try {
-    await action()
-  } catch (error) {
-    failure.value = error instanceof Error ? error.message : 'This did not work. Try again.'
-  } finally {
-    waiting.value = false
-  }
-}
 const editHere = (takeover: Takeover) =>
   attempt(async () => {
     noAnswer.value = !(await props.session.editHere(takeover))

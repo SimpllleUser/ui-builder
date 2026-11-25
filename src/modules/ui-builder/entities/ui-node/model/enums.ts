@@ -85,6 +85,7 @@ export enum StepDirection {
 /** What a problem found in a project is about. */
 export enum IssueKind {
   UnknownVariable = 'unknown-variable',
+  UnusableName = 'unusable-name',
   UnusedVariable = 'unused-variable',
   MissingRoute = 'missing-route',
   InvalidCondition = 'invalid-condition',
