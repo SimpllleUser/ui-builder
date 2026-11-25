@@ -2,6 +2,11 @@
 export {
   CardStyle,
   ColorPreset,
+  DesignPreset,
+  FieldStyle,
+  FontFamily,
+  SpacingScale,
+  TypographyStyle,
   InteractiveStyle,
   SemanticPreset,
   ShadowProfile,
@@ -21,6 +26,9 @@ export {
 } from './model/presets'
 export { generateThemeCss, generateVuetifyConfig } from './model/exportConfig'
 export { sanitizeThemeSettings, DEFAULT_THEME_SETTINGS, type ThemeSettings } from './model/themeSettings'
+export { DESIGN_PRESETS, applyDesignPreset, matchingDesignPreset } from './model/designPresets'
+export { FONTS } from './model/fonts'
+export { resolveFonts } from './model/typographyCss'
 export { buildVuetifyDefaults } from './model/vuetifyDefaults'
 export { resolveThemeColors } from './model/themeColors'
 export { BASE_THEME_COLORS } from './model/baseTheme'

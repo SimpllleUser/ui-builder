@@ -1,7 +1,9 @@
 import { ThemeVariant } from './enums'
-import { buildThemeCss } from './themeCss'
+import { EXPORTED_PAGE_SCOPE } from './pageScope'
+import { buildPageCss, buildThemeCss } from './themeCss'
 import { resolveThemeColors } from './themeColors'
 import type { ThemeSettings } from './themeSettings'
+import { buildFontImports } from './typographyCss'
 import { buildVuetifyDefaults } from './vuetifyDefaults'
 import { toObjectLiteral } from '../../../../../shared/lib/objectLiteral'
 
@@ -17,4 +19,8 @@ export function generateVuetifyConfig(settings: ThemeSettings): string {
 }
 
 /** The style rules for a global stylesheet; empty when the settings need none. */
-export const generateThemeCss = (settings: ThemeSettings) => buildThemeCss(settings)
+// `@import` is only valid before the first rule, so the fonts come first.
+export const generateThemeCss = (settings: ThemeSettings) =>
+  [buildFontImports(settings), buildThemeCss(settings), buildPageCss(settings, EXPORTED_PAGE_SCOPE)]
+    .filter(Boolean)
+    .join('\n')

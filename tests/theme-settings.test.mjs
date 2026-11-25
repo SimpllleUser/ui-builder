@@ -21,6 +21,8 @@ before(async () => {
     ...(await server.ssrLoadModule(`${THEME}exportConfig.ts`)),
     ...(await server.ssrLoadModule(`${THEME}radiusCss.ts`)),
     ...(await server.ssrLoadModule(`${THEME}baseTheme.ts`)),
+    ...(await server.ssrLoadModule(`${THEME}themeCss.ts`)),
+    ...(await server.ssrLoadModule(`${THEME}designPresets.ts`)),
   }
   colorLib = await server.ssrLoadModule('/src/shared/lib/hexColor.ts')
   literal = await server.ssrLoadModule('/src/shared/lib/objectLiteral.ts')
@@ -130,4 +132,58 @@ test('a shadow profile adds rules for raised cards and buttons only', async () =
   assert.match(soft, /\.v-card--variant-elevated/)
   assert.match(theme.generateThemeCss(settings({ shadowProfile: ShadowProfile.NeoBrutal })), /4px 4px 0/)
   assert.equal(theme.sanitizeThemeSettings({ shadowProfile: 'glow' }).shadowProfile, ShadowProfile.Default)
+})
+
+test('type, spacing and field rules stay inside the page scope', () => {
+  assert.equal(theme.buildPageCss(settings({}), '.page'), '')
+  const css = theme.buildPageCss(
+    settings({
+      typography: theme.TypographyStyle.Editorial,
+      spacing: theme.SpacingScale.Airy,
+      fieldStyle: theme.FieldStyle.Filled,
+    }),
+    '.page',
+  )
+  assert.match(css, /Source Serif 4/)
+  assert.match(css, /\.page \.v-card-text \{ padding: 14px 28px/)
+  assert.match(css, /\.page \.v-field--focused/)
+  for (const line of css.split('\n').filter(Boolean)) assert.ok(line.startsWith('.page'), line)
+})
+
+test('a design preset sets the whole look and keeps the mode', () => {
+  const dark = settings({ mode: theme.ThemeMode.Dark })
+  assert.equal(theme.matchingDesignPreset(dark), theme.DesignPreset.Material)
+  for (const preset of Object.values(theme.DesignPreset)) {
+    const applied = theme.applyDesignPreset(dark, preset)
+    assert.equal(applied.mode, theme.ThemeMode.Dark)
+    assert.equal(theme.matchingDesignPreset(applied), preset)
+    assert.deepEqual(theme.sanitizeThemeSettings(applied), applied, `${preset} uses only valid values`)
+  }
+  const changed = { ...theme.applyDesignPreset(dark, theme.DesignPreset.Soft), radius: 0 }
+  assert.equal(theme.matchingDesignPreset(changed), null)
+})
+
+test('the exported styles import the fonts before any rule', () => {
+  const css = theme.generateThemeCss(theme.applyDesignPreset(settings({}), theme.DesignPreset.Editorial))
+  assert.ok(css.startsWith("@import '@fontsource-variable/source-serif-4';"))
+  assert.match(css, /@fontsource-variable\/inter/)
+  assert.match(css, /:is\(\.v-application, \.v-overlay-container\) \.text-h4/)
+})
+
+test('the ink preset stays visible in both modes', () => {
+  const ink = settings({ colorPreset: theme.ColorPreset.Ink })
+  assert.equal(theme.resolveThemeColors(ink, theme.ThemeVariant.Light).primary, '#18181B')
+  assert.equal(theme.resolveThemeColors(ink, theme.ThemeVariant.Dark).primary, '#FAFAFA')
+})
+
+test('a chosen font applies with or without a typography style, and is exported', () => {
+  const only = settings({ headingFont: theme.FontFamily.Unbounded })
+  assert.match(theme.buildPageCss(only, '.page'), /\.page \.text-h1.*Unbounded/)
+  assert.doesNotMatch(theme.buildPageCss(only, '.page'), /font-size/)
+  assert.match(theme.generateThemeCss(only), /@import '@fontsource-variable\/unbounded';/)
+  const overridden = theme.generateThemeCss(
+    settings({ typography: theme.TypographyStyle.Editorial, headingFont: theme.FontFamily.Rubik }),
+  )
+  assert.match(overridden, /Rubik/)
+  assert.doesNotMatch(overridden, /source-serif/)
 })

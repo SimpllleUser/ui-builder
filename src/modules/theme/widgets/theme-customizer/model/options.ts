@@ -3,6 +3,12 @@ import {
   BASE_THEME_COLORS,
   CardStyle,
   ColorPreset,
+  DesignPreset,
+  FieldStyle,
+  FONTS,
+  FontFamily,
+  SpacingScale,
+  TypographyStyle,
   InteractiveStyle,
   SEMANTIC_COLORS,
   isBrandPreset,
@@ -62,6 +68,7 @@ export const INTERACTIVE_STYLE_OPTIONS: ToggleOption<InteractiveStyle>[] = [
 const BASE_LIGHT = BASE_THEME_COLORS[ThemeVariant.Light]
 
 const COLOR_PRESET_LABELS: Record<BrandPreset, string> = {
+  [ColorPreset.Ink]: 'Ink',
   [ColorPreset.Blue]: 'Blue',
   [ColorPreset.DeepPurple]: 'Deep purple',
   [ColorPreset.Rose]: 'Rose',
@@ -131,3 +138,46 @@ export const RADIUS_OPTIONS = [
   { value: 16, title: 'Extra large (16 px)' },
   { value: 24, title: 'Full (24 px)' },
 ]
+
+export const TYPOGRAPHY_OPTIONS: ToggleOption<TypographyStyle>[] = [
+  { value: TypographyStyle.Default, label: 'Default' },
+  { value: TypographyStyle.Modern, label: 'Modern' },
+  { value: TypographyStyle.Friendly, label: 'Friendly' },
+  { value: TypographyStyle.Editorial, label: 'Editorial' },
+  { value: TypographyStyle.Bold, label: 'Bold' },
+]
+
+export const SPACING_OPTIONS: ToggleOption<SpacingScale>[] = [
+  { value: SpacingScale.Default, label: 'Default' },
+  { value: SpacingScale.Tight, label: 'Tight' },
+  { value: SpacingScale.Balanced, label: 'Balanced' },
+  { value: SpacingScale.Airy, label: 'Airy' },
+]
+
+export const FIELD_STYLE_OPTIONS: ToggleOption<FieldStyle>[] = [
+  { value: FieldStyle.Default, label: 'Default' },
+  { value: FieldStyle.Refined, label: 'Refined' },
+  { value: FieldStyle.Filled, label: 'Filled' },
+]
+
+export const DESIGN_PRESET_LABELS: Record<DesignPreset, { label: string; description: string }> = {
+  [DesignPreset.Material]: { label: 'Material', description: 'The Vuetify look' },
+  [DesignPreset.Minimal]: { label: 'Minimal', description: 'Black and white, thin borders' },
+  [DesignPreset.Soft]: { label: 'Soft', description: 'Round, roomy, light shadows' },
+  [DesignPreset.Editorial]: { label: 'Editorial', description: 'Serif headings, lots of air' },
+  [DesignPreset.Dashboard]: { label: 'Dashboard', description: 'Compact, for dense data' },
+  [DesignPreset.Bold]: { label: 'Bold', description: 'Heavy type, hard shadows' },
+}
+
+export interface FontOption {
+  value: FontFamily
+  title: string
+  /** The font itself, so each choice is shown in its own letters. */
+  stack: string
+}
+
+export const FONT_OPTIONS: FontOption[] = Object.values(FontFamily).map(value =>
+  value === FontFamily.Default
+    ? { value, title: 'From typography style', stack: 'inherit' }
+    : { value, title: FONTS[value].label, stack: FONTS[value].stack },
+)

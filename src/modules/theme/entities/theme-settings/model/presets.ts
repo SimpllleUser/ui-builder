@@ -22,6 +22,7 @@ export type BrandPreset = Exclude<ColorPreset, ColorPreset.Default | ColorPreset
 export type SemanticColorPreset = Exclude<SemanticPreset, SemanticPreset.Default>
 
 export const BRAND_COLORS: Record<BrandPreset, BrandColors> = {
+  [ColorPreset.Ink]: { primary: '#18181B', secondary: '#71717A' },
   [ColorPreset.Blue]: { primary: '#1E88E5', secondary: '#FFCA28' },
   [ColorPreset.DeepPurple]: { primary: '#5E35B1', secondary: '#26C6DA' },
   [ColorPreset.Rose]: { primary: '#D81B60', secondary: '#26A69A' },
@@ -35,6 +36,11 @@ export const BRAND_COLORS: Record<BrandPreset, BrandColors> = {
   [ColorPreset.Discord]: { primary: '#5865F2', secondary: '#EB459E' },
   [ColorPreset.Twitch]: { primary: '#9146FF', secondary: '#00E6CB' },
   [ColorPreset.Figma]: { primary: '#F24E1E', secondary: '#0ACF83' },
+}
+
+/** Presets whose light colours would disappear on a dark background have their own dark pair. */
+export const BRAND_DARK_COLORS: Partial<Record<BrandPreset, BrandColors>> = {
+  [ColorPreset.Ink]: { primary: '#FAFAFA', secondary: '#A1A1AA' },
 }
 
 export const SEMANTIC_COLORS: Record<SemanticColorPreset, SemanticColors> = {

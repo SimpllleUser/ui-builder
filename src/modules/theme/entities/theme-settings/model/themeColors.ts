@@ -1,6 +1,6 @@
 import { BASE_THEME_COLORS, type ThemeColorMap } from './baseTheme'
 import { ColorPreset, SemanticPreset, SurfacePreset, ThemeVariant } from './enums'
-import { BRAND_COLORS, SEMANTIC_COLORS, SURFACE_COLORS, type BrandColors } from './presets'
+import { BRAND_COLORS, BRAND_DARK_COLORS, SEMANTIC_COLORS, SURFACE_COLORS, type BrandColors } from './presets'
 import type { ThemeSettings } from './themeSettings'
 import { readableTextColor } from '../../../../../shared/lib/hexColor'
 
@@ -10,17 +10,18 @@ const withText = (name: string, color: string): ThemeColorMap => ({
   [`on-${name}`]: readableTextColor(color),
 })
 
-function brandColors(settings: ThemeSettings): BrandColors | null {
+function brandColors(settings: ThemeSettings, variant: ThemeVariant): BrandColors | null {
   if (settings.colorPreset === ColorPreset.Default) return null
   if (settings.colorPreset === ColorPreset.Custom) {
     return { primary: settings.customPrimary, secondary: settings.customSecondary }
   }
-  return BRAND_COLORS[settings.colorPreset]
+  const dark = variant === ThemeVariant.Dark ? BRAND_DARK_COLORS[settings.colorPreset] : undefined
+  return dark ?? BRAND_COLORS[settings.colorPreset]
 }
 
 /** Only the colours the settings change; everything else stays as the app ships it. */
 export function colorOverrides(settings: ThemeSettings, variant: ThemeVariant): ThemeColorMap {
-  const brand = brandColors(settings)
+  const brand = brandColors(settings, variant)
   const semantic = settings.semanticPreset === SemanticPreset.Default ? null : SEMANTIC_COLORS[settings.semanticPreset]
   const surface =
     settings.surfacePreset === SurfacePreset.Default ? null : SURFACE_COLORS[settings.surfacePreset][variant]
