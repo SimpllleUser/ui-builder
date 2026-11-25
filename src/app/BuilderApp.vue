@@ -31,7 +31,7 @@ import { platformModifierKey } from '../shared/lib/platform'
 import { useFocusMode } from './shell/useFocusMode'
 import { useProjectFiles } from './shell/useProjectFiles'
 
-defineProps<{ session: ProjectSession }>()
+const props = defineProps<{ session: ProjectSession }>()
 const emit = defineEmits<{ openProjects: [dialog: ProjectDialog] }>()
 const store = useUiTreeStore()
 const narrow = useMediaQuery('(max-width: 1100px)')
@@ -50,7 +50,7 @@ const {
 } = panels
 const { focusMode, showChrome, toggleFocus } = useFocusMode(store, modifierKey)
 const { open: tourOpen, finish: finishTour, start: startTour } = useFirstRunTour(store)
-const { exportProject, importFromInput } = useProjectFiles(store)
+const { exportProject, importFromInput } = useProjectFiles(store, props.session)
 
 const importInput = ref<HTMLInputElement>()
 const pageTabs = ref<InstanceType<typeof PageTabs>>()
@@ -183,7 +183,7 @@ useEditorShortcuts({
         type="file"
         accept="application/json,.json"
         hidden
-        aria-label="Import page"
+        aria-label="Import project"
         @change="importFromInput"
       />
     </div>

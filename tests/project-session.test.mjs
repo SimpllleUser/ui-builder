@@ -162,3 +162,25 @@ test('the list counts pages and marks a damaged project, whose text can still be
   assert.equal(await session.readDocument(broken.id), '{oops')
   assert.equal(projects.projectFileName('a/b: c?'), 'a-b- c-.json')
 })
+
+test('an imported file becomes a new project and the open one stays as it was', async () => {
+  await session.start()
+  const first = session.currentProjectId.value
+  store.addComponent('VBtn')
+  const exported = store.exportDocument()
+  store.addComponent('VCard', 'root-canvas')
+
+  assert.equal(await session.importProject('Shop.json', exported), 'Shop')
+  assert.equal(session.currentProject.value.name, 'Shop')
+  assert.equal(store.rootNode.children.length, 1)
+  assert.equal(await elements(first), 2)
+  assert.equal(await session.importProject('shop.JSON', exported), 'shop 2')
+})
+
+test('an invalid file creates no project', async () => {
+  await session.start()
+  const first = session.currentProjectId.value
+  await assert.rejects(session.importProject('broken.json', '{oops'))
+  assert.equal((await repository.listProjects()).length, 1)
+  assert.equal(session.currentProjectId.value, first)
+})

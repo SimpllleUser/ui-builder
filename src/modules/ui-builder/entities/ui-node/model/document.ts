@@ -47,5 +47,8 @@ export function countPages(text: string): number | null {
   }
 }
 
+/** A document from outside, checked and brought to the current format. Throws with the reason when it cannot be. */
+export const normalizeDocument = (text: string) => serializeProject(parseProject(text))
+
 /** The document of a project nothing was done in yet. */
 export const emptyProjectDocument = () => serializeProject(emptyProject())

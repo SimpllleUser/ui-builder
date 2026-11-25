@@ -2,6 +2,7 @@ import { computed, ref, shallowRef, watch, type Ref } from 'vue'
 import {
   countPages,
   emptyProjectDocument,
+  normalizeDocument,
   SaveState,
   type OpenedProject,
   type ProjectStorage,
@@ -10,6 +11,7 @@ import {
 import {
   LEGACY_PROJECT_NAME,
   migrateLegacyProject,
+  projectNameFromFile,
   uniqueProjectName,
   type LegacyStorage,
   type ProjectMeta,
@@ -121,6 +123,20 @@ export function createProjectSession({ repository, store, theme, browserStorage 
     return opened
   }
 
+  /**
+   * Adds the file's content as a new project and opens it. An invalid document rejects and creates nothing.
+   * Resolves with the name given to the project, or null when the open one could not be saved first.
+   */
+  const importProject = async (fileName: string, text: string) => {
+    const document = normalizeDocument(text)
+    if (!(await allSaved())) return null
+    const name = uniqueProjectName(await repository.listProjects(), projectNameFromFile(fileName))
+    const created = await repository.createProject({ name, document })
+    const opened = await open(created.id)
+    await refresh()
+    return opened ? name : null
+  }
+
   const rename = async (id: string, name: string) => {
     await repository.renameProject(id, name)
     await refresh()
@@ -193,6 +209,7 @@ export function createProjectSession({ repository, store, theme, browserStorage 
     readDocument,
     open,
     create,
+    importProject,
     rename,
     duplicate,
     remove,

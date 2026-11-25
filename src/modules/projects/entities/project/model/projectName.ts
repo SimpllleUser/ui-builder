@@ -14,6 +14,9 @@ export function projectNameError(projects: ProjectMeta[], name: string, ownId?: 
 /** A file name for the project's backup: its own name without what file systems refuse. */
 export const projectFileName = (name: string) => `${name.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'project'}.json`
 
+/** The name a project gets when it is imported from a file. */
+export const projectNameFromFile = (fileName: string) => fileName.replace(/\.json$/i, '')
+
 /** `name`, or `name 2`, `name 3`… when it is taken. Used when the app, not the person, chooses the name. */
 export function uniqueProjectName(projects: ProjectMeta[], name: string): string {
   const base = name.trim().slice(0, MAX_PROJECT_NAME_LENGTH) || 'Untitled project'
