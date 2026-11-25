@@ -35,6 +35,19 @@ test('unwrap refuses named slot content without losing data; regular unwrap and 
   assert.ok(store.findNodeById(id))
 })
 
+test('the display control keeps responsive and print display classes', () => {
+  const classes = ['d-md-none', 'd-print-block', 'd-block', 'pa-2']
+  assert.equal(readFlex(classes), 'd-block')
+  assert.deepEqual(writeFlex(classes, 'd-flex flex-column'), [
+    'd-md-none',
+    'd-print-block',
+    'pa-2',
+    'd-flex',
+    'flex-column',
+  ])
+  assert.equal(readFlex(['d-sm-flex']), null)
+})
+
 test('prefab selected on a leaf inserts into the nearest container and selects the new copy', () => {
   store.addComponent('VBtn')
   const button = store.selectedNodeId

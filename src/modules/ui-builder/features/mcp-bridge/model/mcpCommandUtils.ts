@@ -10,6 +10,7 @@ export const summarize = (node: UiNode): unknown => ({
   name: node.name,
   ...(Object.keys(node.props).length ? { props: node.props } : {}),
   ...(node.classes.length ? { classes: node.classes } : {}),
+  ...(node.responsive ? { responsive: node.responsive } : {}),
   ...(node.model ? { model: node.model } : {}),
   ...(node.vIf ? { vIf: node.vIf } : {}),
   ...(node.vFor ? { vFor: node.vFor } : {}),

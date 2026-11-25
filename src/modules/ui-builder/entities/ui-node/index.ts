@@ -61,7 +61,13 @@ export {
 } from './model/vueExport'
 export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
-export { effectiveStyle, hasOverrides, responsiveStylesheet } from './model/responsiveStyle'
+export {
+  effectiveStyle,
+  hasOverrides,
+  patchNodeStyle,
+  responsiveStylesheet,
+  setOverride,
+} from './model/responsiveStyle'
 export { BREAKPOINT_MIN_WIDTHS, BREAKPOINT_WIDTHS, BREAKPOINTS, overrideTarget } from './model/breakpoints'
 export { COLUMN_PROPS, columnPropFor, columnsForWidth, GRID_COLUMN_TYPE, GRID_COLUMNS } from './model/grid'
 export type { ResponsiveStyles } from './model/types'

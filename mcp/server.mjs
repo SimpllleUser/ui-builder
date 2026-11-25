@@ -160,8 +160,15 @@ tool('update_node', 'Change a node. props are merged; a null prop value removes 
 })
 tool(
   'set_style',
-  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, and every value wins over utility classes. A property set to null is removed; style null clears all. Returns the resulting style.',
-  { id, style: z.union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()]) },
+  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, and every value wins over utility classes. Screen sizes follow Vuetify, mobile first: without breakpoint (or with xs) it is the base style; sm, md, lg or xl change only what differs from that width up. A property set to null is removed; style null clears the named breakpoint, or every style when none is named. Returns the base style and the per-breakpoint changes.',
+  {
+    id,
+    style: z.union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()]),
+    breakpoint: z
+      .enum(['xs', 'sm', 'md', 'lg', 'xl'])
+      .optional()
+      .describe('Vuetify breakpoint: sm from 600px, md 960, lg 1280, xl 1920. Omit or xs for the base style.'),
+  },
 )
 tool('delete_node', 'Delete a node and its subtree.', { id })
 tool('move_node', 'Move a node into another container.', { id, parentId: z.string(), slot })

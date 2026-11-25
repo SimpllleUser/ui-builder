@@ -16,6 +16,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 
 ## Style
 - Use **`set_style`** (or `style` in `update_node` / `add_subtree`). Numbers are pixels for lengths (`{ "padding": 16 }` → `16px`). Names may be kebab-case. A **theme colour name** (`primary`, `secondary`, `error`, `success`, `warning`, `info`, `surface`, `background`, `on-primary`…) becomes a colour that follows light/dark mode. Every value wins over utility classes such as `pa-4` or `rounded-lg`. `null` removes a property.
+- **Screen sizes** follow Vuetify's grid, mobile first. Style the phone layout first without `breakpoint`, then call `set_style` with `breakpoint: "sm" | "md" | "lg" | "xl"` (from 600, 960, 1280, 1920px) for only what differs on larger screens, e.g. `{ "id": "…", "style": { "flexDirection": "row" }, "breakpoint": "md" }`. `get_node` shows these under `responsive`. Column widths of `VCol` are not styles: set its `cols`, `sm`, `md`, `lg`, `xl` props with `update_node`.
 - Vuetify utility classes (`d-flex`, `ga-4`, `text-h5`) go in `classes`.
 
 ## Variables, bindings and events
