@@ -37,7 +37,7 @@ export { buildOutline, OutlineKind, outlineToText, outlineToTextAll } from './mo
 export type { OutlineNode, OutlineSection } from './model/structureOutline'
 export { conditionVariables, repeatScopeNames, StartingOutcome, startingOutcome } from './model/conditionOutcome'
 export type { BehaviorNote } from './model/behaviorSummary'
-export { exportLayout, exportPage, exportPrefab } from './model/vueExport'
+export { exportLayout, exportPage, exportPrefab, exportStore, hasAppShell, StateSource } from './model/vueExport'
 export type { VueFile } from './model/vueExport'
 export { useUiTreeStore } from './model/store'
 export { openPrefabRepository } from './api/prefabRepository'

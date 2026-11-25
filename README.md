@@ -128,6 +128,8 @@ row.status != "paid"                       a field of the current item
 
 ### Export code
 
+**Download project (.zip)** in the same dialog gives a whole Vue application: `npm install` and `npm run dev` run it. Pages become `src/pages` with routes, the shared layout `src/layouts`, saved components `src/components`, variables one Pinia store, and the theme `src/plugins/vuetify.js` with its styles. Components placed on pages are written into the pages themselves.
+
 **File → Export code…** (or search → “export code”) opens a dialog with the code of one page, the shared layout or one saved component as a Vue single-file component, ready to **Copy** or **Download** (`OrderDesk.vue`). It opens on what you are editing; the list at the top switches to anything else.
 
 What the file contains:
@@ -137,7 +139,7 @@ What the file contains:
 - Conditions are translated to JavaScript with the same result as in the editor (missing values read as `undefined`, `==` compares as text, `empty`, `contains` and `length` become small helper functions written at the top of the file). A test runs the exported JavaScript against the editor's evaluator on many conditions, and compiles the generated files with Vue's own compiler.
 - A saved component has its parameters (`props.name`) as `defineProps`, so `props.name` in the template keeps working. The shared layout has `<RouterView />` where the page goes.
 
-Things to know: every file has its own copy of the variables (share them, for example in a Pinia store, when pages must see the same data); input masks are not exported; table stripes, borders and header colours are CSS classes from `src/shared/tableStyles.css`, so copy that file too. The generator is in `entities/ui-node/model/vueExport.ts`; the dialog is the `code-export` widget.
+Things to know about a single file: it has its own copy of the variables (the downloaded project shares them); input masks are not exported; table stripes, borders and header colours are CSS classes from `src/shared/tableStyles.css`, so copy that file too. The generator is in `entities/ui-node/model/vueExport.ts`; the dialog is the `code-export` widget.
 
 ### The Behavior guide
 
