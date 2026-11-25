@@ -35,6 +35,19 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
     )
     return { notice: store.notice, selected: store.selectedNodeIds }
   },
+  update_instance(store, a) {
+    const node = need(store, a.id)
+    ok(
+      store.setInstanceProps(node.id, propValues(a.props)),
+      `“${node.name}” is not an instance of a component in My components.`,
+    )
+    return summarize(need(store, node.id))
+  },
+  detach_instance(store, a) {
+    const node = need(store, a.id)
+    ok(store.detachInstance(node.id), `“${node.name}” is not a component instance.`)
+    return summarize(node)
+  },
   delete_saved_component: (store, a) => {
     ok(
       store.prefabs.some(prefab => prefab.prefabId === a.prefabId),

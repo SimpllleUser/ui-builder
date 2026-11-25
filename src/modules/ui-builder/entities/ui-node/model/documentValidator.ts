@@ -105,6 +105,7 @@ function validateNode(value: unknown, ids: Set<string>, countNode: () => number,
   validateLogic(value)
   validateResponsive(value.responsive)
   validateRules(value.rules)
+  validateInstance(value.instance)
   ids.add(id)
   const definition = getComponentDef(type)!
   if (children.length && (definition.isLeaf || !definition.slots.some(slot => slot.name === 'default'))) {
@@ -164,6 +165,16 @@ const isValidEvents = (events: unknown) =>
     ([name, actions]) =>
       Object.values<string>(EventName).includes(name) && (actions === undefined || isValidActions(actions)),
   )
+
+function validateInstance(instance: unknown) {
+  const valid =
+    instance === undefined ||
+    (isRecord(instance) &&
+      typeof instance.prefabId === 'string' &&
+      isRecord(instance.values) &&
+      Object.values(instance.values).every(item => typeof item === 'string'))
+  if (!valid) throw new Error('Invalid component instance in document.')
+}
 
 function validateRules(rules: unknown) {
   const optionalText = (item: unknown) => item === undefined || (typeof item === 'string' && item.length <= 200)

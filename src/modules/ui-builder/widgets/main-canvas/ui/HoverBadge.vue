@@ -29,7 +29,8 @@ const elementAt = (target: EventTarget | null) => {
     const node = store.findNodeById(id)
     return !!node && node.type !== TEXT_NODE_TYPE
   })
-  return id === ROOT_NODE_ID ? null : id
+  // Pointing inside a component instance points at the instance, which is what a click selects.
+  return !id || id === ROOT_NODE_ID ? null : store.selectableId(id)
 }
 
 const place = () => {

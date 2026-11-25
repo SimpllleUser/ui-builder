@@ -15,7 +15,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 - Component names are Vuetify (`VCard`, `VBtn`, `VTextField`, `VDataTable`…) plus `div`. See `list_components` and `describe_component`.
 
 ## Style
-- Use **`set_style`** (or `style` in `update_node` / `add_subtree`). Numbers are pixels for lengths (`{ "padding": 16 }` → `16px`). Names may be kebab-case. A **theme colour name** (`primary`, `secondary`, `error`, `success`, `warning`, `info`, `surface`, `background`, `on-primary`…) becomes a colour that follows light/dark mode. Every value wins over utility classes such as `pa-4` or `rounded-lg`. `null` removes a property.
+- Use **`set_style`** (or `style` in `update_node` / `add_subtree`). Numbers are pixels for lengths (`{ "padding": 16 }` → `16px`). Names may be kebab-case. A **theme colour name** (`primary`, `secondary`, `error`, `success`, `warning`, `info`, `surface`, `background`, `on-primary`…) becomes a colour that follows light/dark mode. **Theme tokens** follow the theme: `space-xs`…`space-xl`, `space-2xl` for margin, padding and gap, `radius-sm|md|lg|full` for `borderRadius`, and `textStyle: "h1"`…`"h6" | "body" | "caption"` for typography. Prefer them to raw pixels. Every value wins over utility classes such as `pa-4` or `rounded-lg`. `null` removes a property.
 - **Screen sizes** follow Vuetify's grid, mobile first. Style the phone layout first without `breakpoint`, then call `set_style` with `breakpoint: "sm" | "md" | "lg" | "xl"` (from 600, 960, 1280, 1920px) for only what differs on larger screens, e.g. `{ "id": "…", "style": { "flexDirection": "row" }, "breakpoint": "md" }`. `get_node` shows these under `responsive`. Column widths of `VCol` are not styles: set its `cols`, `sm`, `md`, `lg`, `xl` props with `update_node`.
 - Vuetify utility classes (`d-flex`, `ga-4`, `text-h5`) go in `classes`.
 
@@ -40,4 +40,5 @@ Work in this order: `get_document` → build → `check_project` → try it with
 ## Safety
 - Before a big change call **`create_checkpoint`**; if it goes wrong, **`restore_checkpoint`** (itself one Undo step). `get_history` lists the named steps; `restore_version` goes back to one.
 - **`get_status`** is a cheap check of the page, variables, selection and whether Preview runs.
-- **`save_component`** / **`insert_saved_component`** reuse an element (write `{{props.title}}` in a property to make it a parameter, then pass `props: { title: "Hi" }` when inserting); **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.
+- **`save_component`** stores an element in My components (write `{{props.title}}` in a property to make it a parameter). **`insert_saved_component`** adds an **instance** of it (pass `props: { title: "Hi" }`): every instance follows the original, and nothing inside one can be edited. Change its parameters with **`update_instance`**, or **`detach_instance`** to get an editable copy.
+- **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.

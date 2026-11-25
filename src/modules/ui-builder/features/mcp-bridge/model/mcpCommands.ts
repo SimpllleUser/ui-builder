@@ -1,5 +1,5 @@
 import { COMPONENT_DEFS, TEXT_NODE_TYPE, type TemplateKind, type UiNode } from '../../../entities/ui-node'
-import { need, ok, summarize, type Args, type McpCommand, type Store } from './mcpCommandUtils'
+import { need, needEditable, ok, summarize, type Args, type McpCommand, type Store } from './mcpCommandUtils'
 import { MCP_PAGE_COMMANDS, pageSummary } from './mcpPageCommands'
 import { MCP_TABLE_COMMANDS } from './mcpTableCommands'
 import { MCP_DIAGNOSTIC_COMMANDS } from './mcpDiagnosticCommands'
@@ -67,7 +67,9 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     return { id: node.id }
   },
   update_node(store, a) {
-    const node = need(store, a.id)
+    // An instance may be renamed; everything else about it comes from the original.
+    const onlyRenames = Object.keys(a).every(key => key === 'id' || key === 'name') && !store.isInsideInstance(a.id)
+    const node = onlyRenames ? need(store, a.id) : needEditable(store, a.id)
     store.commit()
     if (a.name !== undefined) node.name = a.name
     if (a.classes) node.classes = a.classes
@@ -82,7 +84,7 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
   },
   delete_node(store, a) {
     need(store, a.id)
-    ok(store.deleteNode(a.id), 'Cannot delete this node (root?)')
+    ok(store.deleteNode(a.id), 'Cannot delete this node (the root, or part of a component instance)')
     return { deleted: a.id }
   },
   move_node(store, a) {
@@ -91,7 +93,11 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     ok(store.moveNode(a.id, a.parentId, a.slot ?? null), 'Cannot move node there')
     return { moved: a.id }
   },
-  duplicate_node: (store, a) => ({ id: store.duplicateNode(need(store, a.id).id) }),
+  duplicate_node(store, a) {
+    const id = store.duplicateNode(need(store, a.id).id)
+    ok(!!id, store.notice || 'Cannot duplicate this node')
+    return { id }
+  },
   add_template(store, a) {
     store.addTemplate(a.kind as TemplateKind, a.props ?? {})
     return { notice: store.notice }

@@ -39,6 +39,13 @@ export interface DataSource {
   loadingVariable?: string
 }
 
+/** What ties an element to the saved component it was inserted from. */
+export interface InstanceLink {
+  prefabId: string
+  /** Parameter values chosen for this instance; the ones left out follow the component's defaults. */
+  values: Record<string, string>
+}
+
 export interface UiNode {
   id: string
   /** The component's name, such as `VBtn`, `VCard` or `div`. */
@@ -58,6 +65,8 @@ export interface UiNode {
   responsive?: ResponsiveStyles
   /** Checks of a form field. */
   rules?: ValidationRule[]
+  /** Set on the root of a component instance. */
+  instance?: InstanceLink
 }
 
 export interface Page {

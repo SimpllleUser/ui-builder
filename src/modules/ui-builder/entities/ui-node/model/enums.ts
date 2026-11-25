@@ -79,6 +79,10 @@ export enum TemplateKind {
   Onboarding = 'onboarding',
   Blog = 'blog',
   Contact = 'contact',
+  Landing = 'landing',
+  Settings = 'settings',
+  Wizard = 'wizard',
+  Pricing = 'pricing',
 }
 
 /** Margin or padding. The values are the prefixes of the utility classes (`mt-2`, `pa-4`). */

@@ -47,7 +47,7 @@ const confirmDelete = () => {
       v-if="prefabs.length === 0"
       icon="mdi-puzzle-outline"
       title="No saved components yet"
-      description="Select an element, then press the save icon at the top of the inspector to keep it here and reuse it. Write props.name in double curly braces inside it to make a parameter."
+      description="Select an element, then press the save icon at the top of the inspector to keep it here and reuse it. Inserted components follow the original when you change it. Write props.name in double curly braces inside it to make a parameter."
     />
     <div v-else class="prefabs-list">
       <div
@@ -114,7 +114,7 @@ const confirmDelete = () => {
     <VDialog :model-value="!!deleting" max-width="400" @update:model-value="deleting = null">
       <VCard
         title="Delete saved component?"
-        text="Existing copies on your page will remain. This removes the component from your library."
+        text="Instances on your pages stay as ordinary copies. This removes the component from your library."
       >
         <VCardActions
           ><VSpacer /><VBtn @click="deleting = null">Cancel</VBtn

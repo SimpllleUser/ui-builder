@@ -160,7 +160,7 @@ tool('update_node', 'Change a node. props are merged; a null prop value removes 
 })
 tool(
   'set_style',
-  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, and every value wins over utility classes. Screen sizes follow Vuetify, mobile first: without breakpoint (or with xs) it is the base style; sm, md, lg or xl change only what differs from that width up. A property set to null is removed; style null clears the named breakpoint, or every style when none is named. Returns the base style and the per-breakpoint changes.',
+  'Set the style of an element the way the Design tab does: numbers are px ({ padding: 16 }), kebab-case names are fine, theme colour names (primary, surface, on-primary…) follow light/dark mode, theme tokens follow the theme (space-xs, space-sm, space-md, space-lg, space-xl, space-2xl for margin, padding and gap; radius-sm, radius-md, radius-lg, radius-full for borderRadius; textStyle: h1-h6, body or caption), and every value wins over utility classes. Screen sizes follow Vuetify, mobile first: without breakpoint (or with xs) it is the base style; sm, md, lg or xl change only what differs from that width up. A property set to null is removed; style null clears the named breakpoint, or every style when none is named. Returns the base style and the per-breakpoint changes.',
   {
     id,
     style: z.union([z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()])), z.null()]),
@@ -175,7 +175,7 @@ tool('move_node', 'Move a node into another container.', { id, parentId: z.strin
 tool('duplicate_node', 'Duplicate a node next to the original.', { id })
 tool(
   'add_template',
-  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. What is not given keeps its default.',
+  'Insert a starter template. dashboard: key numbers and a table. table: search, status filter, table and a details panel (adds variables query and selected). login: sign-in form that reacts in Preview (adds variables email, password, remember, signedIn). testimonials, faq, onboarding (variables step, onboarded), blog, contact (variables contactName, contactEmail, contactMessage, contactSent) and footer are content sections. Pass props to customize: testimonials { title, quotes: [{ quote, author, role }] }; faq { title, variant, questions: [{ question, answer }] }; onboarding { finishLabel, steps: [{ title, text, icon }] }; blog { title, subtitle, readMoreLabel, posts: [{ tag, title, excerpt, date }] }; contact { title, text, email, phone, address, submitLabel, successMessage }; footer { brand, tagline, copyright, columns: [{ title, links: [text] }] }. landing { title, text, primaryLabel, secondaryLabel, features: [{ title, text, icon }], ctaTitle, ctaLabel }; settings (a settings form; adds variables settingsName, settingsEmail, settingsNewsletter, settingsAlerts, settingsLanguage) { title, text, saveLabel, savedMessage }; wizard (three checked steps; adds wizardStep, wizardName, wizardEmail, wizardPlan) { title, accountTitle, planTitle, reviewTitle, finishLabel, successMessage, plans: [text] }; pricing { title, subtitle, featured, plans: [{ name, price, period, description, features, button }] } with features separated by ;. What is not given keeps its default.',
   {
     kind: z.enum([
       'card',
@@ -190,6 +190,10 @@ tool(
       'blog',
       'contact',
       'footer',
+      'landing',
+      'settings',
+      'wizard',
+      'pricing',
     ]),
     props: z.record(z.string(), z.unknown()).optional().describe('Settings of the template, see the description'),
   },
@@ -372,9 +376,15 @@ tool(
 )
 tool(
   'insert_saved_component',
-  'Insert a saved component into a container (defaults to where the editor would insert). `props` sets its parameters (see list_saved_components); missing ones use their defaults.',
+  'Insert an instance of a saved component into a container (defaults to where the editor would insert). It follows the original: when the saved component changes, every instance changes, and its content cannot be edited. `props` sets its parameters (see list_saved_components); missing ones use their defaults.',
   { prefabId: z.string(), parentId: z.string().optional(), slot, props: propValues },
 )
+tool(
+  'update_instance',
+  'Change parameter values of a component instance; the parameters not given keep their values.',
+  { id, props: z.record(z.string(), z.string()) },
+)
+tool('detach_instance', 'Turn a component instance into an ordinary copy that no longer follows its original.', { id })
 tool('delete_saved_component', 'Delete a saved component.', { prefabId: z.string() })
 tool(
   'wrap_nodes',

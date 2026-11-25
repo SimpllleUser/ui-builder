@@ -24,6 +24,7 @@ import { useDesignTabPreference } from '../model/useDesignTabPreference'
 import { useTabScroll } from '../model/useTabScroll'
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
 import DesignTab from './design/DesignTab.vue'
+import InstancePanel from './InstancePanel.vue'
 import AdvancedProperties from './AdvancedProperties.vue'
 import InteractionsEditor from './InteractionsEditor.vue'
 import MoveNodeDialog from './MoveNodeDialog.vue'
@@ -41,6 +42,8 @@ const selectedNode = computed(() => {
 })
 // The root of a page, the layout or a saved component cannot be deleted or moved.
 const isRoot = computed(() => selectedNode.value?.id === store.rootNode.id)
+// The content of an instance comes from its original, so its settings are not offered here.
+const isInstance = computed(() => !!selectedNode.value && store.isLocked(selectedNode.value.id))
 const componentSections = computed(() =>
   selectedNode.value ? (getComponentDef(selectedNode.value.type)?.propertySections ?? []) : [],
 )
@@ -107,6 +110,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
         </div>
         <div v-if="!isRoot" class="d-flex align-center">
           <VBtn
+            v-if="!isInstance"
             icon="mdi-content-save-outline"
             aria-label="Save to My components"
             title="Save to My components"
@@ -150,8 +154,9 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
         @click="moveDialog.show"
         >Move to…</VBtn
       >
+      <InstancePanel v-if="selectedNode.instance" :key="selectedNode.id" :node="selectedNode" />
       <VTextField
-        v-if="searchable"
+        v-if="searchable && !isInstance"
         v-model="settingsQuery"
         label="Search settings"
         prepend-inner-icon="mdi-magnify"
@@ -163,7 +168,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
       />
       <VDivider class="mb-2" />
 
-      <div class="inspector">
+      <div v-if="!isInstance" class="inspector">
         <!-- Vertical icon rail like the tool strips of design tools; the name shows on hover and for screen readers. -->
         <nav
           v-if="!query"

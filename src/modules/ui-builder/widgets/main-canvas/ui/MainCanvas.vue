@@ -347,7 +347,8 @@ const leaveCanvas = (event: DragEvent) => {
         @click.stop
       >
         Editing component <strong>{{ store.editingPrefab.name }}</strong>. Write <code v-pre>{{ props.name }}</code> to
-        add a parameter. Copies already on pages are not changed.
+        add a parameter. Every instance follows these changes; Undo takes them back.
+        <VBtn size="small" variant="text" class="ml-2" @click="store.stopEditingPrefab()">Done</VBtn>
       </VAlert>
       <component :is="'style'" v-if="isPreviewMode">{{ previewStyles }}</component>
       <div class="canvas-device" :style="{ width: isPreviewMode ? undefined : canvasWidth }">

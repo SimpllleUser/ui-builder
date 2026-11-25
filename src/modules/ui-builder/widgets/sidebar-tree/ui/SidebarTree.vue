@@ -18,6 +18,14 @@ const activeView = ref<SidebarView>(SidebarView.Layers)
 watch(activeView, view => {
   if (view !== SidebarView.Prefabs) store.stopEditingPrefab()
 })
+// “Edit original” opens a component from elsewhere: show its tab, which is also the way back.
+watch(
+  () => store.editingPrefab?.prefabId,
+  prefabId => {
+    if (prefabId) activeView.value = SidebarView.Prefabs
+  },
+  { immediate: true },
+)
 const closePanel = () => {
   store.stopEditingPrefab()
   emit('close')

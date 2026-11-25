@@ -2,13 +2,16 @@
 import { computed, ref } from 'vue'
 import { Corner, cornerProperty } from '../../model/designStyle'
 import { parsePx, toPx } from '../../../../../../shared/lib/inlineStyle'
+import { parseRadiusToken, RadiusToken, radiusValue } from '../../../../../../shared/lib/themeTokens'
 import { useNodeStyle } from '../../model/useNodeStyle'
 import { type UiNode } from '../../../../entities/ui-node'
 import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
 import NumberField from './NumberField.vue'
+import TokenChips from './TokenChips.vue'
 
 const PRESETS = [0, 4, 8, 16, 9999]
+const RADIUS_TOKENS = Object.values(RadiusToken)
 const MAX_RADIUS = 9999
 const CORNERS = [
   { corner: Corner.TopLeft, label: '◜', title: 'Top left corner' },
@@ -27,6 +30,8 @@ const hasCornerValues = computed(() => Object.values(Corner).some(corner => styl
 const perCorner = ref(hasCornerValues.value)
 
 const setAll = (value: number | null) => apply({ borderRadius: toPx(value), ...CLEAR_CORNERS })
+const token = computed(() => parseRadiusToken(style.value.borderRadius))
+const setToken = (next: RadiusToken | null) => apply({ borderRadius: next && radiusValue(next), ...CLEAR_CORNERS })
 const setCorner = (corner: Corner, value: number | null) => {
   // Switching to separate corners starts from the common value, so nothing jumps.
   const base = Object.fromEntries(Object.values(Corner).map(item => [cornerProperty(item), toPx(radius.value)]))
@@ -44,7 +49,7 @@ const cornerValue = (corner: Corner) => parsePx(style.value[cornerProperty(corne
         :model-value="radius"
         :min="0"
         :max="MAX_RADIUS"
-        placeholder="0"
+        :placeholder="token ?? '0'"
         @update:model-value="setAll"
       />
       <IconToggle
@@ -66,6 +71,7 @@ const cornerValue = (corner: Corner) => parsePx(style.value[cornerProperty(corne
         {{ preset === MAX_RADIUS ? 'Pill' : preset }}
       </button>
     </div>
+    <TokenChips label="Radius" :tokens="RADIUS_TOKENS" :selected="token" @pick="setToken" />
     <div v-if="perCorner" class="radius-corners">
       <NumberField
         v-for="item in CORNERS"

@@ -16,3 +16,5 @@ export const MAX_HISTORY_ENTRIES = 50
 export const MAX_CHECKPOINTS = 30
 export const MAX_RECENT_COMPONENTS = 6
 export const HISTORY_COMMIT_DELAY_MS = 600
+/** Joins an instance's id and an original element's id into the id of that element inside the instance. */
+export const INSTANCE_ID_SEPARATOR = '--'

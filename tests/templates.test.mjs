@@ -24,6 +24,10 @@ test('starter templates: dashboard, table page and sign-in form come ready with 
       'blog',
       'contact',
       'footer',
+      'landing',
+      'settings',
+      'wizard',
+      'pricing',
     ],
   )
   const types = node => [node.type, ...[...node.children, ...Object.values(node.slots).flat()].flatMap(types)]
@@ -97,7 +101,7 @@ test('starter templates: dashboard, table page and sign-in form come ready with 
     modifierKey: 'Ctrl',
   }
   const commands = buildCommands(store, host).filter(command => command.group === 'Templates')
-  assert.equal(commands.length, 12)
+  assert.equal(commands.length, 16)
   const count = store.rootNode.children.length
   commands.find(command => command.id === 'template:dashboard').run()
   assert.equal(store.rootNode.children.length, count + 1)
@@ -117,6 +121,10 @@ test('content templates fill their defaults and take every text and list from pr
     'blog',
     'contact',
     'footer',
+    'landing',
+    'settings',
+    'wizard',
+    'pricing',
   ])
   const all = node => [node, ...[...node.children, ...Object.values(node.slots).flat()].flatMap(all)]
   const added = kind => {
@@ -209,7 +217,8 @@ test('template settings: defaults are copies, and the props the dialog sends bui
 
   const names = node =>
     [...node.children, ...Object.values(node.slots).flat()].flatMap(child => [child.name, ...names(child)])
-  for (const kind of ['testimonials', 'faq', 'onboarding', 'blog', 'contact', 'footer']) {
+  const configurable = ['testimonials', 'faq', 'onboarding', 'blog', 'contact', 'footer']
+  for (const kind of [...configurable, 'landing', 'settings', 'wizard', 'pricing']) {
     store.addTemplate(kind)
     const withDefaults = store.rootNode.children.at(-1)
     store.addTemplate(kind, defaultTemplateProps(kind))
@@ -237,4 +246,33 @@ test('presets: the first one is the default look, others change the shape, and a
   assert.equal(count('footer', 'VBtn', presetTemplateProps('footer', 'minimal')), 0)
   assert.equal(count('onboarding', 'VCard', { preset: 'five-steps' }), 5, 'an MCP caller picks a preset by id')
   assert.equal(count('testimonials', 'VCol', { preset: 'two-columns', quotes: [] }), 0, 'own props win over the preset')
+})
+
+test('the wizard moves to the next step only when the fields of the current one are right', () => {
+  store.addTemplate('wizard')
+  const wizard = store.rootNode.children.at(-1)
+  const [first, second] = wizard.children.filter(node => node.type === 'VForm')
+  const [name, email] = first.children.filter(node => node.type === 'VTextField')
+
+  store.startPreview()
+  assert.equal(store.previewSubmit(first.id).length > 0, true)
+  assert.equal(store.runtimeState.wizardStep, 1)
+  store.previewInput(name.id, 'Anna')
+  store.previewInput(email.id, 'anna@example.com')
+  assert.deepEqual(store.previewSubmit(first.id), [])
+  assert.equal(store.runtimeState.wizardStep, 2)
+  assert.ok(store.previewSubmit(second.id).length, 'a plan has to be chosen')
+})
+
+test('the new page templates are valid documents with the settings applied', () => {
+  store.addTemplate('landing', { preset: 'one-button', title: 'Hello' })
+  store.addTemplate('settings')
+  store.addTemplate('pricing', { preset: 'two-plans' })
+  const [landing, settings, pricing] = parseProject(store.exportDocument()).pages[0].root.children
+  const all = node => [node, ...node.children.flatMap(all)]
+  assert.ok(all(landing).some(node => node.name === 'Hello'))
+  assert.ok(!all(landing).some(node => node.name.startsWith('Secondary action')))
+  assert.ok(all(settings).find(node => node.type === 'VForm').events.submit)
+  assert.equal(all(pricing).filter(node => node.type === 'VCol').length, 2)
+  assert.equal('settingsEmail' in store.project.state, true)
 })

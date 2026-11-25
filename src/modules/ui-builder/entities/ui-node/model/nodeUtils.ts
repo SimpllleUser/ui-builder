@@ -1,3 +1,4 @@
+import { INSTANCE_ID_SEPARATOR } from './constants'
 import type { UiNode } from './types'
 
 export function createNodeId(prefix = 'ui'): string {
@@ -9,20 +10,24 @@ export function cloneNode<T>(value: T): T {
 }
 
 export function cloneNodeWithNewIds(node: UiNode): UiNode {
-  const clone = cloneNode(node)
-  return regenerateNodeIds(clone)
+  return regenerateNodeIds(cloneNode(node), () => null)
 }
 
-function regenerateNodeIds(node: UiNode): UiNode {
-  const id = createNodeId()
+/** `rename` gives the new id of an element whose id has to follow another one, or null for a fresh id. */
+function regenerateNodeIds(node: UiNode, rename: (id: string) => string | null): UiNode {
+  const id = rename(node.id) ?? createNodeId()
+  const prefix = `${node.id}${INSTANCE_ID_SEPARATOR}`
+  // What is inside an instance is named after it, so the copy matches what a rebuild from the original gives.
+  const inner = node.instance
+    ? (childId: string) => (childId.startsWith(prefix) ? id + childId.slice(node.id.length) : rename(childId))
+    : rename
+  const regenerate = (child: UiNode) => regenerateNodeIds(child, inner)
 
   return {
     ...node,
     id,
-    children: node.children.map(regenerateNodeIds),
-    slots: Object.fromEntries(
-      Object.entries(node.slots).map(([slotName, nodes]) => [slotName, nodes.map(regenerateNodeIds)]),
-    ),
+    children: node.children.map(regenerate),
+    slots: Object.fromEntries(Object.entries(node.slots).map(([slotName, nodes]) => [slotName, nodes.map(regenerate)])),
   }
 }
 

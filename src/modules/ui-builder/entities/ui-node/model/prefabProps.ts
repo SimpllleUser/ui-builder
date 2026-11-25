@@ -4,7 +4,7 @@ import type { PrefabProp, UiNode } from './types'
 /**
  * A saved component reads its parameters as `{{props.title}}` anywhere in an element including
  * text (the name of a text element), properties, classes, conditions (`vIf`, `vFor`), the linked variable and click actions.
- * They are filled in when the component is inserted, so the `props.` prefix keeps them apart from
+ * They are filled in for each instance (see componentInstances.ts), so the `props.` prefix keeps them apart from
  * the project variables (`{{title}}`) that stay live in preview.
  */
 const PROP_PLACEHOLDER = /\{\{\s*props\.([A-Za-z_]\w*)\s*\}\}/g

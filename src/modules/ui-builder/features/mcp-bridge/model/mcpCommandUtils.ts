@@ -16,6 +16,7 @@ export const summarize = (node: UiNode): unknown => ({
   ...(node.vFor ? { vFor: node.vFor } : {}),
   ...(node.events ? { events: node.events } : {}),
   ...(node.rules ? { rules: node.rules } : {}),
+  ...(node.instance ? { instance: node.instance } : {}),
   ...(node.children.length ? { children: node.children.map(summarize) } : {}),
   ...(Object.keys(node.slots).length
     ? { slots: Object.fromEntries(Object.entries(node.slots).map(([k, v]) => [k, v.map(summarize)])) }
@@ -25,6 +26,16 @@ export const summarize = (node: UiNode): unknown => ({
 export const need = (store: Store, id: unknown): UiNode => {
   const node = typeof id === 'string' ? store.findNodeById(id) : null
   if (!node) throw new Error(`Node not found: ${String(id)}`)
+  return node
+}
+
+/** An element an agent may change: not an instance, nor anything inside one. */
+export const needEditable = (store: Store, id: unknown): UiNode => {
+  const node = need(store, id)
+  if (store.isLocked(node.id))
+    throw new Error(
+      `“${node.name}” is a component instance or part of one: change its parameters with update_instance, or detach_instance first.`,
+    )
   return node
 }
 

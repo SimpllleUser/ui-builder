@@ -271,7 +271,7 @@ test('a saved component can be edited in place of the page, and its parameters f
   assert.equal(store.editPrefab(prefabId), true)
   assert.equal(store.rootNode, store.editingPrefab.node)
   assert.deepEqual(store.selectedNodeIds, [store.rootNode.id], 'its settings open in the properties panel')
-  assert.equal(store.canUndo, false, 'history only covers the project')
+  assert.equal(store.canUndo, false, 'a component just opened has nothing to take back')
 
   store.updateNodeProp(store.rootNode.id, 'color', '{{props.tone}}')
   assert.deepEqual(store.prefabs[0].props, [{ name: 'tone', defaultValue: '' }])

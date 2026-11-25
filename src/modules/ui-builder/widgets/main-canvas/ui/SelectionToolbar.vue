@@ -20,9 +20,13 @@ const visible = computed(() => !!node.value && node.value.id !== ROOT_NODE_ID &&
 const label = computed(() => (node.value ? store.nodeLabel(node.value) : ''))
 const parent = computed(() => (node.value ? store.findParentAndIndex(node.value.id)?.parent : undefined))
 /** The element's own text: a text child (buttons, headings) or the text element itself. */
-const textNode = computed(() =>
-  node.value?.type === TEXT_NODE_TYPE ? node.value : node.value?.children.find(child => child.type === TEXT_NODE_TYPE),
-)
+const textNode = computed(() => {
+  // The text of an instance comes from its original.
+  if (!node.value || store.isLocked(node.value.id)) return undefined
+  return node.value.type === TEXT_NODE_TYPE
+    ? node.value
+    : node.value.children.find(child => child.type === TEXT_NODE_TYPE)
+})
 
 // Place the toolbar above the element (below it when there is no room), kept inside the visible canvas.
 const update = useCanvasUpdates(

@@ -101,6 +101,7 @@ export { applyPrefabProps, declarePrefabProps, findPrefabPropNames } from './mod
 export type { PrefabPropValues } from './model/prefabProps'
 export type {
   DataSource,
+  InstanceLink,
   Page,
   Prefab,
   PrefabProp,

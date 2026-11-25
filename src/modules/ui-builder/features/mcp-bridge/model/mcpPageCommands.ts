@@ -1,6 +1,6 @@
 import { DEFAULT_DELAY_MS, hasValidation, StepDirection } from '../../../entities/ui-node'
 import { eventsFromInput, rulesFromInput } from './mcpLogic'
-import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
+import { need, needEditable, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 export const pageSummary = (store: Store) =>
   store.pages.map(page => ({
@@ -62,19 +62,19 @@ export const MCP_PAGE_COMMANDS: Record<string, McpCommand> = {
     return { state: store.project.state }
   },
   set_binding(store, a) {
-    const node = need(store, a.id)
+    const node = needEditable(store, a.id)
     const patch: Record<string, string> = {}
     for (const key of ['model', 'vIf', 'vFor']) if (a[key] !== undefined) patch[key] = a[key] ?? ''
     store.updateNodeLogic(node.id, patch)
     return summarize(node)
   },
   set_event(store, a) {
-    const node = need(store, a.id)
+    const node = needEditable(store, a.id)
     store.updateNodeLogic(node.id, { events: eventsFromInput(node.events, a) })
     return summarize(node)
   },
   set_rules(store, a) {
-    const node = need(store, a.id)
+    const node = needEditable(store, a.id)
     if (!hasValidation(node.type)) throw new Error(`${node.type} is not a form field, so it has no rules.`)
     store.updateNodeLogic(node.id, { rules: rulesFromInput(a.rules) })
     return summarize(node)

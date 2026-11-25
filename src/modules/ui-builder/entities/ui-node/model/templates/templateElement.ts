@@ -1,5 +1,5 @@
 import { TEXT_NODE_TYPE } from '../constants'
-import type { UiAction, UiNode } from '../types'
+import type { UiAction, UiNode, ValidationRule } from '../types'
 
 export interface TemplateContext {
   createNode(type: string, name?: string): UiNode
@@ -31,6 +31,9 @@ export interface ElementOptions {
   model?: string
   vIf?: string
   click?: UiAction
+  /** What a form does once all its rules are satisfied. */
+  submit?: UiAction
+  rules?: ValidationRule[]
 }
 
 /** An element with its settings in one place, so a template reads like the page it builds. */
@@ -46,5 +49,7 @@ export function element(context: TemplateContext, type: string, options: Element
   if (options.model) node.model = options.model
   if (options.vIf) node.vIf = options.vIf
   if (options.click) node.events = { click: options.click }
+  if (options.submit) node.events = { ...node.events, submit: options.submit }
+  if (options.rules) node.rules = options.rules
   return node
 }

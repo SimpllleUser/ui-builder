@@ -1,5 +1,6 @@
 import { cleanStyle, normalizeStyleInput, readStyle, type StyleInput } from '../../../../../shared/lib/inlineStyle'
 import { themeColorFromName } from '../../../../../shared/lib/themeColors'
+import { TextToken, textStylePatch, tokenFromName } from '../../../../../shared/lib/themeTokens'
 import {
   BREAKPOINTS,
   overrideTarget,
@@ -17,8 +18,19 @@ export function parseBreakpoint(value: unknown): Breakpoint | null {
   return breakpoint
 }
 
+/** `textStyle: "h4"` stands for the size, line height, weight, spacing and font of that theme text style. */
+function expandTextStyle({ textStyle, ...rest }: StyleInput): StyleInput {
+  if (textStyle === undefined) return rest
+  const token = Object.values(TextToken).find(known => known === textStyle)
+  if (textStyle !== null && !token)
+    throw new Error(`Unknown text style “${textStyle}”. Use one of: ${Object.values(TextToken).join(', ')}.`)
+  return { ...textStylePatch(token ?? null), ...rest }
+}
+
+const themeValue = (value: string) => themeColorFromName(value) ?? tokenFromName(value)
+
 /**
- * Applies a style description to an element: lengths as numbers, colours as theme colour names, and every value
+ * Applies a style description to an element: lengths as numbers, theme colours and tokens by name, and every value
  * winning over utility classes (`!important`). `sm`–`xl` change only what differs from that width up; `xs` and no
  * breakpoint change the element's own style. A property set to `null` is removed. A whole style of `null` removes
  * that of the named breakpoint, or, with none named, every style the element has.
@@ -32,7 +44,7 @@ export function applyStyleInput(node: UiNode, input: StyleInput | string | null,
     return
   }
   const description = typeof input === 'string' ? (readStyle(input) as StyleInput) : input
-  patchNodeStyle(node, target, normalizeStyleInput(description, themeColorFromName))
+  patchNodeStyle(node, target, normalizeStyleInput(expandTextStyle(description), themeValue))
 }
 
 /** The element's style as the person sees it in the Design tab: without the `!important` markers. */

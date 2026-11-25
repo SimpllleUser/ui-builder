@@ -47,10 +47,16 @@ export function createHistory({ serialize, applySnapshot, maxEntries, describe, 
     onCommit?.(entry)
   }
 
+  /** Takes what is there now as the current version: for changes that follow from elsewhere, not from an edit. */
+  const amend = () => {
+    entries.value[currentIndex.value].snapshot = serialize()
+  }
+
   const restoreCurrent = () => {
     isRestoring.value = true
     try {
       applySnapshot(entries.value[currentIndex.value].snapshot)
+      amend()
     } finally {
       isRestoring.value = false
     }
@@ -98,5 +104,18 @@ export function createHistory({ serialize, applySnapshot, maxEntries, describe, 
     currentIndex.value = 0
   }
 
-  return { reset, isRestoring, pending, canUndo, canRedo, versions, commit, undo, redo, restore, restoreSnapshot }
+  return {
+    reset,
+    isRestoring,
+    pending,
+    canUndo,
+    canRedo,
+    versions,
+    commit,
+    amend,
+    undo,
+    redo,
+    restore,
+    restoreSnapshot,
+  }
 }

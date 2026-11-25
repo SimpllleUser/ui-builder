@@ -316,7 +316,7 @@ export const GUIDE_SECTIONS: GuideSectionContent[] = [
     icon: 'mdi-puzzle-outline',
     blocks: [
       paragraph(
-        'My components stores an element with its children. Write props.name in double curly braces anywhere in it (text, properties, classes, a condition, a repeat, a linked variable, an action) and name becomes a parameter with a default value. It is filled in when the component is inserted. The props. prefix keeps parameters apart from the project variables, which stay live in Preview.',
+        'My components stores an element with its children. Write props.name in double curly braces anywhere in it (text, properties, classes, a condition, a repeat, a linked variable, an action) and name becomes a parameter with a default value. Inserting it adds an instance that follows the original: change the component and every instance changes, while each keeps its own parameter values. Detach an instance to edit what is inside it. The props. prefix keeps parameters apart from the project variables, which stay live in Preview.',
       ),
       paragraph(
         'In a condition the value is inserted as one safe value: a number stays a number and text is put in quotes. So destination == (props.key) with the value New York becomes destination == "New York" and keeps working. If you already wrote the quotes yourself, the value goes between them as it is.',

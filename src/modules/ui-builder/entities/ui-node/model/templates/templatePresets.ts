@@ -83,6 +83,37 @@ export const TEMPLATE_PRESETS: Partial<Record<TemplateKind, TemplatePreset[]>> =
     { id: 'with-details', label: 'With contacts', props: {} },
     { id: 'form-only', label: 'Form only', props: { email: '', phone: '', address: '' } },
   ],
+  [TemplateKind.Landing]: [
+    { id: 'two-buttons', label: 'Two buttons', props: {} },
+    { id: 'one-button', label: 'One button', props: { secondaryLabel: '' } },
+  ],
+  [TemplateKind.Pricing]: [
+    { id: 'three-plans', label: '3 plans', props: {} },
+    {
+      id: 'two-plans',
+      label: '2 plans',
+      props: {
+        plans: [
+          {
+            name: 'Free',
+            price: '$0',
+            period: 'forever',
+            description: 'For trying things out.',
+            features: '1 project; Basic components',
+            button: 'Start free',
+          },
+          {
+            name: 'Pro',
+            price: '$12',
+            period: 'per month',
+            description: 'For people who build often.',
+            features: 'Unlimited projects; Vue project export',
+            button: 'Go Pro',
+          },
+        ],
+      },
+    },
+  ],
   [TemplateKind.Onboarding]: [
     { id: 'three-steps', label: '3 steps', props: {} },
     { id: 'five-steps', label: '5 steps', props: { steps: MORE_STEPS } },

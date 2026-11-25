@@ -32,7 +32,13 @@ interface Measured {
 const measured = ref<Measured | null>(null)
 
 const node = computed(() => (store.selectedNodeIds.length === 1 ? store.findNodeById(store.selectedNodeId!) : null))
-const resizable = computed(() => !!node.value && node.value.id !== ROOT_NODE_ID && node.value.type !== TEXT_NODE_TYPE)
+const resizable = computed(
+  () =>
+    !!node.value &&
+    node.value.id !== ROOT_NODE_ID &&
+    node.value.type !== TEXT_NODE_TYPE &&
+    !store.isLocked(node.value.id),
+)
 const selectedElement = () => {
   const element = props.container && node.value ? findCanvasElement(props.container, node.value.id) : null
   return element && !element.matches(PLACEHOLDERS) ? element : null
