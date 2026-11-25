@@ -20,6 +20,8 @@ test('command palette: finds commands, components, pages, elements and settings,
     openCodeExport: () => calls.push('code'),
     openThemeSettings: () => calls.push('theme'),
     openStructureGraph: () => calls.push('graph'),
+    openProjects: () => calls.push('projects'),
+    newProject: () => calls.push('newProject'),
     toggleFocus: () => calls.push('focus'),
     togglePanel: side => calls.push(`panel:${side}`),
     modifierKey: 'Ctrl',
@@ -66,6 +68,10 @@ test('command palette: finds commands, components, pages, elements and settings,
   find(commands, 'export')[0].run()
   find(commands, 'focus mode')[0].run()
   assert.deepEqual(calls, ['addPage', 'export', 'focus'])
+  calls.splice(0)
+  find(commands, 'all projects')[0].run()
+  find(commands, 'new project')[0].run()
+  assert.deepEqual(calls, ['projects', 'newProject'])
   store.selectPage(store.pages[0].id)
   store.selectNode(null)
   find(buildCommands(store, host), 'select data table')[0].run()

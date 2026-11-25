@@ -36,7 +36,7 @@ On a first visit to an empty project, a three-step **quick tour** points at the 
 
 ## Saving and preview
 
-Pages save automatically in this browser and restore on reload. The status beside the page name reports saving failures. Use **File → Export project** for a JSON backup or transfer, and **Import** (both in the **File** menu) to restore one. Import validates the document before replacing the page, and can be undone. This is local browser storage, not cloud sync; clearing site data removes saved pages and components.
+You can keep several **projects**: the folder button in the top bar switches between them, creates one and opens **All projects** (rename, duplicate, export, delete). Each project has its own pages, checkpoints and theme; **My components** are shared between projects and tabs. Projects save automatically in this browser and restore on reload. The status beside the page name reports saving failures. Use **File → Export project** for a JSON backup or transfer, and **Import** (both in the **File** menu) to restore one. Import validates the document and adds it as a new project named after the file; the other projects stay as they are. The file carries the project's theme; a file without one gets the default theme. This is local browser storage, not cloud sync; clearing site data removes saved projects and components. Each tab keeps its own project open, and one tab edits a project at a time: another tab that opens it shows a read-only view with **Edit here**, which asks the first one to save and let go. A saved component is likewise edited in one tab at a time.
 
 **Preview** hides the editor panels and uses an isolated viewport for Desktop (1280), Tablet (768) and Mobile (390). Zoom changes the display scale independently of the viewport width. Use **Back to editor** or Escape to return. The route bar shows which page the preview is on (click it to jump to another page), **variables** lists their current values, and **Reset** puts every variable back to its starting value and returns to the page the preview opened on. Esc closes an open menu first, and leaves Preview when nothing else is open.
 
@@ -150,8 +150,9 @@ The same material is built into the editor: **Help → Behavior guide**, or sear
 1. `npm run dev` and open http://localhost:3001 (the tab must stay open).
 2. Claude Code picks up `.mcp.json` automatically. For other clients, run `node mcp/server.mjs` over stdio.
 
-Tools (56):
+Tools (60):
 
+- **Projects:** `list_projects`, `create_project`, `open_project`, `rename_project`. Agents cannot delete projects, and `import_document` replaces the open one.
 - **Read:** `get_document`, `get_node`, `list_components`, `describe_component`, `list_pages`, `get_table`, `export_document`.
 - **Build:** `add_subtree` (a whole nested tree in one call and one Undo step; `ref` names come back as ids), `batch` (several tools as one Undo step; `"$0.id"` uses the result of step 0; if a step fails, all are undone), `add_component`, `add_template`, `move_node`, `duplicate_node`, `delete_node`, `import_document`.
 - **Change:** `update_node`, `set_style` (numbers are px, theme colour names such as `primary`, and values win over utility classes, like the Design tab), `set_binding`, `set_event`, `set_state`, and the table tools (`add_/update_/remove_table_column`, `add_/update_/remove_table_row`).
@@ -168,6 +169,7 @@ The code follows Feature-Sliced Design, from the top layer down:
 
 - `src/app`: the application shell (`App.vue`, `BuilderApp.vue`, and in `shell/` the panels, keyboard shortcuts, focus mode and project files). It puts the other layers together.
 - `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour, Behavior guide, code export).
+- `src/modules/projects`: several local projects: the repository (IndexedDB) in `entities/project`, opening, saving and tab locking in `features/manage-projects`, the switcher and dialogs in `widgets/project-switcher`.
 - `src/modules/ui-builder/features/mcp-bridge`: lets an MCP client edit the page open in the browser.
 - `src/modules/ui-builder/entities/ui-node`: the document, its store, validation and rendering. Conditions are read in `model/expression.ts` (parser `jsep` plus a fixed evaluator) and used by `model/runtime.ts`, the preview snapshot and the project check.
 - `src/shared`: code with no knowledge of the editor (icons, DOM helpers, `useCheckedDrafts`, table styles).

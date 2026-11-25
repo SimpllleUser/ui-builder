@@ -26,7 +26,7 @@ defineEmits<{
         <VListItem
           prepend-icon="mdi-import"
           title="Import project…"
-          subtitle="Open a JSON backup"
+          subtitle="Add a JSON backup as a new project"
           @click="$emit('importProject')"
         />
         <VListItem

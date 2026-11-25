@@ -3,7 +3,6 @@ import { validateProject } from './documentValidator'
 import { createNodeId } from './nodeUtils'
 import type { Page, Project, UiNode } from './types'
 
-export const DOCUMENT_KEY = 'ui-builder:document:v1'
 export const emptyDocument = (name = 'Untitled page'): UiNode => ({
   id: ROOT_NODE_ID,
   type: 'VCard',
@@ -38,3 +37,18 @@ export function parseProject(text: string): Project {
 }
 
 export const serializeProject = (project: Project) => JSON.stringify({ version: DOCUMENT_VERSION, ...project }, null, 2)
+
+/** How many pages a saved document has, or null when it cannot be read. */
+export function countPages(text: string): number | null {
+  try {
+    return parseProject(text).pages.length
+  } catch {
+    return null
+  }
+}
+
+/** A document from outside, checked and brought to the current format. Throws with the reason when it cannot be. */
+export const normalizeDocument = (text: string) => serializeProject(parseProject(text))
+
+/** The document of a project nothing was done in yet. */
+export const emptyProjectDocument = () => serializeProject(emptyProject())

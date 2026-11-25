@@ -9,6 +9,7 @@ import {
   parseDocument,
   serializeDocument,
   store,
+  memoryProject,
 } from './support.mjs'
 
 test('immediate undo preserves inserted component and redo restores the property edit', () => {
@@ -41,13 +42,16 @@ test('a new edit after undo invalidates redo', () => {
   assert.equal(store.canRedo, false)
 })
 
-test('save and restore include complete document and slot contents', () => {
+test('save and restore include complete document and slot contents', async () => {
+  const project = memoryProject(store.exportDocument())
+  store.openProject(project.opened())
   store.addComponent('VCard')
   const card = store.selectedNodeId
   store.appendToSlot(card, 'title', store.createNode('TEXT', 'Title'))
-  store.saveDocument()
+  await store.saveDocument()
   const saved = store.exportDocument()
   const next = useStore(createPinia())
+  next.openProject(project.opened())
   assert.equal(next.exportDocument(), saved)
   next.$dispose()
 })

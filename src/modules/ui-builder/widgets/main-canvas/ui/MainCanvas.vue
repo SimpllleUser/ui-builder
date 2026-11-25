@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { platformModifierKey } from '../../../../../shared/lib/platform'
 import { PREVIEW_FRAME_STYLE } from '../model/previewFrameStyle'
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
 import {
@@ -18,6 +18,8 @@ import { mirrorStyles } from '../../../../../shared/lib/mirrorStyles'
 import { ThemeDefaultsProvider } from '../../../../theme/entities/theme-settings'
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
+/** `previewOnly` shows the project without any way back to editing it. */
+const props = defineProps<{ previewOnly?: boolean }>()
 const emit = defineEmits<{ 'open-components': []; 'add-template': [kind: TemplateKind] }>()
 const store = useUiTreeStore()
 const { rootNode, canUndo, canRedo, isPreviewMode, selectedNodeIds } = storeToRefs(store)
@@ -45,7 +47,13 @@ const devices = [
 ]
 // The frame follows the editor's styles, so theme changes reach an open preview.
 let stopMirroringStyles = () => {}
-onBeforeUnmount(() => stopMirroringStyles())
+onMounted(() => {
+  if (props.previewOnly) store.startPreview()
+})
+onBeforeUnmount(() => {
+  stopMirroringStyles()
+  if (props.previewOnly) isPreviewMode.value = false
+})
 const loadPreview = (event: Event) => {
   const doc = (event.target as HTMLIFrameElement).contentDocument
   if (!doc) return
@@ -55,7 +63,7 @@ const loadPreview = (event: Event) => {
   reset.textContent = PREVIEW_FRAME_STYLE
   doc.head.appendChild(reset)
   doc.addEventListener('keydown', event => {
-    if (event.key === 'Escape') isPreviewMode.value = false
+    if (event.key === 'Escape' && !props.previewOnly) isPreviewMode.value = false
   })
   previewTarget.value = doc.getElementById('preview-root')
 }
@@ -235,6 +243,7 @@ const leaveCanvas = (event: DragEvent) => {
           />
         </template>
         <VBtn
+          v-if="!previewOnly"
           :prepend-icon="isPreviewMode ? 'mdi-pencil-outline' : 'mdi-eye-outline'"
           size="small"
           :variant="isPreviewMode ? 'flat' : 'tonal'"
@@ -262,7 +271,7 @@ const leaveCanvas = (event: DragEvent) => {
         title="This page has no elements yet"
       >
         Preview shows what you build. Go back to the editor and add a component or start from a template.
-        <template #append>
+        <template v-if="!previewOnly" #append>
           <VBtn size="small" variant="text" @click="isPreviewMode = false">Back to editor</VBtn>
         </template>
       </VAlert>

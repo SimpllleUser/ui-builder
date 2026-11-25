@@ -38,6 +38,8 @@ export interface CommandHost {
   openBehaviorGuide(): void
   openCodeExport(): void
   openThemeSettings(): void
+  openProjects(): void
+  newProject(): void
   /** Asks for the template's settings first when it has any. */
   addTemplate(kind: TemplateKind): void
   openStructureGraph(): void
@@ -220,6 +222,24 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
       run: () => store.editLayout(true),
     })
   }
+
+  // ─── Projects ──────────────────────────────────────────────────────────────
+  add({
+    id: 'project:all',
+    title: 'All projects…',
+    group: 'Projects',
+    icon: 'mdi-folder-multiple-outline',
+    keywords: 'open switch rename duplicate delete export project',
+    run: host.openProjects,
+  })
+  add({
+    id: 'project:new',
+    title: 'New project…',
+    group: 'Projects',
+    icon: 'mdi-folder-plus-outline',
+    keywords: 'add create project',
+    run: host.newProject,
+  })
 
   // ─── Editor ────────────────────────────────────────────────────────────────
   add({
