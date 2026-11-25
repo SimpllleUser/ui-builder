@@ -187,3 +187,20 @@ test('a chosen font applies with or without a typography style, and is exported'
   assert.match(overridden, /Rubik/)
   assert.doesNotMatch(overridden, /source-serif/)
 })
+
+test('a theme change from outside is applied whole or refused with what is allowed', async () => {
+  const { applyThemePatch } = await server.ssrLoadModule(`${THEME}themePatch.ts`)
+  const changed = applyThemePatch(settings({}), { radius: 12, spacing: 'airy', customPrimary: '#7c3aed' })
+  assert.deepEqual(
+    [changed.radius, changed.spacing, changed.customPrimary, changed.colorPreset],
+    [12, 'airy', '#7c3aed', 'custom'],
+  )
+  const preset = applyThemePatch(settings({ mode: 'dark' }), { preset: 'minimal', radius: 4 })
+  assert.deepEqual([preset.mode, preset.colorPreset, preset.radius], ['dark', 'ink', 4])
+
+  assert.throws(() => applyThemePatch(settings({}), { radius: 5 }), /Invalid radius: 5\. Use null, 0, 4/)
+  assert.throws(() => applyThemePatch(settings({}), { spacing: 'wide' }), /Invalid spacing.*"airy"/)
+  assert.throws(() => applyThemePatch(settings({}), { customPrimary: 'red' }), /hex colour/)
+  assert.throws(() => applyThemePatch(settings({}), { shadows: 'none' }), /Unknown theme setting/)
+  assert.throws(() => applyThemePatch(settings({}), { preset: 'neon' }), /Unknown design preset/)
+})

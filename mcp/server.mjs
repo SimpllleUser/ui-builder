@@ -332,7 +332,7 @@ tool(
 )
 tool(
   'batch',
-  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document and the project tools.',
+  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document, edit_saved_component, close_saved_component, the theme tools and the project tools.',
   {
     steps: z
       .array(z.object({ tool: z.string(), args: z.record(z.string(), z.unknown()).optional() }))
@@ -385,7 +385,33 @@ tool(
   { id, props: z.record(z.string(), z.string()) },
 )
 tool('detach_instance', 'Turn a component instance into an ordinary copy that no longer follows its original.', { id })
-tool('delete_saved_component', 'Delete a saved component.', { prefabId: z.string() })
+tool(
+  'get_theme',
+  'The theme of the open project (mode, colours, corner radius, spacing, typography, fonts…), what every setting accepts, and the design presets. Spacing, radius and typography decide what the theme tokens (space-md, radius-lg, textStyle) stand for.',
+  {},
+)
+tool(
+  'set_theme',
+  "Change theme settings of the open project; settings not named stay. { preset } applies a whole design preset first. Giving customPrimary or customSecondary switches to custom colours. radius null keeps each component's own. An unknown name or value changes nothing. Not an undo step and not allowed in batch: read get_theme first to be able to put it back.",
+  { settings: z.record(z.string(), z.union([z.string(), z.number(), z.null()])) },
+)
+tool(
+  'edit_saved_component',
+  'Open the original of a saved component. Until close_saved_component, the editing tools (add, update, style, events, undo, get_history, preview…) work on it, and every instance follows each change. Its root is what get_document returns. Write {{props.name}} to add a parameter. Refused while another tab edits it. Cannot be used in batch.',
+  { prefabId: z.string() },
+)
+tool('close_saved_component', 'Leave the saved component and return to the page or layout.', {})
+tool(
+  'delete_saved_component',
+  'Delete a saved component. Its instances stay as ordinary copies. undo right after brings it back, restore_saved_component later.',
+  { prefabId: z.string() },
+)
+tool('list_deleted_components', 'Saved components deleted lately (up to 10), newest first.', {})
+tool(
+  'restore_saved_component',
+  'Bring a deleted saved component back with its history. Its instances follow it again; copies edited meanwhile stay copies.',
+  { prefabId: z.string() },
+)
 tool(
   'wrap_nodes',
   'Put sibling elements into a new container (for example VContainer, VRow, VCard, div). Returns the container id.',

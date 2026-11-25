@@ -3,6 +3,7 @@ import { AppView } from './appView'
 import { ref, defineAsyncComponent, onBeforeUnmount } from 'vue'
 import { StartupState, useProjectStartup } from './shell/useProjectStartup'
 import { createMcpHost } from './shell/mcpHost'
+import { createMcpTheme } from './shell/mcpTheme'
 import {
   ProjectConflictBanner,
   ProjectDialog,
@@ -31,7 +32,7 @@ const connectAgents = async () => {
   if (session.value)
     disconnectMcp = connectMcpBridge(
       store,
-      createMcpHost(session.value, () => store.notice),
+      createMcpHost(session.value, () => store.notice, createMcpTheme()),
     )
 }
 const { startup, session } = useProjectStartup(store, connectAgents)

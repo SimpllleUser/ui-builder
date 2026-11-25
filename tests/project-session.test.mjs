@@ -420,6 +420,11 @@ test('the lock adapter works with the real Web Locks API', { skip: !globalThis.n
   third.release()
 })
 
+const themeStub = {
+  describe: () => ({ settings: { radius: null } }),
+  change: patch => ({ settings: patch }),
+}
+
 const mcpTab = async () => {
   const { createMcpHost } = await server.ssrLoadModule('/src/app/shell/mcpHost.ts')
   const { runMcpCommand } = await server.ssrLoadModule(
@@ -428,7 +433,7 @@ const mcpTab = async () => {
   return (editor, projectSession, command, args) =>
     runMcpCommand(
       editor,
-      createMcpHost(projectSession, () => editor.notice),
+      createMcpHost(projectSession, () => editor.notice, themeStub),
       command,
       args,
     )
@@ -492,4 +497,12 @@ test('export_document and import_document carry the theme', async () => {
   assert.equal(theme.value, '{"mode":"dark"}')
   await run(store, session, 'import_document', { json: store.exportDocument() })
   assert.equal(theme.value, '{"mode":"dark"}', 'a file without a theme keeps the current one')
+})
+
+test('theme tools reach the application, and are refused where the project cannot be edited', async () => {
+  const run = await mcpTab()
+  await session.start()
+  assert.deepEqual(await run(store, session, 'get_theme'), { settings: { radius: null } })
+  assert.deepEqual(await run(store, session, 'set_theme', { settings: { radius: 8 } }), { settings: { radius: 8 } })
+  await assert.rejects(run(store, session, 'batch', { steps: [{ tool: 'set_theme' }] }), /cannot be used in a batch/)
 })

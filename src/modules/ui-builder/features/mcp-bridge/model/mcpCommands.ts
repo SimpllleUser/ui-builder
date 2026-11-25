@@ -1,5 +1,14 @@
 import { COMPONENT_DEFS, TEXT_NODE_TYPE, type TemplateKind, type UiNode } from '../../../entities/ui-node'
-import { need, needEditable, ok, summarize, type Args, type McpCommand, type Store } from './mcpCommandUtils'
+import {
+  editingTarget,
+  need,
+  needEditable,
+  ok,
+  summarize,
+  type Args,
+  type McpCommand,
+  type Store,
+} from './mcpCommandUtils'
 import { MCP_PAGE_COMMANDS, pageSummary } from './mcpPageCommands'
 import { MCP_TABLE_COMMANDS } from './mcpTableCommands'
 import { MCP_DIAGNOSTIC_COMMANDS } from './mcpDiagnosticCommands'
@@ -34,7 +43,7 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
   ...MCP_HISTORY_COMMANDS,
   ...MCP_COMPONENT_COMMANDS,
   get_document: store => ({
-    editing: store.editingLayout ? 'layout' : store.activePage.id,
+    editing: editingTarget(store),
     pages: pageSummary(store),
     hasLayout: !!store.project.layout,
     state: store.project.state,
@@ -53,7 +62,7 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
       defaultProps: d.defaultProps,
     })),
   add_component(store, a) {
-    const parent = need(store, a.parentId ?? store.rootNode.id)
+    const parent = needEditable(store, a.parentId ?? store.rootNode.id)
     const node = store.createNode(a.type)
     if (a.name) node.name = a.name
     if (a.props) Object.assign(node.props, a.props)
@@ -89,7 +98,7 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
   },
   move_node(store, a) {
     need(store, a.id)
-    need(store, a.parentId)
+    needEditable(store, a.parentId)
     ok(store.moveNode(a.id, a.parentId, a.slot ?? null), 'Cannot move node there')
     return { moved: a.id }
   },
@@ -99,6 +108,7 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     return { id }
   },
   add_template(store, a) {
+    ok(!store.editingPrefab, 'Templates are added to pages. Call close_saved_component first.')
     store.addTemplate(a.kind as TemplateKind, a.props ?? {})
     return { notice: store.notice }
   },

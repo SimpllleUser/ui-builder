@@ -545,7 +545,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     editTarget.value = leavePrefabTarget(editTarget.value)
     selectedNodeIds.value = []
   }
-  usePrefabEditLock(editingPrefabId, {
+  const prefabEditLock = usePrefabEditLock(editingPrefabId, {
     lock: prefabSync.lock,
     save: prefabSync.flush,
     onGranted: async prefabId => {
@@ -790,6 +790,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     editingPrefab,
     editPrefab,
     stopEditingPrefab,
+    prefabEditSettled: prefabEditLock.settled,
     rootNode,
     selectedNodeIds,
     selectedNodeId,

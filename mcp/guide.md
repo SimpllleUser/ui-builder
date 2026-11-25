@@ -19,6 +19,10 @@ Work in this order: `get_document` → build → `check_project` → try it with
 - **Screen sizes** follow Vuetify's grid, mobile first. Style the phone layout first without `breakpoint`, then call `set_style` with `breakpoint: "sm" | "md" | "lg" | "xl"` (from 600, 960, 1280, 1920px) for only what differs on larger screens, e.g. `{ "id": "…", "style": { "flexDirection": "row" }, "breakpoint": "md" }`. `get_node` shows these under `responsive`. Column widths of `VCol` are not styles: set its `cols`, `sm`, `md`, `lg`, `xl` props with `update_node`.
 - Vuetify utility classes (`d-flex`, `ga-4`, `text-h5`) go in `classes`.
 
+## Theme
+- **`get_theme`** / **`set_theme`** read and change the project's look: `{ settings: { preset: "minimal" } }`, `{ settings: { radius: 12, spacing: "airy", customPrimary: "#7c3aed" } }`. Spacing, radius and typography set what the tokens stand for, so elements that use tokens follow.
+- The theme is not part of undo, history or checkpoints: read it first and ask before changing a look the person chose. These tools do not work in `batch`.
+
 ## Variables, bindings and events
 - `set_state` defines a variable. A value is JSON (`3`, `true`, `"text"`, `[1,2]`), so give text without extra quotes only when it is plain text.
 - Text and props accept `{{ name }}` and `{{ item.field }}`. Inside a repeated element (`vFor`) use `{{ item.field }}` and `{{ index }}`; inside a table cell slot use `{{ item.field }}` too.
@@ -42,4 +46,6 @@ Work in this order: `get_document` → build → `check_project` → try it with
 - While the person edits a saved component, `get_history`, `undo`, `redo` and `restore_version` act on that component's own history (`scope` says which). Right after `delete_saved_component`, `undo` brings the component back.
 - **`get_status`** is a cheap check of the page, variables, selection and whether Preview runs.
 - **`save_component`** stores an element in My components (write `{{props.title}}` in a property to make it a parameter). **`insert_saved_component`** adds an **instance** of it (pass `props: { title: "Hi" }`): every instance follows the original, and nothing inside one can be edited. Change its parameters with **`update_instance`**, or **`detach_instance`** to get an editable copy.
+- To change the **original**, call **`edit_saved_component`**, edit with the usual tools (the page is not what you are editing then; `get_status` shows `editing: { component }`), and call **`close_saved_component`**. Every instance, in every project, follows, so check with `list_saved_components` that it is the right one. It has its own `undo` and `get_history`. Templates cannot be added inside it, and these two tools do not work in `batch`.
+- **`list_deleted_components`** / **`restore_saved_component`** bring back a deleted component.
 - **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.

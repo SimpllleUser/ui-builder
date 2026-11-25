@@ -16,7 +16,8 @@ export const summarize = (node: UiNode): unknown => ({
   ...(node.vFor ? { vFor: node.vFor } : {}),
   ...(node.events ? { events: node.events } : {}),
   ...(node.rules ? { rules: node.rules } : {}),
-  ...(node.instance ? { instance: node.instance } : {}),
+  // The stamp is the editor's own bookkeeping.
+  ...(node.instance ? { instance: { prefabId: node.instance.prefabId, values: node.instance.values } } : {}),
   ...(node.children.length ? { children: node.children.map(summarize) } : {}),
   ...(Object.keys(node.slots).length
     ? { slots: Object.fromEntries(Object.entries(node.slots).map(([k, v]) => [k, v.map(summarize)])) }
@@ -38,6 +39,14 @@ export const needEditable = (store: Store, id: unknown): UiNode => {
     )
   return node
 }
+
+/** What the editing tools act on now: a saved component, the shared layout or a page. */
+export const editingTarget = (store: Store) =>
+  store.editingPrefab
+    ? { component: store.editingPrefab.prefabId, name: store.editingPrefab.name }
+    : store.editingLayout
+      ? 'layout'
+      : store.activePage.id
 
 export const ok = (success: boolean, message: string) => {
   if (!success) throw new Error(message)

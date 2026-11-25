@@ -1,10 +1,16 @@
 import { WRAP_CONTAINER_TYPES, type PrefabPropValues } from '../../../entities/ui-node'
-import { need, ok, summarize, type McpCommand } from './mcpCommandUtils'
+import { editingTarget, need, needEditable, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 /** Parameter values given by an agent as `{ name: text }`; anything else is ignored. */
 function propValues(input: unknown): PrefabPropValues {
   if (input === null || typeof input !== 'object') return {}
   return Object.fromEntries(Object.entries(input).map(([name, value]) => [name, String(value)]))
+}
+
+const needSaved = (store: Store, prefabId: unknown) => {
+  const prefab = store.prefabs.find(item => item.prefabId === prefabId)
+  if (!prefab) throw new Error(`No saved component ${String(prefabId)} (see list_saved_components).`)
+  return prefab
 }
 
 const WRAP_TYPES = WRAP_CONTAINER_TYPES.map(item => item.type)
@@ -28,11 +34,9 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
     return { prefabId: store.prefabs[store.prefabs.length - 1].prefabId, name }
   },
   insert_saved_component: (store, a) => {
-    if (a.parentId) need(store, a.parentId)
-    ok(
-      store.insertPrefab(a.prefabId, a.parentId, a.slot ?? null, propValues(a.props)),
-      `No saved component ${String(a.prefabId)} (see list_saved_components).`,
-    )
+    if (a.parentId) needEditable(store, a.parentId)
+    needSaved(store, a.prefabId)
+    ok(store.insertPrefab(a.prefabId, a.parentId, a.slot ?? null, propValues(a.props)), store.notice)
     return { notice: store.notice, selected: store.selectedNodeIds }
   },
   update_instance(store, a) {
@@ -48,13 +52,34 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
     ok(store.detachInstance(node.id), `“${node.name}” is not a component instance.`)
     return summarize(node)
   },
+  /** Opens the original in the editor: every editing tool then works on it, and its instances follow. */
+  async edit_saved_component(store, a) {
+    const { prefabId } = needSaved(store, a.prefabId)
+    store.editPrefab(prefabId)
+    // Another tab may be editing it, which is known only a moment later.
+    await store.prefabEditSettled()
+    ok(store.editingPrefab?.prefabId === prefabId, store.notice)
+    return { editing: editingTarget(store), root: summarize(store.rootNode) }
+  },
+  close_saved_component(store) {
+    store.stopEditingPrefab()
+    return { editing: editingTarget(store) }
+  },
   delete_saved_component: (store, a) => {
-    ok(
-      store.prefabs.some(prefab => prefab.prefabId === a.prefabId),
-      `No saved component ${String(a.prefabId)}.`,
-    )
+    needSaved(store, a.prefabId)
     store.deletePrefab(a.prefabId)
     return { deleted: a.prefabId }
+  },
+
+  list_deleted_components: store =>
+    store.deletedPrefabs.map(({ prefab, deletedAt }) => ({
+      prefabId: prefab.prefabId,
+      name: prefab.name,
+      deletedAt: new Date(deletedAt).toISOString(),
+    })),
+  restore_saved_component: (store, a) => {
+    ok(store.restorePrefab(a.prefabId), `No deleted component ${String(a.prefabId)} (see list_deleted_components).`)
+    return { restored: a.prefabId }
   },
 
   // ─── Grouping ───────────────────────────────────────────────────────────────
@@ -62,7 +87,11 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
   wrap_nodes: (store, a) => {
     const ids: string[] = Array.isArray(a.ids) ? a.ids : []
     ok(ids.length > 0, 'Give the ids of the elements to wrap.')
-    ids.forEach(id => need(store, id))
+    ids.forEach(id => {
+      need(store, id)
+      // Parts of an instance stay where its original has them.
+      if (store.isInsideInstance(id)) needEditable(store, id)
+    })
     ok(WRAP_TYPES.includes(a.type), `Wrap with one of: ${WRAP_TYPES.join(', ')}.`)
     store.wrapNodes(ids, a.type)
     const [wrapperId] = store.selectedNodeIds
@@ -81,7 +110,7 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
   /** A short picture of where the editor is: what an agent should know before it starts. */
   get_status: store => ({
     connected: true,
-    editing: store.editingLayout ? 'layout' : store.activePage.id,
+    editing: editingTarget(store),
     page: { id: store.activePage.id, name: store.activePage.name, path: store.activePage.path },
     pages: store.project.pages.length,
     hasLayout: !!store.project.layout,

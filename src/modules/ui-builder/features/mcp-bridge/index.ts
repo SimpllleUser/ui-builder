@@ -2,4 +2,4 @@
 export { connectMcpBridge } from './model/mcpBridge'
 export { executeMcpCommand } from './model/mcpCommands'
 export { runMcpCommand } from './model/mcpProjectCommands'
-export type { McpHost, McpProjects } from './model/mcpProjectCommands'
+export type { McpHost, McpProjects, McpTheme } from './model/mcpProjectCommands'

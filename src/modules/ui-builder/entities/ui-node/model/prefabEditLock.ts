@@ -44,4 +44,7 @@ export function usePrefabEditLock(
     },
     { flush: 'sync' },
   )
+
+  /** Resolves once it is known whether the component just opened may be edited here. */
+  return { settled: () => queue }
 }

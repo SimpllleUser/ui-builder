@@ -27,6 +27,7 @@ export {
 export { generateThemeCss, generateVuetifyConfig } from './model/exportConfig'
 export { sanitizeThemeSettings, DEFAULT_THEME_SETTINGS, type ThemeSettings } from './model/themeSettings'
 export { DESIGN_PRESETS, applyDesignPreset, matchingDesignPreset } from './model/designPresets'
+export { applyThemePatch, DESIGN_PRESET_NAMES, THEME_CHOICES } from './model/themePatch'
 export { FONTS } from './model/fonts'
 export { resolveFonts } from './model/typographyCss'
 export { buildVuetifyDefaults } from './model/vuetifyDefaults'
