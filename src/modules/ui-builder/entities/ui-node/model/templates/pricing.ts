@@ -38,7 +38,7 @@ export const buildPricing: Builder = (context, props) => {
               name: 'Features',
               classes: ['flex-grow-1'],
               children: listed.map(feature =>
-                element(context, 'VCardText', { name: 'Feature', text: `✓ ${feature}`, classes: ['py-1'] }),
+                element(context, 'VCardText', { name: 'Feature', text: `✓ ${feature}`, classes: ['py-1', 'px-0'] }),
               ),
             }),
             element(context, 'VBtn', {
