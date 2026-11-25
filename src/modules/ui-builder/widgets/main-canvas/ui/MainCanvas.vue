@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { platformModifierKey } from '../../../../../shared/lib/platform'
 import { PREVIEW_FRAME_STYLE } from '../model/previewFrameStyle'
+import { PREVIEW_DEVICES } from '../model/previewDevices'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from 'vuetify'
@@ -13,11 +14,16 @@ import {
   type TemplateKind,
   NodeRenderer,
   canvasDragTargetId,
+  BREAKPOINT_WIDTHS,
+  responsiveStylesheet,
 } from '../../../entities/ui-node'
 import { mirrorStyles } from '../../../../../shared/lib/mirrorStyles'
 import { ThemeDefaultsProvider } from '../../../../theme/entities/theme-settings'
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
+import BreakpointSwitcher from './BreakpointSwitcher.vue'
+import MeasureOverlay from './MeasureOverlay.vue'
+import ResizeHandles from './ResizeHandles.vue'
 /** `previewOnly` shows the project without any way back to editing it. */
 const props = defineProps<{ previewOnly?: boolean }>()
 const emit = defineEmits<{ 'open-components': []; 'add-template': [kind: TemplateKind] }>()
@@ -40,11 +46,20 @@ const hiddenElements = computed(() =>
   isPreviewMode.value ? explainHiddenElements(store.describePreview().hidden, store.runtimeState) : [],
 )
 const pageItems = computed(() => store.pages.map(page => ({ title: page.name, subtitle: page.path, value: page.id })))
-const devices = [
-  { title: 'Desktop · 1280', value: 1280 },
-  { title: 'Tablet · 768', value: 768 },
-  { title: 'Mobile · 390', value: 390 },
-]
+// The canvas stands for the screen size being edited, and Preview opens on the same one.
+const canvasWidth = computed(() =>
+  store.editingBreakpoint ? `${BREAKPOINT_WIDTHS[store.editingBreakpoint]}px` : undefined,
+)
+// Preview has a real width, so elements that differ per size need their media queries in the page.
+const previewStyles = computed(() =>
+  isPreviewMode.value
+    ? responsiveStylesheet([
+        ...store.pages.map(page => page.root),
+        ...(store.project.layout ? [store.project.layout] : []),
+        store.previewRoot,
+      ])
+    : '',
+)
 // The frame follows the editor's styles, so theme changes reach an open preview.
 let stopMirroringStyles = () => {}
 onMounted(() => {
@@ -67,7 +82,8 @@ const loadPreview = (event: Event) => {
   })
   previewTarget.value = doc.getElementById('preview-root')
 }
-watch(isPreviewMode, () => {
+watch(isPreviewMode, on => {
+  if (on && store.editingBreakpoint) viewport.value = BREAKPOINT_WIDTHS[store.editingBreakpoint]
   previewTarget.value = null
   stopMirroringStyles()
 })
@@ -203,7 +219,7 @@ const leaveCanvas = (event: DragEvent) => {
         <VSelect
           v-if="!store.editingPrefab"
           v-model="viewport"
-          :items="devices"
+          :items="PREVIEW_DEVICES"
           label="Viewport"
           variant="outlined"
           density="compact"
@@ -221,6 +237,7 @@ const leaveCanvas = (event: DragEvent) => {
           class="zoom-select"
         />
       </template>
+      <BreakpointSwitcher v-if="!isPreviewMode" />
       <div class="canvas-toolbar__actions">
         <template v-if="!isPreviewMode">
           <VBtn
@@ -287,6 +304,7 @@ const leaveCanvas = (event: DragEvent) => {
       </div>
       <Teleport v-if="previewTarget" :to="previewTarget">
         <div class="v-application preview-app" :class="`v-theme--${theme.global.name.value}`">
+          <component :is="'style'">{{ previewStyles }}</component>
           <ThemeDefaultsProvider>
             <NodeRenderer :key="store.previewPage.id" :node="store.previewRoot" :in-page="!store.project.layout" />
           </ThemeDefaultsProvider>
@@ -327,16 +345,21 @@ const leaveCanvas = (event: DragEvent) => {
         Editing component <strong>{{ store.editingPrefab.name }}</strong>. Write <code v-pre>{{ props.name }}</code> to
         add a parameter. Copies already on pages are not changed.
       </VAlert>
-      <ThemeDefaultsProvider>
-        <NodeRenderer
-          :key="store.editingPrefab?.prefabId"
-          :node="isPreviewMode ? store.previewRoot : rootNode"
-          :in-page="!!store.editingPrefab"
-        />
-      </ThemeDefaultsProvider>
+      <component :is="'style'" v-if="isPreviewMode">{{ previewStyles }}</component>
+      <div class="canvas-device" :style="{ width: isPreviewMode ? undefined : canvasWidth }">
+        <ThemeDefaultsProvider>
+          <NodeRenderer
+            :key="store.editingPrefab?.prefabId"
+            :node="isPreviewMode ? store.previewRoot : rootNode"
+            :in-page="!!store.editingPrefab"
+          />
+        </ThemeDefaultsProvider>
+      </div>
       <template v-if="!isPreviewMode">
         <HoverBadge :container="canvas" />
         <SelectionToolbar :container="canvas" />
+        <ResizeHandles :container="canvas" />
+        <MeasureOverlay :container="canvas" />
       </template>
       <p v-if="empty && !isPreviewMode" class="drop-hint">Drop components in the outlined area above.</p>
     </div>
@@ -380,6 +403,11 @@ const leaveCanvas = (event: DragEvent) => {
 }
 .main-canvas-wrapper {
   position: relative;
+  /* Shift-clicking elements must not select their text, which Ctrl/⌘ C would then copy instead of them. */
+  user-select: none;
+}
+.canvas-device {
+  margin-inline: auto;
 }
 .route-pill {
   text-transform: none;

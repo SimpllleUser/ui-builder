@@ -13,6 +13,7 @@ import {
   type useUiTreeStore,
   type UiNode,
 } from '../../../entities/ui-node'
+import { copyToClipboard, pasteFromClipboard } from '../../../features/copy-paste'
 
 type Store = ReturnType<typeof useUiTreeStore>
 
@@ -71,6 +72,25 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
   const add = (command: Command) => commands.push(command)
   const selected = store.selectedNodeIds.length === 1 ? store.findNodeById(store.selectedNodeId!) : null
   const mod = host.modifierKey
+
+  // ─── The clipboard ─────────────────────────────────────────────────────────
+  if (store.selectedNodeIds.some(id => id !== ROOT_NODE_ID))
+    add({
+      id: 'clipboard:copy',
+      title: 'Copy selected elements',
+      group: 'Clipboard',
+      icon: 'mdi-clipboard-outline',
+      shortcut: `${mod} C`,
+      run: () => void copyToClipboard(store),
+    })
+  add({
+    id: 'clipboard:paste',
+    title: 'Paste elements',
+    group: 'Clipboard',
+    icon: 'mdi-clipboard-arrow-down-outline',
+    shortcut: `${mod} V`,
+    run: () => void pasteFromClipboard(store),
+  })
 
   // ─── The selected element ──────────────────────────────────────────────────
   if (selected && selected.id !== ROOT_NODE_ID) {

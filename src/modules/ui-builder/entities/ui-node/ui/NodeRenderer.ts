@@ -190,12 +190,7 @@ const NodeRenderer = defineComponent({
       const behavior = behaviorOf(node.type)
       // In the editor a binding shows the variable's starting value, so the canvas always has real data to draw.
       const shownProps = behavior.previewProps?.(resolvedProps, preview ? scope : store.project.state) ?? resolvedProps
-      const classes = [
-        propClass,
-        ...node.classes,
-        ...(behavior.editorClasses?.(shownProps) ?? []),
-        rules?.className,
-      ]
+      const classes = [propClass, ...node.classes, ...(behavior.editorClasses?.(shownProps) ?? []), rules?.className]
       const slots = { ...generatedSlots(node.type, shownProps), ...buildSlots(node, render) }
       const givenProps = componentProps(node.type, shownProps)
       const extraProps: Record<string, unknown> = {}

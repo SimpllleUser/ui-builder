@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { StepDirection, useUiTreeStore, ROOT_NODE_ID, TEXT_NODE_TYPE } from '../../../entities/ui-node'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useCanvasUpdates } from '../model/useCanvasUpdates'
 import { elementBox, findCanvasElement, labelLeft, labelTop } from '../model/canvasGeometry'
 
 /** Quick actions next to the selected element, so common edits do not need a trip to the Inspector. */
@@ -24,10 +25,9 @@ const textNode = computed(() =>
 )
 
 // Place the toolbar above the element (below it when there is no room), kept inside the visible canvas.
-let frame = 0
-const update = () => {
-  cancelAnimationFrame(frame)
-  frame = requestAnimationFrame(() => {
+const update = useCanvasUpdates(
+  () => props.container,
+  () => {
     const container = props.container
     const id = store.selectedNodeId
     const element = container && id ? findCanvasElement(container, id) : null
@@ -42,33 +42,8 @@ const update = () => {
     }
     // Only change when it moved, otherwise re-rendering would keep triggering the observers.
     if (position.value?.top !== next.top || position.value?.left !== next.left) position.value = next
-  })
-}
-
-let observers: Array<{ disconnect(): void }> = []
-const observe = () => {
-  observers.forEach(observer => observer.disconnect())
-  observers = []
-  const container = props.container
-  if (!container) return
-  const resize = new ResizeObserver(update)
-  resize.observe(container)
-  const mutation = new MutationObserver(update)
-  mutation.observe(container, { childList: true, subtree: true, attributes: true, characterData: true })
-  observers = [resize, mutation]
-  container.addEventListener('scroll', update, { passive: true })
-}
-onMounted(() => {
-  observe()
-  window.addEventListener('resize', update)
-})
-onBeforeUnmount(() => {
-  cancelAnimationFrame(frame)
-  observers.forEach(observer => observer.disconnect())
-  props.container?.removeEventListener('scroll', update)
-  window.removeEventListener('resize', update)
-})
-watch(() => props.container, observe)
+  },
+)
 watch(
   () => store.selectedNodeIds.slice(),
   async () => {

@@ -30,6 +30,7 @@ import { useEditorShortcuts } from './shell/useEditorShortcuts'
 import { platformModifierKey } from '../shared/lib/platform'
 import { useFocusMode } from './shell/useFocusMode'
 import { useProjectFiles } from './shell/useProjectFiles'
+import { useClipboardShortcuts } from '../modules/ui-builder/features/copy-paste'
 
 const props = defineProps<{ session: ProjectSession }>()
 const emit = defineEmits<{ openProjects: [dialog: ProjectDialog] }>()
@@ -111,6 +112,15 @@ const undoFromMessage = () => {
   snackbar.value = false
   store.undo()
 }
+
+useClipboardShortcuts(store)
+// Styles per screen size are set in the Design tab, so picking a size brings the tab back.
+watch(
+  () => store.editingBreakpoint,
+  breakpoint => {
+    if (breakpoint) designTab.value = true
+  },
+)
 
 useEditorShortcuts({
   store,

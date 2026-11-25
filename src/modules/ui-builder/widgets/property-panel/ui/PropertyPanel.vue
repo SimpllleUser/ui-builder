@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { describeBehaviors, overrideTarget, useUiTreeStore, getComponentDef, TEXT_NODE_TYPE } from '../../../entities/ui-node'
+import {
+  describeBehaviors,
+  overrideTarget,
+  useUiTreeStore,
+  getComponentDef,
+  TEXT_NODE_TYPE,
+} from '../../../entities/ui-node'
 import { Icons } from '../../../../../shared/icons'
 import { useSettingsGroups } from '../model/useSettingsGroups'
 import { useClassEditor } from '../model/useClassEditor'

@@ -19,8 +19,8 @@ const changed = computed(() => !!target.value && hasOverrides(props.node, target
 <template>
   <div v-if="target" class="breakpoint-notice" role="status">
     <p>
-      Editing <strong>{{ target.toUpperCase() }}</strong
-      >: values you change here apply from {{ BREAKPOINT_MIN_WIDTHS[target] }}px up; the rest is inherited.
+      Editing <strong>{{ target.toUpperCase() }}</strong>: values you change here apply from
+      {{ BREAKPOINT_MIN_WIDTHS[target] }}px up; the rest is inherited.
     </p>
     <VBtn
       v-if="changed"

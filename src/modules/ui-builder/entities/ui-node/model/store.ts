@@ -350,41 +350,39 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     node.props[prop] = value
     return true
   }
-  const mutationContext: ContainerMutationContext &
-    PrefabMutationContext &
-    TemplateContext &
-    ClipboardMutationContext = {
-    getRoot: () => rootNode.value,
-    findNodeById,
-    findParentAndIndex,
-    getNodeList,
-    canContain,
-    cloneNodeWithNewIds,
-    commit,
-    selectNode,
-    setNotice,
-    clearDeletedSelection: () => {
-      selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
-    },
-    createNode: (type, name) => createNode(type, name),
-    getComponentDef,
-    setSelectedNodeIds: ids => {
-      selectedNodeIds.value = ids
-    },
-    getPrefabs: () => prefabs.value,
-    setPrefabs: value => {
-      prefabs.value = value
-    },
-    uniqueName: uniqueNodeName,
-    getInsertionTargetId: () => insertionTarget.value.id,
-    appendNode: (parentId, node, slotName, prepare?: () => void) =>
-      appendNode(mutationContext, parentId, node, slotName, prepare),
-    ensureVariables: variables => {
-      for (const [name, value] of Object.entries(variables)) {
-        if (!(name in project.value.state)) project.value.state[name] = value
-      }
-    },
-  }
+  const mutationContext: ContainerMutationContext & PrefabMutationContext & TemplateContext & ClipboardMutationContext =
+    {
+      getRoot: () => rootNode.value,
+      findNodeById,
+      findParentAndIndex,
+      getNodeList,
+      canContain,
+      cloneNodeWithNewIds,
+      commit,
+      selectNode,
+      setNotice,
+      clearDeletedSelection: () => {
+        selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
+      },
+      createNode: (type, name) => createNode(type, name),
+      getComponentDef,
+      setSelectedNodeIds: ids => {
+        selectedNodeIds.value = ids
+      },
+      getPrefabs: () => prefabs.value,
+      setPrefabs: value => {
+        prefabs.value = value
+      },
+      uniqueName: uniqueNodeName,
+      getInsertionTargetId: () => insertionTarget.value.id,
+      appendNode: (parentId, node, slotName, prepare?: () => void) =>
+        appendNode(mutationContext, parentId, node, slotName, prepare),
+      ensureVariables: variables => {
+        for (const [name, value] of Object.entries(variables)) {
+          if (!(name in project.value.state)) project.value.state[name] = value
+        }
+      },
+    }
   const createNode = (type: string, name?: string): UiNode => {
     const def = getComponentDef(type)
     if (!def) throw new Error('Unknown component type')

@@ -1,9 +1,6 @@
 import { SaveState, StepDirection, type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 import { onBeforeUnmount, onMounted, type Ref } from 'vue'
-
-// Open menus and dialogs, but not messages and tooltips: those should not swallow Escape.
-const OPEN_OVERLAY = '.v-overlay--active:not(.v-snackbar):not(.v-tooltip)'
-const TEXT_FIELD = 'input, textarea, select, [contenteditable="true"], [role="textbox"]'
+import { hasOpenOverlay, isInTextField } from '../../shared/lib/dom'
 
 interface Shortcuts {
   store: ReturnType<typeof useUiTreeStore>
@@ -33,7 +30,7 @@ export function useEditorShortcuts({
   }
 
   const onEscape = () => {
-    if (paletteOpen.value || document.querySelector(OPEN_OVERLAY)) return
+    if (paletteOpen.value || hasOpenOverlay()) return
     if (store.isPreviewMode) store.isPreviewMode = false
     else if (focusMode.value) focusMode.value = false
     else if (narrow.value) closePanels()
@@ -56,7 +53,7 @@ export function useEditorShortcuts({
     if (e.key === 'Escape') return onEscape()
 
     // The rest would get in the way of typing, or make no sense in Preview.
-    if (store.isPreviewMode || (e.target instanceof HTMLElement && e.target.closest(TEXT_FIELD))) return
+    if (store.isPreviewMode || isInTextField(e.target)) return
     if (e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
       e.preventDefault()
       goToNeighbourPage(e.code === 'BracketLeft' ? StepDirection.Back : StepDirection.Forward)

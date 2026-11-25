@@ -34,6 +34,10 @@ export let server,
   variableList,
   exportTargets,
   pascalCase,
+  responsive,
+  grid,
+  measure,
+  drag,
   store
 const storage = new Map()
 /** A project saved in memory. `saved` holds what the store has written to it. */
@@ -107,6 +111,10 @@ before(async () => {
     '/src/modules/ui-builder/widgets/property-panel/model/conditionInsert.ts',
   )
   variableList = await server.ssrLoadModule('/src/modules/ui-builder/widgets/sidebar-tree/model/variableList.ts')
+  responsive = await server.ssrLoadModule(`${model}responsiveStyle.ts`)
+  grid = await server.ssrLoadModule(`${model}grid.ts`)
+  measure = await server.ssrLoadModule('/src/modules/ui-builder/widgets/main-canvas/model/measure.ts')
+  drag = await server.ssrLoadModule('/src/modules/ui-builder/widgets/main-canvas/model/dragResize.ts')
   nodeModel = await server.ssrLoadModule(`${model}nodeUtils.ts`)
   tabScroll = await server.ssrLoadModule('/src/modules/ui-builder/widgets/property-panel/model/useTabScroll.ts')
   graphLayout = await server.ssrLoadModule('/src/modules/ui-builder/widgets/structure-graph/model/graphLayout.ts')
