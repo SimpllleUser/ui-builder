@@ -1,6 +1,7 @@
+import { actionReferences } from './actions'
 import { TEXT_NODE_TYPE } from './constants'
-import { ActionType } from './enums'
 import { expressionError, expressionVariables } from './expression'
+import { walkNodes } from './treeUtils'
 import type { Project, UiNode } from './types'
 
 /** Names that exist inside repeated elements, table cells and saved-component templates (`props`) without being defined as variables. */
@@ -42,15 +43,12 @@ export function variablesOfNode(node: UiNode): VariableReference[] {
   if (node.vIf && !expressionError(node.vIf))
     expressionVariables(node.vIf).forEach(name => add(name, UsageKind.Condition))
   const click = node.events?.click
-  if (click?.type === ActionType.Navigate) addBindings(click.to, UsageKind.Click)
-  else if (click) add(click.key, UsageKind.Click)
-  if (click?.type === ActionType.Set) addBindings(click.value, UsageKind.Click)
+  if (click) {
+    const { variable, text } = actionReferences(click)
+    add(variable, UsageKind.Click)
+    if (text) addBindings(text, UsageKind.Click)
+  }
   return references
-}
-
-export function* walkNodes(node: UiNode): Generator<UiNode> {
-  yield node
-  for (const child of [...node.children, ...Object.values(node.slots).flat()]) yield* walkNodes(child)
 }
 
 export interface ProjectNode {

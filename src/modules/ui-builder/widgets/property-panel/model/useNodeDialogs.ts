@@ -1,5 +1,6 @@
 import { computed, ref, type ComputedRef } from 'vue'
 import {
+  childNodes,
   findPrefabPropNames,
   getNodeSlots,
   ROOT_NODE_ID,
@@ -52,7 +53,7 @@ export function useMoveDialog(store: Store, node: ComputedRef<UiNode | null>) {
           })
         }
       }
-      for (const child of [...current.children, ...Object.values(current.slots).flat()]) visit(child, names)
+      for (const child of childNodes(current)) visit(child, names)
     }
     visit(store.rootNode, [])
     return result

@@ -5,6 +5,13 @@ export enum ActionType {
   Toggle = 'toggle',
 }
 
+/** How a click on an element reaches its action; the values are the events listened to. */
+export enum ClickEvent {
+  Element = 'click',
+  /** A data table reports which row was clicked. */
+  Row = 'click:row',
+}
+
 /** The kind of control an inspector setting is drawn with. */
 export enum FieldKind {
   Text = 'text',
@@ -87,6 +94,7 @@ export enum IssueKind {
   UnknownVariable = 'unknown-variable',
   UnusableName = 'unusable-name',
   UnusedVariable = 'unused-variable',
+  MissingVariable = 'missing-variable',
   MissingRoute = 'missing-route',
   InvalidCondition = 'invalid-condition',
   EmptyTable = 'empty-table',

@@ -1,5 +1,5 @@
-import { ActionType } from './enums'
-import type { UiAction, UiNode } from './types'
+import { describeAction } from './actions'
+import type { UiNode } from './types'
 
 /** The four things an element can be made to do in Preview, as they are shown on the canvas and in Layers. */
 export enum BehaviorBadge {
@@ -15,12 +15,6 @@ export interface BehaviorNote {
   shortLabel: string
   /** A full sentence for a tooltip or a screen reader. */
   description: string
-}
-
-function describeClick(action: UiAction): string {
-  if (action.type === ActionType.Navigate) return `On click: go to ${action.to || 'a page'}`
-  if (action.type === ActionType.Toggle) return `On click: switch ${action.key || 'a variable'} on or off`
-  return `On click: set ${action.key || 'a variable'} to ${action.value}`
 }
 
 const filled = (text: string | undefined): text is string => !!text?.trim()
@@ -47,7 +41,8 @@ export function describeBehaviors(node: UiNode): BehaviorNote[] {
       description: `Linked to the variable ${node.model.trim()}`,
     })
   const click = node.events?.click
-  if (click) notes.push({ badge: BehaviorBadge.Click, shortLabel: 'click', description: describeClick(click) })
+  if (click)
+    notes.push({ badge: BehaviorBadge.Click, shortLabel: 'click', description: `On click: ${describeAction(click)}` })
   return notes
 }
 

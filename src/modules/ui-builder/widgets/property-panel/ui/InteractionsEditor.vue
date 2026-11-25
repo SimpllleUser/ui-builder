@@ -1,5 +1,17 @@
 <script setup lang="ts">
-import { ActionType, useUiTreeStore, type UiAction, type UiNode } from '../../../entities/ui-node'
+import {
+  actionLabel,
+  ActionType,
+  ClickEvent,
+  clickEventOf,
+  createAction,
+  isActionType,
+  lacksVariable,
+  newVariableValue,
+  useUiTreeStore,
+  type UiAction,
+  type UiNode,
+} from '../../../entities/ui-node'
 import { BehaviorKind } from '../model/behaviorKinds'
 import { computed, ref, watch } from 'vue'
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
@@ -10,7 +22,7 @@ import { useEnsureVariable } from '../model/useEnsureVariable'
 const props = defineProps<{ node: UiNode }>()
 const store = useUiTreeStore()
 
-const isTable = computed(() => props.node.type === 'VDataTable')
+const isTable = computed(() => clickEventOf(props.node.type) === ClickEvent.Row)
 const behaviors: Record<BehaviorKind, { title: () => string; description: string; hint: string }> = {
   [BehaviorKind.Click]: {
     title: () => (isTable.value ? 'When a row is clicked' : 'When clicked'),
@@ -70,25 +82,26 @@ const routeProblem = computed(() => {
   if (!to || to.includes('{{') || store.pages.some(page => page.path === to)) return null
   return 'No page has this route yet. Pick a page from the list or add one.'
 })
-const actionType = computed(() => action.value?.type ?? 'none')
+const variableProblem = computed(() =>
+  action.value && lacksVariable(action.value) ? 'Choose a variable. Until then the click does nothing.' : undefined,
+)
+const NO_ACTION = 'none'
+const actionType = computed(() => action.value?.type ?? NO_ACTION)
 const actionTypes = [
-  { title: 'Nothing', value: 'none' },
-  { title: 'Go to page', value: ActionType.Navigate },
-  { title: 'Set a variable', value: ActionType.Set },
-  { title: 'Switch a variable on/off', value: ActionType.Toggle },
+  { title: 'Nothing', value: NO_ACTION },
+  ...Object.values(ActionType).map(type => ({ title: actionLabel(type), value: type })),
 ]
 const setClick = (click: UiAction | undefined) => setLogic({ events: click ? { click } : undefined })
-const changeType = (type: string) => {
-  if (type === ActionType.Navigate) setClick({ type, to: store.pages[0]?.path ?? '/' })
-  else if (type === ActionType.Set) setClick({ type, key: stateKeys.value[0] ?? '', value: 'true' })
-  else if (type === ActionType.Toggle) setClick({ type, key: stateKeys.value[0] ?? '' })
-  else setClick(undefined)
+const changeType = (type: unknown) => {
+  const defaults = { path: store.pages[0]?.path ?? '/', variable: stateKeys.value[0] ?? '' }
+  setClick(isActionType(type) ? createAction(type, defaults) : undefined)
 }
 const patchAction = (patch: Partial<UiAction>) => {
   if (action.value) setClick({ ...action.value, ...patch } as UiAction)
 }
 const setActionVariable = (name: string) => {
-  ensureVariable(name, action.value?.type === ActionType.Toggle ? false : '')
+  if (!action.value) return
+  ensureVariable(name, newVariableValue(action.value.type))
   patchAction({ key: name })
 }
 </script>
@@ -168,7 +181,12 @@ const setActionVariable = (name: string) => {
           @update:model-value="value => patchAction({ to: String(value ?? '') })"
         />
         <template v-else-if="action">
-          <VariableField label="Variable" :model-value="action.key" @update:model-value="setActionVariable" />
+          <VariableField
+            label="Variable"
+            :model-value="action.key"
+            :problem="variableProblem"
+            @update:model-value="setActionVariable"
+          />
           <VTextField
             v-if="action.type === ActionType.Set"
             :model-value="action.value"

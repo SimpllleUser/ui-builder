@@ -16,6 +16,15 @@ export function resolveTableData(props: Record<string, unknown>, scope: Scope): 
   return resolved
 }
 
+/** The rows a table shows for a search text: a row stays when any of its values contains the text. */
+export const shownRowCount = (rows: unknown[], search: string) => {
+  const needle = search.trim().toLowerCase()
+  if (!needle) return rows.length
+  return rows.filter(row =>
+    Object.values(row as Record<string, unknown>).some(value => String(value).toLowerCase().includes(needle)),
+  ).length
+}
+
 /** Table looks that Vuetify has no prop for are CSS classes (see shared/tableStyles.css). */
 export function tableStyleClasses({ striped, bordered, headerColor }: Record<string, unknown>): string[] {
   return [

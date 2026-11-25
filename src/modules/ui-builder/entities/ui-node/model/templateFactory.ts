@@ -76,8 +76,11 @@ export const TEMPLATES: TemplateInfo[] = [
   },
 ]
 
-/** Starters with their own variables and behavior. Each reads its settings from the props and has a default for all of them. */
-const BUILDERS: Partial<Record<TemplateKind, Builder>> = {
+/** Every starter builds one element. Each reads its settings from the props and has a default for all of them. */
+const BUILDERS: Record<TemplateKind, Builder> = {
+  [TemplateKind.Card]: buildWelcomeCard,
+  [TemplateKind.Form]: buildContactForm,
+  [TemplateKind.Columns]: buildColumns,
   [TemplateKind.Dashboard]: buildDashboard,
   [TemplateKind.Table]: buildTablePage,
   [TemplateKind.Login]: buildLogin,
@@ -91,55 +94,74 @@ const BUILDERS: Partial<Record<TemplateKind, Builder>> = {
 
 /** `props` customizes the template (texts, lists of entries, or a `preset` id); what is not given keeps its default. */
 export function addTemplate(context: TemplateContext, kind: TemplateKind, props: TemplateProps = {}): void {
-  const build = BUILDERS[kind]
-  if (build) {
-    const { node, variables } = build(context, resolveTemplateProps(kind, props))
-    context.appendNode(ROOT_NODE_ID, node, null, () => context.ensureVariables(variables))
-    return
-  }
-  const card = createCard(context, kind)
-
-  if (kind === TemplateKind.Columns) {
-    const row = context.createNode('VRow', 'Two columns')
-    row.children = [1, 2].map(number => {
-      const column = context.createNode('VCol', `Column ${number}`)
-      column.props = { cols: 12, md: 6 }
-      column.children = [context.cloneNodeWithNewIds(card)]
-      return column
-    })
-    context.appendNode('root-canvas', row, null)
-    return
-  }
-
-  context.appendNode('root-canvas', card, null)
+  const { node, variables } = BUILDERS[kind](context, resolveTemplateProps(kind, props))
+  context.appendNode(ROOT_NODE_ID, node, null, () => context.ensureVariables(variables))
 }
 
-function createCard(context: TemplateContext, kind: TemplateKind): UiNode {
-  const card = context.createNode('VCard', kind === TemplateKind.Form ? 'Contact form' : 'Welcome card')
+interface CardTexts {
+  name: string
+  title: string
+  fields: string[]
+  action: string
+}
+
+const WELCOME_CARD: CardTexts = {
+  name: 'Welcome card',
+  title: 'Your next idea starts here',
+  fields: [],
+  action: 'Get started',
+}
+const CONTACT_FORM: CardTexts = {
+  name: 'Contact form',
+  title: 'Get in touch',
+  fields: ['Name', 'Email', 'Message'],
+  action: 'Send message',
+}
+
+function createCard(context: TemplateContext, texts: CardTexts): UiNode {
+  const card = context.createNode('VCard', texts.name)
   card.classes = ['pa-6', 'rounded-lg']
 
   const title = context.createNode('VCardTitle')
   title.classes.push('text-wrap')
-  title.children[0].name = kind === TemplateKind.Form ? 'Get in touch' : 'Your next idea starts here'
+  title.children[0].name = texts.title
 
   const text = context.createNode('VCardText')
   text.children[0].name = 'Select an element to edit its content and appearance.'
   card.children = [title, text]
 
-  if (kind === TemplateKind.Form) {
-    for (const label of ['Name', 'Email', 'Message']) {
-      const input = context.createNode('VTextField')
-      input.props = { label, variant: 'outlined', type: label === 'Email' ? 'email' : 'text' }
-      card.children.push(input)
-    }
+  for (const label of texts.fields) {
+    const input = context.createNode('VTextField')
+    input.props = { label, variant: 'outlined', type: label === 'Email' ? 'email' : 'text' }
+    card.children.push(input)
   }
 
   const button = context.createNode('VBtn')
   button.props = { color: 'primary', variant: 'flat' }
-  button.children[0].name = kind === TemplateKind.Form ? 'Send message' : 'Get started'
+  button.children[0].name = texts.action
   card.children.push(button)
 
   return card
+}
+
+function buildWelcomeCard(context: TemplateContext): Built {
+  return { node: createCard(context, WELCOME_CARD), variables: {} }
+}
+
+function buildContactForm(context: TemplateContext): Built {
+  return { node: createCard(context, CONTACT_FORM), variables: {} }
+}
+
+function buildColumns(context: TemplateContext): Built {
+  const card = createCard(context, WELCOME_CARD)
+  const row = context.createNode('VRow', 'Two columns')
+  row.children = [1, 2].map(number => {
+    const column = context.createNode('VCol', `Column ${number}`)
+    column.props = { cols: 12, md: 6 }
+    column.children = [context.cloneNodeWithNewIds(card)]
+    return column
+  })
+  return { node: row, variables: {} }
 }
 
 // ─── Templates that bring their own variables and behavior ─────────────────────

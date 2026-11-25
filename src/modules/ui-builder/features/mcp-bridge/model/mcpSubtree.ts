@@ -1,4 +1,11 @@
-import { ActionType, TEXT_NODE_TYPE, getNodeSlots, type UiAction, type UiNode } from '../../../entities/ui-node'
+import {
+  actionExamples,
+  actionFromInput,
+  TEXT_NODE_TYPE,
+  getNodeSlots,
+  type UiAction,
+  type UiNode,
+} from '../../../entities/ui-node'
 import { applyStyleInput } from './mcpStyle'
 import type { Store } from './mcpCommandUtils'
 import type { StyleInput } from '../../../../../shared/lib/inlineStyle'
@@ -25,13 +32,10 @@ export interface SubtreeSpec {
 export const MAX_SUBTREE_NODES = 500
 
 const toAction = (click: NonNullable<SubtreeSpec['click']>): UiAction => {
-  if (click.type === ActionType.Navigate && click.to !== undefined) return { type: ActionType.Navigate, to: click.to }
-  if (click.type === ActionType.Set && click.key !== undefined)
-    return { type: ActionType.Set, key: click.key, value: String(click.value ?? '') }
-  if (click.type === ActionType.Toggle && click.key !== undefined) return { type: ActionType.Toggle, key: click.key }
-  throw new Error(
-    `Invalid click action: ${JSON.stringify(click)}. Use { type: "navigate", to }, { type: "set", key, value } or { type: "toggle", key }.`,
-  )
+  const action = actionFromInput(click)
+  if (action) return action
+  const shapes = new Intl.ListFormat('en', { type: 'disjunction' }).format(actionExamples())
+  throw new Error(`Invalid click action: ${JSON.stringify(click)}. Use ${shapes}.`)
 }
 
 /**

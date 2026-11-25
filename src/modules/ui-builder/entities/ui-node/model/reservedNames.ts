@@ -53,6 +53,7 @@ const JAVASCRIPT_WORDS = [
   'yield',
 ]
 const EXPORTED_CODE_NAMES = [
+  'applyInputMask',
   'contains',
   'copyOf',
   'defineProps',
@@ -63,6 +64,9 @@ const EXPORTED_CODE_NAMES = [
   'props',
   'ref',
   'router',
+  'statusChipColor',
+  'statusChipColors',
+  'statusChipKeys',
   'storeToRefs',
   'useProjectStore',
   'useRouter',

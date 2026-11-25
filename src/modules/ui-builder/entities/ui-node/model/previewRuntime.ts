@@ -1,6 +1,6 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { cloneNode } from './nodeUtils'
-import { runAction, type BoundAction } from './runtime'
+import { runAction, type BoundAction } from './actions'
 import type { Page, Project, UiAction } from './types'
 
 interface PreviewRuntimeSources {

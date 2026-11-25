@@ -10,9 +10,20 @@ export {
   WRAP_CONTAINER_TYPES,
 } from './model/componentDefinitions'
 export type { ComponentDef, PropertySection, PropField } from './model/componentDefinitions'
+export { behaviorOf, clickEventOf } from './model/componentBehaviors'
+export {
+  actionExamples,
+  actionFromInput,
+  actionLabel,
+  createAction,
+  isActionType,
+  lacksVariable,
+  newVariableValue,
+} from './model/actions'
 export { ROOT_NODE_ID, TEXT_NODE_TYPE } from './model/constants'
 export {
   ActionType,
+  ClickEvent,
   IssueKind,
   IssueSeverity,
   ColumnAlign,
@@ -32,6 +43,7 @@ export { BEHAVIOR_ICONS } from './model/behaviorIcons'
 export { explainHiddenElements, valueToText } from './model/hiddenExplanation'
 export type { HiddenElement } from './model/hiddenExplanation'
 export { isNodeEmpty } from './model/nodeUtils'
+export { childNodes } from './model/treeUtils'
 export { isCurrentSection, openSection, selectInSection } from './model/outlineNavigation'
 export { buildOutline, OutlineKind, outlineToText, outlineToTextAll } from './model/structureOutline'
 export type { OutlineNode, OutlineSection } from './model/structureOutline'

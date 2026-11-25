@@ -1,6 +1,12 @@
 export const ROOT_NODE_ID = 'root-canvas'
 export const TEXT_NODE_TYPE = 'TEXT'
 export const OUTLET_NODE_TYPE = 'PageOutlet'
+export const DATA_TABLE_TYPE = 'VDataTable'
+export const IMAGE_TYPE = 'VImg'
+export const DIALOG_TYPE = 'VDialog'
+export const MENU_TYPE = 'VMenu'
+export const SNACKBAR_TYPE = 'VSnackbar'
+export const TOOLTIP_TYPE = 'VTooltip'
 
 export const DOCUMENT_VERSION = 2
 export const MAX_DOCUMENT_NODES = 5_000

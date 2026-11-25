@@ -1,14 +1,18 @@
 import type jsep from 'jsep'
 import { expressionError, isCoreExpression, parseExpression } from './expression'
 import { jsLiteral, jsString } from './jsLiteral'
+import { DEFAULT_STATUS_COLOR, STATUS_COLORS } from './statusChips'
 
-/** Small functions the exported file needs for conditions that use `==`, `empty`, `contains`, `length` or a copied row. */
+/** Small functions an exported file needs for its conditions, copied rows, status chips and input masks. */
 export enum HelperName {
   LooseEquals = 'looseEquals',
   IsEmpty = 'isEmpty',
   Contains = 'contains',
   LengthOf = 'lengthOf',
   CopyOf = 'copyOf',
+  StatusChipColor = 'statusChipColor',
+  StatusChipKeys = 'statusChipKeys',
+  ApplyInputMask = 'applyInputMask',
 }
 
 /** Same behaviour as the editor's evaluator, so an exported page decides like Preview does. */
@@ -22,6 +26,32 @@ export const HELPER_SOURCE: Record<HelperName, string> = {
   [HelperName.LengthOf]:
     "const lengthOf = value => (typeof value === 'string' || Array.isArray(value) ? value.length : 0)",
   [HelperName.CopyOf]: 'const copyOf = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)))',
+  [HelperName.StatusChipColor]: `const statusChipColors = ${jsLiteral(STATUS_COLORS)}
+const statusChipColor = value => {
+  const status = String(value ?? '').toLowerCase()
+  return Object.hasOwn(statusChipColors, status) ? statusChipColors[status] : ${jsString(DEFAULT_STATUS_COLOR)}
+}`,
+  [HelperName.StatusChipKeys]:
+    "const statusChipKeys = headers => (Array.isArray(headers) ? headers.filter(header => header?.chip && typeof header.key === 'string').map(header => header.key) : [])",
+  // The same steps as `applyMask` of the editor: `#` takes a digit, `A` a letter, anything else is written as it is.
+  [HelperName.ApplyInputMask]: `const applyInputMask = (value, mask) => {
+  if (typeof value !== 'string' || !mask) return value
+  let result = ''
+  let cursor = 0
+  for (const token of mask) {
+    if (cursor >= value.length) break
+    if (token === '#' || token === 'A') {
+      const pattern = token === '#' ? /\\d/ : /[A-Za-z]/
+      while (cursor < value.length && !pattern.test(value[cursor])) cursor++
+      if (cursor >= value.length) break
+      result += value[cursor++]
+    } else {
+      result += token
+      if (value[cursor] === token) cursor++
+    }
+  }
+  return result
+}`,
 }
 
 /** Helpers a helper calls itself, in the order they must be written. */

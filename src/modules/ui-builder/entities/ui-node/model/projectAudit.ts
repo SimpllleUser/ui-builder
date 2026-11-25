@@ -1,9 +1,13 @@
+import { actionProblem } from './actions'
+import { behaviorOf } from './componentBehaviors'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
-import { ActionType, IssueKind, IssueSeverity } from './enums'
+import { IssueKind, IssueSeverity } from './enums'
 import { variableNameError } from './projectMutations'
 import { conditionError } from './runtime'
 import type { Project, UiNode } from './types'
-import { UsageKind, variablesOfNode, walkNodes, walkProject, type ProjectNode } from './variableUsage'
+import { isNodeEmpty } from './nodeUtils'
+import { walkNodes } from './treeUtils'
+import { UsageKind, variablesOfNode, walkProject, type ProjectNode } from './variableUsage'
 
 export { AMBIENT_NAMES, bindingRoots } from './variableUsage'
 
@@ -78,25 +82,19 @@ export function auditProject(project: Project): Issue[] {
     }
 
     const click = node.events?.click
-    if (click?.type === ActionType.Navigate && !click.to.includes('{{') && !routes.has(click.to)) {
+    const broken = click && actionProblem(click, routes)
+    if (broken) {
       report({
-        kind: IssueKind.MissingRoute,
+        kind: broken.kind,
         severity: IssueSeverity.Error,
-        message: `${here} goes to “${click.to}”, but no page has that route.`,
+        message: `${here} ${broken.predicate}`,
         pageId,
         node,
       })
     }
 
-    if (node.type === 'VDataTable' && Array.isArray(node.props.headers) && node.props.headers.length === 0) {
-      report({
-        kind: IssueKind.EmptyTable,
-        severity: IssueSeverity.Warning,
-        message: `${here} has no columns.`,
-        pageId,
-        node,
-      })
-    }
+    for (const { kind, severity, predicate } of behaviorOf(node.type).problems?.(node) ?? [])
+      report({ kind, severity, message: `${here} ${predicate}`, pageId, node })
   }
 
   if (project.layout && ![...walkNodes(project.layout)].some(node => node.type === OUTLET_NODE_TYPE)) {
@@ -107,7 +105,7 @@ export function auditProject(project: Project): Issue[] {
     })
   }
   for (const page of project.pages) {
-    if (!page.root.children.length && !Object.values(page.root.slots).some(nodes => nodes.length)) {
+    if (isNodeEmpty(page.root)) {
       report({
         kind: IssueKind.EmptyPage,
         severity: IssueSeverity.Info,

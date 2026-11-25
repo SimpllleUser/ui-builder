@@ -1,6 +1,7 @@
+import { behaviorOf, type TableSummary } from './componentBehaviors'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { evaluateCondition, interpolate, repeatItems, type Scope } from './runtime'
-import { resolveTableData } from './tableBindings'
+import { childNodes } from './treeUtils'
 import type { Page, Project, UiNode } from './types'
 
 export interface PreviewSnapshot {
@@ -12,19 +13,10 @@ export interface PreviewSnapshot {
   hidden: Array<{ id: string; name: string; condition: string }>
   /** What each input shows, by the variable it is linked to. */
   inputs: Array<{ id: string; name: string; variable: string; value: unknown }>
-  tables: Array<{ id: string; name: string; columns: string[]; rows: number; rowsShown: number; search: string }>
+  tables: Array<{ id: string; name: string } & TableSummary>
 }
 
 const MAX_TEXTS = 300
-
-/** The rows a table shows for a search text: a row stays when any of its values contains the text. */
-const shownRows = (rows: unknown[], search: string) => {
-  const needle = search.trim().toLowerCase()
-  if (!needle) return rows.length
-  return rows.filter(row =>
-    Object.values(row as Record<string, unknown>).some(value => String(value).toLowerCase().includes(needle)),
-  ).length
-}
 
 /** What a person would see in Preview, worked out from the project and the current variables, without drawing it. */
 export function snapshotPreview(project: Project, page: Page, state: Scope): PreviewSnapshot {
@@ -60,27 +52,13 @@ export function snapshotPreview(project: Project, page: Page, state: Scope): Pre
     }
     if (node.model)
       snapshot.inputs.push({ id: node.id, name: node.name, variable: node.model, value: scope[node.model] })
-    if (node.type === 'VDataTable') {
-      const data = { ...node.props, ...resolveTableData(node.props, scope) }
-      const rows = Array.isArray(data.items) ? data.items : []
-      const columns = (Array.isArray(data.headers) ? data.headers : []).map(header =>
-        String((header as { key?: unknown }).key ?? ''),
-      )
-      const search = String(interpolate(node.props.search ?? '', scope) ?? '')
-      snapshot.tables.push({
-        id: node.id,
-        name: node.name,
-        columns,
-        rows: rows.length,
-        rowsShown: shownRows(rows, search),
-        search,
-      })
-    }
+    const summary = behaviorOf(node.type).summarize?.(node, scope)
+    if (summary) snapshot.tables.push({ id: node.id, name: node.name, ...summary })
     visitChildren(node, scope)
   }
 
   const visitChildren = (node: UiNode, scope: Scope) => {
-    for (const child of [...node.children, ...Object.values(node.slots).flat()]) visit(child, scope)
+    for (const child of childNodes(node)) visit(child, scope)
   }
 
   const start = project.layout ?? page.root

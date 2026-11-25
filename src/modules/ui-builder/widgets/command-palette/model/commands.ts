@@ -2,6 +2,7 @@ import {
   FieldKind,
   StepDirection,
   PALETTE_COMPONENTS,
+  childNodes,
   getComponentCategory,
   getComponentDef,
   TEXT_NODE_TYPE,
@@ -55,7 +56,7 @@ const MAX_ELEMENTS = 150
 function elements(root: UiNode): Array<{ node: UiNode; parent: UiNode }> {
   const found: Array<{ node: UiNode; parent: UiNode }> = []
   const visit = (node: UiNode) => {
-    for (const child of [...node.children, ...Object.values(node.slots).flat()]) {
+    for (const child of childNodes(node)) {
       if (child.type !== TEXT_NODE_TYPE && found.length < MAX_ELEMENTS) found.push({ node: child, parent: node })
       visit(child)
     }

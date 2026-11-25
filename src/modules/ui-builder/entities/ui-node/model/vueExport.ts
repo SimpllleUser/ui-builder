@@ -1,7 +1,8 @@
 import { helperSources, HelperName } from './expressionToJs'
 import { jsLiteral } from './jsLiteral'
 import { variableNameError } from './projectMutations'
-import { AMBIENT_NAMES, variablesOfNode, walkNodes } from './variableUsage'
+import { walkNodes } from './treeUtils'
+import { AMBIENT_NAMES, variablesOfNode } from './variableUsage'
 import type { Page, Prefab, UiNode } from './types'
 import { renderNodes, type TemplateContext } from './vueTemplate'
 
