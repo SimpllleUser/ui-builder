@@ -9,6 +9,7 @@ import {
   type Project,
 } from '../../../entities/ui-node'
 import { toPascalCase } from '../../../../../shared/lib/pascalCase'
+import { transliterate } from '../../../../../shared/lib/transliterate'
 import { mainSource, packageJson, readme, routerSource, scaffoldFiles } from './vueProjectScaffold'
 
 export interface VueProjectSources {
@@ -33,7 +34,7 @@ export interface ExportedProject {
 const LAYOUT_FILE = 'AppLayout.vue'
 
 const packageName = (name: string) =>
-  name
+  transliterate(name)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'ui-project'

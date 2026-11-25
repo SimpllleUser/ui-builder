@@ -102,3 +102,24 @@ test('the archive holds every file in one folder', async () => {
   assert.equal(Object.keys(unpacked).length, Object.keys(exported.files).length)
   assert.equal(strFromU8(unpacked['my-shop/src/main.js']), exported.files['src/main.js'])
 })
+
+test('Cyrillic names become readable file and folder names', async () => {
+  const { transliterate } = await server.ssrLoadModule('/src/shared/lib/transliterate.ts')
+  const cases = {
+    Замовлення: 'Zamovlennia',
+    'Мої замовлення': 'Moi zamovlennia',
+    'Юлія Їжак': 'Yuliia Yizhak',
+    Згода: 'Zghoda',
+    'Комп’ютер': 'Kompiuter',
+    ЩОСЬ: 'ShchOS',
+    "Don't stop": "Don't stop",
+  }
+  for (const [from, to] of Object.entries(cases)) assert.equal(transliterate(from), to, from)
+
+  store.addPage('Замовлення')
+  store.addPage('Мої товари')
+  const { name, files } = await build({ name: 'Мій магазин' })
+  assert.equal(name, 'mii-mahazyn')
+  assert.ok(files['src/pages/Zamovlennia.vue'])
+  assert.ok(files['src/pages/MoiTovary.vue'])
+})

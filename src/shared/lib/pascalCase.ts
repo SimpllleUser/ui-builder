@@ -1,6 +1,8 @@
-/** "order desk" and "order-desk" become "OrderDesk". Characters that cannot be in a file name are dropped. */
+import { transliterate } from './transliterate'
+
+/** "order desk" and "order-desk" become "OrderDesk". Cyrillic is transliterated; other characters that cannot be in a file name are dropped. */
 export function toPascalCase(text: string): string {
-  return text
+  return transliterate(text)
     .split(/[^A-Za-z0-9]+/)
     .filter(Boolean)
     .map(word => word[0].toUpperCase() + word.slice(1))
