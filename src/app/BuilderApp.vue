@@ -196,7 +196,7 @@ useEditorShortcuts({
       Exit focus mode <kbd>Esc</kbd>
     </button>
     <CommandPalette v-model="paletteOpen" :host="commandHost" />
-    <CodeExportDialog v-model="codeExportOpen" />
+    <CodeExportDialog v-model="codeExportOpen" :project-name="session.currentProject.value?.name ?? ''" />
     <ThemeCustomizerDialog v-model="themeOpen" />
     <TemplateSettingsDialog
       :kind="templateInSettings"

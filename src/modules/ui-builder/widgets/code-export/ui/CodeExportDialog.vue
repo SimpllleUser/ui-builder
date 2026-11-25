@@ -2,7 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import { useUiTreeStore } from '../../../entities/ui-node'
-import { downloadTextFile } from '../../../../../shared/lib/downloadTextFile'
+import { downloadFile, downloadTextFile } from '../../../../../shared/lib/downloadTextFile'
+import tableCss from '../../../../../shared/tableStyles.css?raw'
+import { generateThemeCss, generateVuetifyConfig, useThemeSettings } from '../../../../theme/entities/theme-settings'
+import { zipProject } from '../model/projectArchive'
+import { buildVueProject } from '../model/vueProject'
 import { buildExportTargets, defaultTargetId, ExportTargetKind } from '../model/exportTargets'
 
 const COPIED_MESSAGE_MS = 2000
@@ -12,12 +16,33 @@ const KIND_HEADINGS: Record<ExportTargetKind, string> = {
   [ExportTargetKind.Component]: 'Components',
 }
 const NOTES = [
-  'The files use Vue 3 with Vuetify; links use vue-router.',
-  'Each file has its own copy of the variables, starting from the project’s values. Share them (for example in a Pinia store) when pages must see the same data.',
+  'The whole project is a ready Vue app: pages with routes, shared variables in a Pinia store, saved components and the theme.',
+  'A single file works with Vue 3 and Vuetify and has its own copy of the variables.',
   'Input masks are not exported, and neither are the editor-only table looks beyond their CSS classes (add shared/tableStyles.css).',
 ]
 
+const props = defineProps<{ projectName: string }>()
 const open = defineModel<boolean>({ required: true })
+const { settings } = useThemeSettings()
+const failure = ref('')
+
+const downloadProject = () => {
+  failure.value = ''
+  try {
+    const exported = buildVueProject({
+      name: props.projectName,
+      project: store.project,
+      prefabs: store.prefabs,
+      vuetifyConfig: generateVuetifyConfig(settings.value),
+      themeCss: generateThemeCss(settings.value),
+      tableCss,
+    })
+    downloadFile(`${exported.name}.zip`, new Uint8Array(zipProject(exported)), 'application/zip')
+  } catch (error) {
+    console.error(error)
+    failure.value = 'Could not build the project archive.'
+  }
+}
 const store = useUiTreeStore()
 const { copy, copied } = useClipboard({ copiedDuring: COPIED_MESSAGE_MS })
 
@@ -78,7 +103,11 @@ const download = () =>
           <li v-for="note in NOTES" :key="note">{{ note }}</li>
         </ul>
       </VCardText>
-      <VCardActions>
+      <VAlert v-if="failure" type="error" variant="tonal" density="compact" class="mx-4">{{ failure }}</VAlert>
+      <VCardActions class="flex-wrap ga-2">
+        <VBtn prepend-icon="mdi-folder-zip-outline" variant="tonal" color="primary" @click="downloadProject">
+          Download project (.zip)
+        </VBtn>
         <VSpacer />
         <VBtn prepend-icon="mdi-download" @click="download">Download {{ selected?.file.fileName }}</VBtn>
         <VBtn

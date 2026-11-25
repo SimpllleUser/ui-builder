@@ -30,6 +30,7 @@
     "@vue-flow/core": "^1.48.2",
     "@vue-flow/minimap": "^1.5.4",
     "@vueuse/core": "^14.0.0",
+    "fflate": "^0.8.3",
     "jsep": "^1.4.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.21",

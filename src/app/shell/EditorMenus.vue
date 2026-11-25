@@ -39,7 +39,7 @@ defineEmits<{
         <VListItem
           prepend-icon="mdi-code-tags"
           title="Export code…"
-          subtitle="Vue files for pages and components"
+          subtitle="A whole Vue project, or single files"
           @click="$emit('exportCode')"
         />
       </VList>
