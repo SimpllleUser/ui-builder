@@ -1,12 +1,16 @@
 import {
   CardStyle,
   ColorPreset,
+  FieldStyle,
+  FontFamily,
   InteractiveStyle,
   SemanticPreset,
   SurfacePreset,
   ShadowProfile,
   ThemeDensity,
   ThemeMode,
+  SpacingScale,
+  TypographyStyle,
 } from './enums'
 import { DEFAULT_CUSTOM_PRIMARY, DEFAULT_CUSTOM_SECONDARY, RADIUS_VALUES } from './presets'
 import { isHexColor } from '../../../../../shared/lib/hexColor'
@@ -24,6 +28,11 @@ export interface ThemeSettings {
   cardStyle: CardStyle
   shadowProfile: ShadowProfile
   interactiveStyle: InteractiveStyle
+  typography: TypographyStyle
+  spacing: SpacingScale
+  fieldStyle: FieldStyle
+  headingFont: FontFamily
+  bodyFont: FontFamily
 }
 
 /** Nothing customised: the app looks the way it did before theme settings existed. */
@@ -39,6 +48,11 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   cardStyle: CardStyle.Elevated,
   shadowProfile: ShadowProfile.Default,
   interactiveStyle: InteractiveStyle.Material,
+  typography: TypographyStyle.Default,
+  spacing: SpacingScale.Default,
+  fieldStyle: FieldStyle.Default,
+  headingFont: FontFamily.Default,
+  bodyFont: FontFamily.Default,
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
@@ -68,5 +82,10 @@ export function sanitizeThemeSettings(raw: unknown): ThemeSettings {
     cardStyle: pickEnum(CardStyle, source.cardStyle, defaults.cardStyle),
     shadowProfile: pickEnum(ShadowProfile, source.shadowProfile, defaults.shadowProfile),
     interactiveStyle: pickEnum(InteractiveStyle, source.interactiveStyle, defaults.interactiveStyle),
+    typography: pickEnum(TypographyStyle, source.typography, defaults.typography),
+    spacing: pickEnum(SpacingScale, source.spacing, defaults.spacing),
+    fieldStyle: pickEnum(FieldStyle, source.fieldStyle, defaults.fieldStyle),
+    headingFont: pickEnum(FontFamily, source.headingFont, defaults.headingFont),
+    bodyFont: pickEnum(FontFamily, source.bodyFont, defaults.bodyFont),
   }
 }

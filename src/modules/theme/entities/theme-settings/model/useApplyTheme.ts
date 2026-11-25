@@ -2,7 +2,8 @@ import { computed, watch } from 'vue'
 import { useStyleTag } from '@vueuse/core'
 import { useTheme } from 'vuetify'
 import { ThemeVariant } from './enums'
-import { buildThemeCss } from './themeCss'
+import { PAGE_SCOPE_CLASS } from './pageScope'
+import { buildPageCss, buildThemeCss } from './themeCss'
 import { resolveThemeColors } from './themeColors'
 import { useThemeSettings } from './useThemeSettings'
 
@@ -28,7 +29,7 @@ export function useApplyTheme() {
   )
 
   useStyleTag(
-    computed(() => buildThemeCss(settings.value)),
+    computed(() => `${buildThemeCss(settings.value)}\n${buildPageCss(settings.value, `.${PAGE_SCOPE_CLASS}`)}`),
     { id: 'ui-builder-theme-css' },
   )
 }

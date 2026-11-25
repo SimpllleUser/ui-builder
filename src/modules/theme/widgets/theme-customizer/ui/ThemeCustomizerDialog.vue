@@ -5,6 +5,9 @@ import {
   CARD_STYLE_OPTIONS,
   COLOR_PRESET_OPTIONS,
   DENSITY_OPTIONS,
+  FIELD_STYLE_OPTIONS,
+  SPACING_OPTIONS,
+  TYPOGRAPHY_OPTIONS,
   INTERACTIVE_STYLE_OPTIONS,
   MODE_OPTIONS,
   RADIUS_OPTIONS,
@@ -12,6 +15,8 @@ import {
   SHADOW_PROFILE_OPTIONS,
   SURFACE_PRESET_OPTIONS,
 } from '../model/options'
+import DesignPresetGrid from './DesignPresetGrid.vue'
+import FontSelect from './FontSelect.vue'
 import OptionToggle from './OptionToggle.vue'
 import SettingSection from './SettingSection.vue'
 import SwatchGrid from './SwatchGrid.vue'
@@ -55,6 +60,10 @@ const colorOptions = computed(() => [
         <VWindow v-model="tab">
           <VWindowItem :value="CustomizerTab.Appearance">
             <div class="d-flex flex-column ga-5">
+              <SettingSection title="Style presets">
+                <DesignPresetGrid v-model="settings" />
+              </SettingSection>
+
               <SettingSection title="Mode">
                 <OptionToggle v-model="settings.mode" :options="MODE_OPTIONS" label="Mode" />
               </SettingSection>
@@ -77,6 +86,25 @@ const colorOptions = computed(() => [
 
               <SettingSection title="Background and surfaces">
                 <SwatchGrid v-model="settings.surfacePreset" :options="SURFACE_PRESET_OPTIONS" label="Surfaces" />
+              </SettingSection>
+
+              <SettingSection title="Typography">
+                <OptionToggle v-model="settings.typography" :options="TYPOGRAPHY_OPTIONS" label="Typography" />
+              </SettingSection>
+
+              <SettingSection title="Fonts">
+                <div class="font-selects">
+                  <FontSelect v-model="settings.headingFont" label="Headings" />
+                  <FontSelect v-model="settings.bodyFont" label="Text" />
+                </div>
+              </SettingSection>
+
+              <SettingSection title="Spacing">
+                <OptionToggle v-model="settings.spacing" :options="SPACING_OPTIONS" label="Spacing" />
+              </SettingSection>
+
+              <SettingSection title="Text fields">
+                <OptionToggle v-model="settings.fieldStyle" :options="FIELD_STYLE_OPTIONS" label="Text fields" />
               </SettingSection>
 
               <SettingSection title="Density">
@@ -126,6 +154,12 @@ const colorOptions = computed(() => [
 /* In a scrollable dialog only the body may shrink; the title and tabs keep their height. */
 .theme-dialog__fixed {
   flex-shrink: 0;
+}
+.font-selects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  padding-top: 4px;
 }
 .custom-colors {
   display: flex;
