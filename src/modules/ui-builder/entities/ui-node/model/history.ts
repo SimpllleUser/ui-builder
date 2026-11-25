@@ -7,6 +7,32 @@ export interface HistoryEntry {
   at: number
 }
 
+/** A history as it is stored, to be carried on later. */
+export interface SavedHistory {
+  entries: HistoryEntry[]
+  index: number
+}
+
+const isEntry = (value: unknown): value is HistoryEntry =>
+  typeof value === 'object' &&
+  value !== null &&
+  'snapshot' in value &&
+  typeof value.snapshot === 'string' &&
+  'label' in value &&
+  typeof value.label === 'string' &&
+  'at' in value &&
+  typeof value.at === 'number'
+
+export const isSavedHistory = (value: unknown): value is SavedHistory =>
+  typeof value === 'object' &&
+  value !== null &&
+  'entries' in value &&
+  Array.isArray(value.entries) &&
+  value.entries.every(isEntry) &&
+  'index' in value &&
+  typeof value.index === 'number' &&
+  !!value.entries[value.index]
+
 interface HistoryOptions {
   serialize: () => string
   applySnapshot: (snapshot: string) => void
@@ -34,12 +60,14 @@ export function createHistory({ serialize, applySnapshot, maxEntries, describe, 
     })),
   )
 
-  const commit = () => {
+  /** Records what is there now as a new version, named after the difference unless `label` says what it was. */
+  const commit = (label?: string) => {
     const snapshot = serialize()
     const previous = entries.value[currentIndex.value].snapshot
     if (previous === snapshot) return
 
-    const entry: HistoryEntry = { snapshot, label: describe?.(previous, snapshot) ?? 'Edited the page', at: Date.now() }
+    const name = label ?? describe?.(previous, snapshot) ?? 'Edited the page'
+    const entry: HistoryEntry = { snapshot, label: name, at: Date.now() }
     entries.value = entries.value.slice(0, currentIndex.value + 1)
     entries.value.push(entry)
     if (entries.value.length > maxEntries) entries.value.shift()
@@ -104,7 +132,18 @@ export function createHistory({ serialize, applySnapshot, maxEntries, describe, 
     currentIndex.value = 0
   }
 
+  const currentSnapshot = () => entries.value[currentIndex.value].snapshot
+  const dump = (): SavedHistory => ({ entries: entries.value.map(entry => ({ ...entry })), index: currentIndex.value })
+  /** Carries on a stored history. What is there now is left as it is. */
+  const load = (saved: SavedHistory) => {
+    entries.value = saved.entries.slice(-maxEntries)
+    currentIndex.value = Math.max(0, saved.index - (saved.entries.length - entries.value.length))
+  }
+
   return {
+    currentSnapshot,
+    dump,
+    load,
     reset,
     isRestoring,
     pending,

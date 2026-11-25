@@ -1,5 +1,6 @@
 import { openDatabase, requestResult, runTransaction, TransactionMode } from '../../../../../shared/lib/indexedDb'
 import { createTabLocks, type TabLocks } from '../../../../../shared/lib/webLocks'
+import { isSavedHistory } from '../model/history'
 import type { PrefabLibrary } from '../model/prefabSync'
 import type { Prefab } from '../model/types'
 
@@ -7,6 +8,7 @@ import type { Prefab } from '../model/types'
 const DATABASE_NAME = 'ui-builder-library'
 const DATABASE_VERSION = 1
 const CHANNEL_NAME = 'ui-builder:prefabs'
+const HISTORY_PREFIX = 'history:'
 const LEGACY_IMPORTED_KEY = 'legacy-imported'
 const LEGACY_BACKUP_PREFIX = 'legacy-backup:'
 export const LEGACY_PREFABS_KEY = 'ui-builder:prefabs'
@@ -111,11 +113,23 @@ export async function openPrefabRepository({
       channel.post()
     },
     remove: async prefabId => {
-      await write([StoreName.Prefabs], async transaction => {
+      await write([StoreName.Prefabs, StoreName.Meta], async transaction => {
         transaction.objectStore(StoreName.Prefabs).delete(prefabId)
+        transaction.objectStore(StoreName.Meta).delete(`${HISTORY_PREFIX}${prefabId}`)
       })
       channel.post()
     },
+    readHistory: prefabId =>
+      runTransaction(database, [StoreName.Meta], TransactionMode.Read, async transaction => {
+        const value: unknown = await requestResult(
+          transaction.objectStore(StoreName.Meta).get(`${HISTORY_PREFIX}${prefabId}`),
+        )
+        return isSavedHistory(value) ? value : null
+      }),
+    writeHistory: (prefabId, history) =>
+      write([StoreName.Meta], async transaction => {
+        transaction.objectStore(StoreName.Meta).put(history, `${HISTORY_PREFIX}${prefabId}`)
+      }),
     subscribe: listener => channel.subscribe(listener),
     lock: prefabId => locks.tryAcquire(`ui-builder:prefab:${prefabId}`, () => {}),
   }

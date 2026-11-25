@@ -39,6 +39,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 
 ## Safety
 - Before a big change call **`create_checkpoint`**; if it goes wrong, **`restore_checkpoint`** (itself one Undo step). `get_history` lists the named steps; `restore_version` goes back to one.
+- While the person edits a saved component, `get_history`, `undo`, `redo` and `restore_version` act on that component's own history (`scope` says which). Right after `delete_saved_component`, `undo` brings the component back.
 - **`get_status`** is a cheap check of the page, variables, selection and whether Preview runs.
 - **`save_component`** stores an element in My components (write `{{props.title}}` in a property to make it a parameter). **`insert_saved_component`** adds an **instance** of it (pass `props: { title: "Hi" }`): every instance follows the original, and nothing inside one can be edited. Change its parameters with **`update_instance`**, or **`detach_instance`** to get an editable copy.
 - **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.

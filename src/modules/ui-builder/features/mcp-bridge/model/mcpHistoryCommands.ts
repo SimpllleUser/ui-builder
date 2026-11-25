@@ -5,6 +5,10 @@ const MAX_LISTED_VERSIONS = 50
 export const MCP_HISTORY_COMMANDS: Record<string, McpCommand> = {
   /** The named steps of the history, newest first, so an agent can see what was done and go back to one. */
   get_history: store => ({
+    // While a saved component is edited in the editor, the versions are that component's.
+    scope: store.editingPrefab
+      ? { component: store.editingPrefab.prefabId, name: store.editingPrefab.name }
+      : 'project',
     canUndo: store.canUndo,
     canRedo: store.canRedo,
     versions: [...store.historyVersions].reverse().slice(0, MAX_LISTED_VERSIONS),

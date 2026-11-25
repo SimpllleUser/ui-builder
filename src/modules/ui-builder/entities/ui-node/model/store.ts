@@ -52,7 +52,8 @@ import {
   type NodeLocation,
 } from './treeUtils'
 import { createHistory, type HistoryEntry } from './history'
-import { useComponentHistory } from './componentHistory'
+import { OUTSIDE_CHANGE_LABEL, useComponentHistory } from './componentHistory'
+import { useDeletedPrefab } from './deletedPrefab'
 import {
   editedPrefabId,
   isOnLayout,
@@ -162,8 +163,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   }
   // Anything that was removed can be brought back from the message that says so.
   const offerUndo = (entry: HistoryEntry) => {
+    // Something was edited since a component was deleted, so Undo takes that back now.
+    if (entry.label !== OUTSIDE_CHANGE_LABEL) deletedPrefab.forget()
     if (/^(Deleted|Removed)/.test(entry.label)) setNotice(`${entry.label}.`, true)
   }
+  const deletedPrefab = useDeletedPrefab(prefabs, prefabId => prefabSync.readHistory(prefabId))
   const history = createHistory({
     serialize: () => JSON.stringify(project.value),
     applySnapshot: applyProjectSnapshot,
@@ -171,12 +175,14 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     describe: describeChange,
     onCommit: offerUndo,
   })
-  const { versions: historyVersions, commit: commitHistory } = history
+  const { commit: commitHistory } = history
   // While a transaction runs, steps are not saved one by one: they become a single version at the end.
   let transactionDepth = 0
   const componentHistory = useComponentHistory({
     prefabs,
     editingPrefabId,
+    read: prefabId => prefabSync.readHistory(prefabId),
+    write: (prefabId, saved) => void prefabSync.writeHistory(prefabId, saved),
     isHeld: () => transactionDepth > 0,
     onCommit: offerUndo,
     onRestored: () => {
@@ -184,8 +190,14 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     },
   })
   // A saved component being edited has a history of its own; otherwise it is the project's.
-  const canUndo = computed(() => (editingPrefab.value ? componentHistory.canUndo.value : history.canUndo.value))
-  const canRedo = computed(() => (editingPrefab.value ? componentHistory.canRedo.value : history.canRedo.value))
+  /** What the history being shown says: the component's while one is edited, otherwise the project's. */
+  const shown = <T>(ofComponent: { readonly value: T }, ofProject: { readonly value: T }) =>
+    computed(() => (editingPrefab.value ? ofComponent.value : ofProject.value))
+  const shownCanUndo = shown(componentHistory.canUndo, history.canUndo)
+  const canUndo = computed(() => !!deletedPrefab.deleted.value || shownCanUndo.value)
+  const canRedo = shown(componentHistory.canRedo, history.canRedo)
+  const historyVersions = shown(componentHistory.versions, history.versions)
+  const historyPending = shown(componentHistory.pending, history.pending)
   const commitProject = () => {
     clearTimeout(historyTimer)
     if (transactionDepth === 0 && !history.isRestoring.value) commitHistory()
@@ -230,7 +242,26 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       commit()
     }
   }
+  /** Brings back the component deleted last, unless something was edited after it. */
+  const restoreDeletedPrefab = () => {
+    // Changes not recorded yet are newer than the deletion.
+    commit()
+    const restored = deletedPrefab.bringBack()
+    if (!restored) return false
+    void componentHistory.revive(restored.prefab.prefabId, restored.history)
+    setNotice(`Restored ${restored.prefab.name} to My components.`)
+    return true
+  }
+  const deletePrefab = (prefabId: string) => {
+    const name = prefabs.value.find(prefab => prefab.prefabId === prefabId)?.name
+    if (name === undefined) return
+    commit()
+    deletedPrefab.remember(prefabId)
+    deletePrefabMutation(mutationContext, prefabId)
+    setNotice(`Deleted component ${name}.`, true)
+  }
   const undo = () => {
+    if (restoreDeletedPrefab()) return
     if (editingPrefab.value) return componentHistory.undo()
     clearTimeout(historyTimer)
     history.undo()
@@ -241,6 +272,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     history.redo()
   }
   const restoreHistoryVersion = (index: number) => {
+    if (editingPrefab.value) return componentHistory.restoreVersion(index)
     clearTimeout(historyTimer)
     history.restore(index)
   }
@@ -505,6 +537,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   usePrefabEditLock(editingPrefabId, {
     lock: prefabSync.lock,
     save: prefabSync.flush,
+    onGranted: async prefabId => {
+      // What the tab that edited it before wrote last may not have arrived yet.
+      await prefabSync.refresh()
+      await componentHistory.load(prefabId)
+    },
     onRefused: prefabId => {
       const name = prefabs.value.find(prefab => prefab.prefabId === prefabId)?.name ?? 'This component'
       stopEditingPrefab()
@@ -630,6 +667,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       activePageId.value = (next.pages.find(page => page.id === opened.activePageId) ?? next.pages[0]).id
       checkpoints.value = [...opened.checkpoints]
       history.reset()
+      deletedPrefab.forget()
     } finally {
       isOpening = false
     }
@@ -761,7 +799,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     canUndo,
     canRedo,
     historyVersions,
-    historyPending: history.pending,
+    historyPending,
     checkpoints,
     undo,
     redo,
@@ -774,7 +812,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     flush,
     openProject,
     openPrefabLibrary: prefabSync.open,
-    flushPrefabs: prefabSync.flush,
+    flushPrefabs: () => {
+      componentHistory.commit()
+      return prefabSync.flush()
+    },
     hasUnsavedPrefabs: prefabSync.pending,
     importDocument,
     exportDocument: () => serializeProject(project.value),
@@ -846,7 +887,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     originalOf: instances.originalOf,
     setInstanceProps: instances.setInstanceProps,
     detachInstance: instances.detachInstance,
-    deletePrefab: (id: string) => deletePrefabMutation(mutationContext, id),
+    deletePrefab,
     selectNode,
     renameNode,
     updateSlotChildren,

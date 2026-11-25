@@ -352,7 +352,7 @@ tool(
 )
 tool(
   'get_history',
-  'The named steps of the history (newest first, with index) and the checkpoints. Use before a risky change, or to see what was done.',
+  "The named steps of the history (newest first, with index) and the checkpoints. Use before a risky change, or to see what was done. While the person edits a saved component, the steps are that component's (see scope), and undo, redo and restore_version act on them.",
   {},
 )
 tool(

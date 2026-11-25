@@ -1,5 +1,6 @@
 import { ref, watch, type Ref } from 'vue'
 import type { HeldLock } from '../../../../../shared/lib/webLocks'
+import type { SavedHistory } from './history'
 import type { Prefab } from './types'
 
 const SAVE_DELAY_MS = 250
@@ -8,6 +9,9 @@ export interface PrefabLibrary {
   list(): Promise<Prefab[]>
   put(prefab: Prefab): Promise<unknown>
   remove(prefabId: string): Promise<unknown>
+  /** The undo history of a component, or null when none was stored. It goes when the component is removed. */
+  readHistory(prefabId: string): Promise<SavedHistory | null>
+  writeHistory(prefabId: string, history: SavedHistory): Promise<unknown>
   /** Calls `listener` when another tab changed the library. */
   subscribe(listener: () => void): void
   /** Resolves with null when another tab is editing this component. */
@@ -105,5 +109,22 @@ export function usePrefabSync(prefabs: Ref<Prefab[]>, onError: () => void) {
 
   const lock = async (prefabId: string) => (library ? library.lock(prefabId) : { release: () => {} })
 
-  return { open, flush, pending, stop, lock }
+  /** Takes in what other tabs wrote, without waiting to be told about it. */
+  const refresh = () => enqueue(takeIn)
+
+  const readHistory = async (prefabId: string) => {
+    await queue
+    try {
+      return (await library?.readHistory(prefabId)) ?? null
+    } catch {
+      onError()
+      return null
+    }
+  }
+  const writeHistory = (prefabId: string, history: SavedHistory) =>
+    enqueue(async target => {
+      await target.writeHistory(prefabId, history)
+    })
+
+  return { open, flush, refresh, readHistory, writeHistory, pending, stop, lock }
 }

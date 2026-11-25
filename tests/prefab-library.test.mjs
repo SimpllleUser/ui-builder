@@ -147,3 +147,105 @@ test('the old library key is removed after it was moved', async () => {
   })
   assert.equal(value, null)
 })
+
+const variantOf = store => store.rootNode.props.variant
+const changeVariant = (store, variant) => {
+  store.updateNodeProp(store.rootNode.id, 'variant', variant)
+  store.commit()
+}
+/** Opens the component and waits until the tab holds it and has read its history. */
+const edit = async (store, prefabId) => {
+  store.editPrefab(prefabId)
+  await settle()
+}
+const leave = async store => {
+  store.stopEditingPrefab()
+  await store.flushPrefabs()
+  await settle()
+}
+
+test('the history of a component survives closing the app', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  const [{ prefabId }] = first.prefabs
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+
+  const reopened = await openTab()
+  await edit(reopened, prefabId)
+  assert.equal(reopened.historyVersions.length, 2)
+  reopened.undo()
+  assert.equal(variantOf(reopened), undefined)
+  await leave(reopened)
+
+  const again = await openTab()
+  await edit(again, prefabId)
+  assert.equal(variantOf(again), undefined)
+  again.redo()
+  assert.equal(variantOf(again), 'tonal', 'where the history stood is stored too')
+})
+
+test('tabs share the history of a component', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  await first.flushPrefabs()
+  const second = await openTab()
+  const [{ prefabId }] = second.prefabs
+
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+  await edit(second, prefabId)
+  changeVariant(second, 'outlined')
+  await leave(second)
+
+  await edit(first, prefabId)
+  assert.equal(first.historyVersions.length, 3)
+  first.undo()
+  assert.equal(variantOf(first), 'tonal', 'the step of the other tab is taken back as a step')
+  first.undo()
+  assert.equal(variantOf(first), undefined)
+})
+
+test('a deleted component comes back with its history, and removing it clears what was stored', async () => {
+  const store = await openTab()
+  save(store, 'Card')
+  const [{ prefabId }] = store.prefabs
+  await edit(store, prefabId)
+  changeVariant(store, 'tonal')
+  await leave(store)
+
+  store.deletePrefab(prefabId)
+  await store.flushPrefabs()
+  assert.equal(await (await repository()).readHistory(prefabId), null)
+
+  store.undo()
+  await store.flushPrefabs()
+  const reopened = await openTab()
+  assert.deepEqual(names(reopened.prefabs), ['Card'])
+  await edit(reopened, prefabId)
+  assert.equal(reopened.historyVersions.length, 2)
+  reopened.undo()
+  assert.equal(variantOf(reopened), undefined)
+})
+
+test('a component deleted without being opened since the app started keeps its history', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  const [{ prefabId }] = first.prefabs
+  await edit(first, prefabId)
+  changeVariant(first, 'tonal')
+  await leave(first)
+
+  const store = await openTab()
+  store.deletePrefab(prefabId)
+  await store.flushPrefabs()
+  store.undo()
+  await settle()
+  await store.flushPrefabs()
+
+  const reopened = await openTab()
+  await edit(reopened, prefabId)
+  assert.equal(reopened.historyVersions.length, 2)
+})

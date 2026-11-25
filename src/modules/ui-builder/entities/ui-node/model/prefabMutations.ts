@@ -70,5 +70,4 @@ export function insertPrefab(
 
 export function deletePrefab(context: PrefabMutationContext, prefabId: string): void {
   context.setPrefabs(context.getPrefabs().filter(prefab => prefab.prefabId !== prefabId))
-  context.setNotice('Saved component deleted.')
 }
