@@ -30,6 +30,7 @@ beforeEach(async () => {
   theme = ref(null)
   values = new Map()
   listeners = []
+  locks = fakeLocks()
   session = newSession()
 })
 afterEach(() => {
@@ -51,6 +52,45 @@ const channel = () => {
     },
   }
 }
+/** Web Locks shared by all tabs of a test. A wait gives up quickly, as the real timeout would later. */
+const fakeLocks = () => {
+  const holders = new Map()
+  const waiting = new Map()
+  const grant = (name, onStolen) => {
+    const holder = { onStolen }
+    holders.set(name, holder)
+    return {
+      release: () => {
+        if (holders.get(name) !== holder) return
+        holders.delete(name)
+        waiting.get(name)?.()
+      },
+    }
+  }
+  return {
+    tryAcquire: async (name, onStolen) => (holders.has(name) ? null : grant(name, onStolen)),
+    waitFor: (name, _timeout, onStolen) =>
+      new Promise(resolve => {
+        if (!holders.has(name)) return resolve(grant(name, onStolen))
+        const timer = setTimeout(() => resolve(null), 50)
+        waiting.set(name, () => {
+          clearTimeout(timer)
+          resolve(grant(name, onStolen))
+        })
+      }),
+    steal: async (name, onStolen) => {
+      holders.get(name)?.onStolen()
+      return grant(name, onStolen)
+    },
+  }
+}
+/** What a browser without Web Locks gives: the revision check is then the only protection. */
+const noLocks = () => ({
+  tryAcquire: async () => ({ release() {} }),
+  waitFor: async () => ({ release() {} }),
+  steal: async () => ({ release() {} }),
+})
+let locks
 const newSession = (editor = store, tab = new Map()) =>
   createProjectSession({
     repository,
@@ -59,6 +99,7 @@ const newSession = (editor = store, tab = new Map()) =>
     browserStorage: memoryStorage(values),
     tabStorage: memoryStorage(tab),
     channel: channel(),
+    locks,
   })
 const emptyDocument = () => store.exportDocument()
 const create = (name, document = emptyDocument()) => repository.createProject({ name, document })
@@ -224,6 +265,8 @@ test('a tab reopens its own project, and a new tab the one used last', async () 
 })
 
 test('a tab left behind does not overwrite what another tab saved', async () => {
+  locks = noLocks()
+  session = newSession()
   await session.start()
   const id = session.currentProjectId.value
   const { editor, other } = await secondTab()
@@ -246,6 +289,8 @@ test('a tab left behind does not overwrite what another tab saved', async () => 
 })
 
 test('the changes of a tab left behind can be kept as a copy', async () => {
+  locks = noLocks()
+  session = newSession()
   await session.start()
   const id = session.currentProjectId.value
   const { editor } = await secondTab()
@@ -262,6 +307,8 @@ test('the changes of a tab left behind can be kept as a copy', async () => {
 })
 
 test('a project deleted in another tab is not written back', async () => {
+  locks = noLocks()
+  session = newSession()
   await session.start()
   const id = session.currentProjectId.value
   const { editor, other } = await secondTab()
@@ -302,4 +349,69 @@ test('the exported file carries the theme, and importing it brings the theme bac
 test('a damaged project is exported as it was saved', async () => {
   const broken = await repository.createProject({ name: 'Broken', document: '{oops', preferences: { theme: '{}' } })
   assert.equal(await session.exportFile(broken.id), '{oops')
+})
+
+const settle = () => new Promise(resolve => setTimeout(resolve, 20))
+
+test('a second tab is locked out until the first hands the project over, with its changes', async () => {
+  await session.start()
+  const { editor, other } = await secondTab()
+  assert.equal(session.isLocked.value, false)
+  assert.equal(other.isLocked.value, true)
+
+  store.addComponent('VBtn')
+  assert.equal(await other.editHere(), true)
+  assert.equal(other.isLocked.value, false)
+  assert.equal(session.isLocked.value, true)
+  assert.equal(editor.rootNode.children.length, 1, 'the change made just before is there')
+
+  store.addComponent('VCard', 'root-canvas')
+  await store.flush()
+  assert.equal(store.saveState, 'error', 'the tab that let go no longer writes')
+  assert.equal(await elements(other.currentProjectId.value), 1)
+  editor.$dispose()
+})
+
+test('a project another tab edits is not deleted, and switching away frees the lock', async () => {
+  await session.start()
+  const first = session.currentProjectId.value
+  const { editor, other } = await secondTab()
+  await assert.rejects(other.remove(first), /open in another tab/)
+
+  await session.create('Shop')
+  assert.equal(await other.editHere(), true)
+  await assert.rejects(session.remove(first), /open in another tab/)
+  editor.$dispose()
+})
+
+test('a tab that does not answer can be taken over', async () => {
+  await session.start()
+  const { editor, other } = await secondTab()
+  listeners.splice(0, 1)
+
+  assert.equal(await other.editHere(), false)
+  assert.equal(other.isLocked.value, true)
+  assert.equal(await other.editHere('force'), true)
+  await settle()
+  assert.equal(session.isLocked.value, true)
+  assert.equal(other.isLocked.value, false)
+  editor.$dispose()
+})
+
+test('the lock adapter works with the real Web Locks API', { skip: !globalThis.navigator?.locks }, async () => {
+  const { createTabLocks } = await server.ssrLoadModule('/src/shared/lib/webLocks.ts')
+  const tabs = createTabLocks()
+  let stolen = false
+  const first = await tabs.tryAcquire('lock-test', () => (stolen = true))
+  assert.ok(first)
+  assert.equal(await tabs.tryAcquire('lock-test', () => {}), null)
+  assert.equal(await tabs.waitFor('lock-test', 20, () => {}), null)
+
+  const second = await tabs.steal('lock-test', () => {})
+  await settle()
+  assert.equal(stolen, true)
+  second.release()
+  const third = await tabs.waitFor('lock-test', 1000, () => {})
+  assert.ok(third)
+  third.release()
 })

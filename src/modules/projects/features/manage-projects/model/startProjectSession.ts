@@ -5,6 +5,7 @@ import {
   sanitizeThemeSettings,
   useThemeSettings,
 } from '../../../../theme/entities/theme-settings'
+import { createTabLocks } from '../../../../../shared/lib/webLocks'
 import { openProjectRepository } from '../../../entities/project'
 import { openProjectChannel } from './projectChannel'
 import { createProjectSession } from './projectSession'
@@ -33,6 +34,7 @@ export async function startProjectSession(store: ReturnType<typeof useUiTreeStor
     browserStorage: window.localStorage,
     tabStorage: window.sessionStorage,
     channel: openProjectChannel(),
+    locks: createTabLocks(),
   })
   await session.start()
   return session

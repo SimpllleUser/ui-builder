@@ -21,10 +21,22 @@ import {
   type ProjectMeta,
   type ProjectRepository,
 } from '../../../entities/project'
+import type { HeldLock, TabLocks } from '../../../../../shared/lib/webLocks'
 import { themeOfProjectFile, toProjectFile } from './projectFile'
 import { ProjectEvent, type ProjectChannel, type ProjectMessage } from './projectChannel'
 
 export const LAST_PROJECT_KEY = 'ui-builder:last-project'
+const HAND_OVER_TIMEOUT_MS = 4000
+const LOCKED_MESSAGE = 'Not saved: this project is being edited in another tab.'
+const lockName = (id: string) => `ui-builder:project:${id}`
+
+/** How to take over a project another tab is editing. */
+export enum Takeover {
+  /** Ask that tab to save and let go. */
+  Ask = 'ask',
+  /** Take it even though that tab does not answer; what it has not saved stays only there. */
+  Force = 'force',
+}
 
 /** Why the open project can no longer be saved as it is. */
 export enum ProjectConflict {
@@ -56,11 +68,12 @@ interface SessionSources {
   /** Lives as long as the tab, so each tab reopens its own project. */
   tabStorage: Pick<Storage, 'getItem' | 'setItem'>
   channel: ProjectChannel
+  locks: TabLocks
 }
 
 /** Which project is open in this tab, and moving between projects without mixing them. */
 export function createProjectSession(sources: SessionSources) {
-  const { repository, store, theme, browserStorage, tabStorage, channel } = sources
+  const { repository, store, theme, browserStorage, tabStorage, channel, locks } = sources
   const currentProjectId = ref<string | null>(null)
   /** Most recently changed first, as of the last `refresh`. */
   const projects = shallowRef<ProjectMeta[]>([])
@@ -71,6 +84,19 @@ export function createProjectSession(sources: SessionSources) {
   const conflict = ref<ProjectConflict | null>(null)
   /** The revision of the open document that this tab has read or written last. */
   let knownRevision = 0
+  /** True while another tab edits the open project: the editor is then not shown. */
+  const isLocked = ref(false)
+  let held: { id: string; lock: HeldLock } | null = null
+  const holds = (id: string) => held?.id === id
+  const onStolen = (id: string) => () => {
+    if (!holds(id)) return
+    held = null
+    isLocked.value = true
+  }
+  const releaseHeld = () => {
+    held?.lock.release()
+    held = null
+  }
   let latestRequest = 0
   /** Grows each time a project is put in the editor. */
   const openCount = ref(0)
@@ -80,7 +106,7 @@ export function createProjectSession(sources: SessionSources) {
     theme,
     text => {
       const id = currentProjectId.value
-      if (id) repository.updatePreferences(id, { theme: text }).catch(reportSaveFailure)
+      if (id && holds(id)) repository.updatePreferences(id, { theme: text }).catch(reportSaveFailure)
     },
     { flush: 'sync' },
   )
@@ -90,12 +116,18 @@ export function createProjectSession(sources: SessionSources) {
     return new SaveRejectedError(CONFLICT_MESSAGES[reason])
   }
 
+  /** Only the tab holding the project's lock writes to it. */
+  const asOwner = <T>(id: string, write: () => Promise<T>) => {
+    if (!holds(id)) return Promise.reject(new SaveRejectedError(LOCKED_MESSAGE))
+    return write()
+  }
+
   const storageFor = (id: string, revision: number): ProjectStorage => {
     let baseRevision = revision
     return {
       saveDocument: async document => {
         try {
-          baseRevision = await repository.saveDocument(id, document, baseRevision)
+          baseRevision = await asOwner(id, () => repository.saveDocument(id, document, baseRevision))
         } catch (error) {
           // A project already left must not mark the open one as conflicting.
           if (id !== currentProjectId.value) throw error
@@ -106,17 +138,31 @@ export function createProjectSession(sources: SessionSources) {
         if (id === currentProjectId.value) knownRevision = baseRevision
         channel.post({ event: ProjectEvent.Saved, id, revision: baseRevision })
       },
-      saveActivePageId: activePageId => repository.updatePreferences(id, { activePageId }),
-      saveCheckpoint: checkpoint => repository.saveCheckpoint(id, checkpoint),
-      deleteCheckpoint: checkpointId => repository.deleteCheckpoint(id, checkpointId),
+      saveActivePageId: activePageId => asOwner(id, () => repository.updatePreferences(id, { activePageId })),
+      saveCheckpoint: checkpoint => asOwner(id, () => repository.saveCheckpoint(id, checkpoint)),
+      deleteCheckpoint: checkpointId => asOwner(id, () => repository.deleteCheckpoint(id, checkpointId)),
     }
+  }
+
+  /** Saves what is here and lets the asking tab have the project. Keeps it when saving fails. */
+  const handOver = async (id: string) => {
+    // Locked first, so nothing more is changed while the last write runs.
+    isLocked.value = true
+    await store.flush()
+    if (!holds(id)) return
+    if (store.saveState === SaveState.Saved) releaseHeld()
+    else isLocked.value = false
   }
 
   const onMessage = ({ event, id, revision = 0 }: ProjectMessage) => {
     if (id === currentProjectId.value) {
+      if (event === ProjectEvent.ReleaseRequested && holds(id)) handOver(id)
       if (event === ProjectEvent.Removed) conflict.value = ProjectConflict.Deleted
-      if (event === ProjectEvent.Saved && revision > knownRevision) conflict.value = ProjectConflict.Changed
+      if (event === ProjectEvent.Saved && holds(id) && revision > knownRevision) {
+        conflict.value = ProjectConflict.Changed
+      }
     }
+    if (event === ProjectEvent.ReleaseRequested) return
     refresh().catch(() => {
       /* the list is read again the next time it is shown */
     })
@@ -139,36 +185,58 @@ export function createProjectSession(sources: SessionSources) {
   }
 
   /** Reads a project and puts it in the editor, also when it is the one already open. */
-  const load = async (id: string, { canLeave, unsaved }: Departure): Promise<boolean> => {
-    const request = ++latestRequest
+  const replaceOpenProject = async (id: string, request: number, { canLeave, unsaved }: Departure) => {
     if (!(await canLeave())) return false
-    const [content, preferences, checkpoints] = await Promise.all([
-      repository.readContent(id),
-      repository.readPreferences(id),
-      repository.listCheckpoints(id),
-    ])
-    // Changes made while reading are saved too before anything is replaced.
-    if (!(await canLeave()) || request !== latestRequest) return false
-    const opened: OpenedProject = {
-      document: content.document,
-      activePageId: preferences.activePageId,
-      checkpoints,
-      storage: storageFor(id, content.revision),
-    }
-    try {
-      store.openProject(opened, unsaved)
-    } catch {
-      store.setNotice('Could not open a damaged project. Its saved copy has not been changed.')
+    // The lock comes first, so what is read already includes the last write of its previous holder.
+    const lock = holds(id) ? held!.lock : await locks.tryAcquire(lockName(id), onStolen(id))
+    const giveBack = () => {
+      if (!holds(id)) lock?.release()
       return false
     }
-    currentProjectId.value = null
-    theme.value = preferences.theme
-    knownRevision = content.revision
-    conflict.value = null
-    currentProjectId.value = id
-    openCount.value++
-    rememberLast(id)
-    return true
+    try {
+      const [content, preferences, checkpoints] = await Promise.all([
+        repository.readContent(id),
+        repository.readPreferences(id),
+        repository.listCheckpoints(id),
+      ])
+      // Changes made while reading are saved too before anything is replaced.
+      if (!(await canLeave()) || request !== latestRequest) return giveBack()
+      const opened: OpenedProject = {
+        document: content.document,
+        activePageId: preferences.activePageId,
+        checkpoints,
+        storage: storageFor(id, content.revision),
+      }
+      try {
+        store.openProject(opened, unsaved)
+      } catch {
+        store.setNotice('Could not open a damaged project. Its saved copy has not been changed.')
+        return giveBack()
+      }
+      if (!holds(id)) releaseHeld()
+      held = lock ? { id, lock } : null
+      currentProjectId.value = null
+      theme.value = preferences.theme
+      knownRevision = content.revision
+      conflict.value = null
+      isLocked.value = !lock
+      currentProjectId.value = id
+      openCount.value++
+      rememberLast(id)
+      return true
+    } catch (error) {
+      giveBack()
+      throw error
+    }
+  }
+
+  /** Projects are loaded one at a time, so a tab never competes with itself for a lock. */
+  let loading: Promise<unknown> = Promise.resolve()
+  const load = (id: string, departure: Departure) => {
+    const request = ++latestRequest
+    const result = loading.then(() => (request === latestRequest ? replaceOpenProject(id, request, departure) : false))
+    loading = result.catch(() => {})
+    return result
   }
 
   const keepingChanges: Departure = { canLeave: allSaved, unsaved: UnsavedChanges.Write }
@@ -247,6 +315,27 @@ export function createProjectSession(sources: SessionSources) {
     return id ? load(id, droppingChanges) : false
   }
 
+  /** Takes the open project over from the tab editing it. Resolves with false when that tab did not let go. */
+  const editHere = async (takeover = Takeover.Ask) => {
+    const id = currentProjectId.value
+    if (!id) return false
+    if (holds(id)) return true
+    channel.post({ event: ProjectEvent.ReleaseRequested, id })
+    const lock =
+      takeover === Takeover.Force
+        ? await locks.steal(lockName(id), onStolen(id))
+        : await locks.waitFor(lockName(id), HAND_OVER_TIMEOUT_MS, onStolen(id))
+    if (!lock) return false
+    if (id !== currentProjectId.value) {
+      lock.release()
+      return false
+    }
+    held = { id, lock }
+    const loaded = await load(id, droppingChanges)
+    if (!loaded && isLocked.value) releaseHeld()
+    return loaded
+  }
+
   /** Keeps what this tab shows as a new project, whatever happened to the original. */
   const saveAsCopy = async () => {
     const document = store.exportDocument()
@@ -260,9 +349,12 @@ export function createProjectSession(sources: SessionSources) {
     return opened
   }
 
+  const openElsewhere = () => new Error('This project is open in another tab. Close it there first.')
+
   /** Deleting the open project opens another one first, a new empty one when there is none. */
   const remove = async (id: string) => {
     if (id === currentProjectId.value) {
+      if (!holds(id) && conflict.value !== ProjectConflict.Deleted) throw openElsewhere()
       // What is not saved yet is still written, in case the delete does not go through.
       await store.flush()
       await replaceCurrent()
@@ -270,7 +362,13 @@ export function createProjectSession(sources: SessionSources) {
       // Writes still going to the project being deleted finish before it goes.
       await store.flush()
     }
-    await repository.deleteProject(id)
+    const lock = await locks.tryAcquire(lockName(id), () => {})
+    if (!lock) throw openElsewhere()
+    try {
+      await repository.deleteProject(id)
+    } finally {
+      lock.release()
+    }
     channel.post({ event: ProjectEvent.Removed, id })
     await refresh()
     return true
@@ -313,6 +411,8 @@ export function createProjectSession(sources: SessionSources) {
     projects,
     conflict,
     openCount,
+    isLocked,
+    editHere,
     reloadCurrent,
     saveAsCopy,
     leaveDeleted: replaceCurrent,

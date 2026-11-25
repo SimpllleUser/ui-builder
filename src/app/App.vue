@@ -2,7 +2,12 @@
 import { AppView } from './appView'
 import { ref, defineAsyncComponent, onBeforeUnmount } from 'vue'
 import { StartupState, useProjectStartup } from './shell/useProjectStartup'
-import { ProjectConflictBanner, ProjectDialog, ProjectDialogs } from '../modules/projects/widgets/project-switcher'
+import {
+  ProjectConflictBanner,
+  ProjectDialog,
+  ProjectDialogs,
+  ProjectLockedScreen,
+} from '../modules/projects/widgets/project-switcher'
 import { useUiTreeStore } from '../modules/ui-builder/entities/ui-node'
 import { useApplyTheme } from '../modules/theme/entities/theme-settings'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
@@ -21,7 +26,9 @@ let disconnectMcp = () => {}
 const connectAgents = async () => {
   if (!import.meta.env.DEV) return
   const { connectMcpBridge } = await import('../modules/ui-builder/features/mcp-bridge')
-  disconnectMcp = connectMcpBridge(store)
+  disconnectMcp = connectMcpBridge(store, () =>
+    session.value?.isLocked.value ? 'This tab does not edit the project: it is open in another tab.' : null,
+  )
 }
 const { startup, session } = useProjectStartup(store, connectAgents)
 const projectDialog = ref<ProjectDialog | null>(null)
@@ -40,8 +47,9 @@ onBeforeUnmount(() => disconnectMcp())
     <template v-if="view === AppView.Current">
       <template v-if="startup === StartupState.Ready && session">
         <ProjectConflictBanner :session="session" />
+        <ProjectLockedScreen v-if="session.isLocked.value" :session="session" @open="projectDialog = $event" />
         <!-- A new key per project, so nothing a panel remembers is carried into another one. -->
-        <BuilderApp :key="session.openCount.value" :session="session" @open-projects="projectDialog = $event" />
+        <BuilderApp v-else :key="session.openCount.value" :session="session" @open-projects="projectDialog = $event" />
         <ProjectDialogs v-model="projectDialog" :session="session" />
       </template>
       <div v-else-if="startup === StartupState.Failed" class="pa-4">

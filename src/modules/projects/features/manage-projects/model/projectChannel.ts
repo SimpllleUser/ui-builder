@@ -3,6 +3,8 @@ export enum ProjectEvent {
   Removed = 'removed',
   /** A project was added or renamed. */
   ListChanged = 'list-changed',
+  /** A tab asks the one editing the project to save it and let it go. */
+  ReleaseRequested = 'release-requested',
 }
 
 export interface ProjectMessage {
