@@ -1,4 +1,5 @@
 import { openDatabase, requestResult, runTransaction, TransactionMode } from '../../../../../shared/lib/indexedDb'
+import { createTabLocks, type TabLocks } from '../../../../../shared/lib/webLocks'
 import type { PrefabLibrary } from '../model/prefabSync'
 import type { Prefab } from '../model/types'
 
@@ -7,6 +8,7 @@ const DATABASE_NAME = 'ui-builder-library'
 const DATABASE_VERSION = 1
 const CHANNEL_NAME = 'ui-builder:prefabs'
 const LEGACY_IMPORTED_KEY = 'legacy-imported'
+const LEGACY_BACKUP_PREFIX = 'legacy-backup:'
 export const LEGACY_PREFABS_KEY = 'ui-builder:prefabs'
 
 enum StoreName {
@@ -65,8 +67,9 @@ const allRecords = (transaction: IDBTransaction): Promise<PrefabRecord[]> =>
 interface RepositorySources {
   factory?: IDBFactory
   channel?: LibraryChannel
-  /** Where the library lived before, to be moved over once. The old key is kept. */
-  legacyStorage?: Pick<Storage, 'getItem'>
+  /** Where the library lived before, to be moved over once. */
+  legacyStorage?: Pick<Storage, 'getItem' | 'removeItem'>
+  locks?: TabLocks
 }
 
 /** Saved components, one record each, so tabs that change different components do not overwrite each other. */
@@ -74,19 +77,24 @@ export async function openPrefabRepository({
   factory = indexedDB,
   channel = openLibraryChannel(),
   legacyStorage = window.localStorage,
+  locks = createTabLocks(),
 }: RepositorySources = {}): Promise<PrefabLibrary> {
   const database = await openDatabase(factory, DATABASE_NAME, DATABASE_VERSION, createStores)
   const write = (stores: StoreName[], work: (transaction: IDBTransaction) => Promise<void>) =>
     runTransaction(database, stores, TransactionMode.Write, work)
 
+  const legacy = legacyStorage.getItem(LEGACY_PREFABS_KEY)
   await write([StoreName.Prefabs, StoreName.Meta], async transaction => {
     const meta = transaction.objectStore(StoreName.Meta)
+    // The raw value is kept here, so removing it from the old storage loses nothing, broken entries included.
+    if (legacy !== null) meta.put(legacy, `${LEGACY_BACKUP_PREFIX}${Date.now()}`)
     if (await requestResult(meta.get(LEGACY_IMPORTED_KEY))) return
-    readLegacyPrefabs(legacyStorage.getItem(LEGACY_PREFABS_KEY)).forEach((prefab, order) => {
+    readLegacyPrefabs(legacy).forEach((prefab, order) => {
       transaction.objectStore(StoreName.Prefabs).put({ prefab, order }, prefab.prefabId)
     })
     meta.put(true, LEGACY_IMPORTED_KEY)
   })
+  if (legacy !== null) legacyStorage.removeItem(LEGACY_PREFABS_KEY)
 
   return {
     list: () =>
@@ -109,5 +117,6 @@ export async function openPrefabRepository({
       channel.post()
     },
     subscribe: listener => channel.subscribe(listener),
+    lock: prefabId => locks.tryAcquire(`ui-builder:prefab:${prefabId}`, () => {}),
   }
 }

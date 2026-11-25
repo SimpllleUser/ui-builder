@@ -148,10 +148,33 @@ export function createProjectSession(sources: SessionSources) {
   const handOver = async (id: string) => {
     // Locked first, so nothing more is changed while the last write runs.
     isLocked.value = true
+    // So that the other tab can edit saved components too.
+    store.stopEditingPrefab()
     await store.flush()
     if (!holds(id)) return
     if (store.saveState === SaveState.Saved) releaseHeld()
     else isLocked.value = false
+  }
+
+  /** Shows what the editing tab has saved since. Nothing is written and no lock is asked for. */
+  const refreshView = async (id: string) => {
+    const [content, preferences, checkpoints] = await Promise.all([
+      repository.readContent(id),
+      repository.readPreferences(id),
+      repository.listCheckpoints(id),
+    ])
+    // Unsaved changes left by a forced takeover stay on screen until the person decides about them.
+    if (id !== currentProjectId.value || !isLocked.value || store.saveState !== SaveState.Saved) return
+    const opened: OpenedProject = {
+      document: content.document,
+      activePageId: store.activePageId,
+      checkpoints,
+      storage: storageFor(id, content.revision),
+    }
+    store.openProject(opened, UnsavedChanges.Discard)
+    theme.value = preferences.theme
+    knownRevision = content.revision
+    openCount.value++
   }
 
   const onMessage = ({ event, id, revision = 0 }: ProjectMessage) => {
@@ -160,6 +183,11 @@ export function createProjectSession(sources: SessionSources) {
       if (event === ProjectEvent.Removed) conflict.value = ProjectConflict.Deleted
       if (event === ProjectEvent.Saved && holds(id) && revision > knownRevision) {
         conflict.value = ProjectConflict.Changed
+      }
+      if (event === ProjectEvent.Saved && isLocked.value && !holds(id)) {
+        refreshView(id).catch(() => {
+          /* the view stays as it was; taking over reads the project again */
+        })
       }
     }
     if (event === ProjectEvent.ReleaseRequested) return
@@ -374,6 +402,12 @@ export function createProjectSession(sources: SessionSources) {
     return true
   }
 
+  /** Applies the theme a file carries to the open project; a file without one leaves the theme as it is. */
+  const applyFileTheme = (text: string) => {
+    const carried = themeOfProjectFile(text)
+    if (carried) theme.value = carried
+  }
+
   const listDetails = async (): Promise<ProjectDetails[]> => {
     await refresh()
     return Promise.all(
@@ -419,6 +453,7 @@ export function createProjectSession(sources: SessionSources) {
     refresh,
     listDetails,
     exportFile,
+    applyFileTheme,
     open,
     create,
     importProject,

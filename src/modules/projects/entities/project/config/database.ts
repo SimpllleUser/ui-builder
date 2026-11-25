@@ -12,6 +12,7 @@ export enum StoreName {
 
 export const CHECKPOINTS_BY_PROJECT = 'by-project'
 export const LEGACY_IMPORTED_KEY = 'legacy-imported'
+export const LEGACY_BACKUP_PREFIX = 'legacy-backup:'
 
 /** Where the single project lived before there were several. */
 export enum LegacyStorageKey {

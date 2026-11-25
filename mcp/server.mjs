@@ -190,8 +190,12 @@ tool(
 tool('select_node', 'Select a node in the editor (omit id to clear).', { id: z.string().optional() })
 tool('undo', 'Undo the last change.', {})
 tool('redo', 'Redo the last undone change.', {})
-tool('export_document', 'Export the page as JSON text.', {})
-tool('import_document', 'Replace the page with exported JSON (undoable).', { json: z.string() })
+tool('export_document', 'Export the open project as JSON text, its theme included.', {})
+tool(
+  'import_document',
+  'Replace the open project with exported JSON. Undo brings the content back, but not a theme the JSON carried.',
+  { json: z.string() },
+)
 
 const projectRef = z.string().describe('Project id or exact name')
 tool('list_projects', 'The projects saved in this browser, and which one is open.', {})

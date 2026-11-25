@@ -1,4 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
+import type { HeldLock } from '../../../../../shared/lib/webLocks'
 import type { Prefab } from './types'
 
 const SAVE_DELAY_MS = 250
@@ -9,6 +10,8 @@ export interface PrefabLibrary {
   remove(prefabId: string): Promise<unknown>
   /** Calls `listener` when another tab changed the library. */
   subscribe(listener: () => void): void
+  /** Resolves with null when another tab is editing this component. */
+  lock(prefabId: string): Promise<HeldLock | null>
 }
 
 /**
@@ -100,5 +103,7 @@ export function usePrefabSync(prefabs: Ref<Prefab[]>, onError: () => void) {
 
   const stop = () => clearTimeout(timer)
 
-  return { open, flush, pending, stop }
+  const lock = async (prefabId: string) => (library ? library.lock(prefabId) : { release: () => {} })
+
+  return { open, flush, pending, stop, lock }
 }

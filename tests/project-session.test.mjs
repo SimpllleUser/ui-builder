@@ -39,7 +39,11 @@ afterEach(() => {
 })
 after(() => server.close())
 
-const memoryStorage = map => ({ getItem: key => map.get(key) ?? null, setItem: (key, value) => map.set(key, value) })
+const memoryStorage = map => ({
+  getItem: key => map.get(key) ?? null,
+  setItem: (key, value) => map.set(key, value),
+  removeItem: key => map.delete(key),
+})
 /** Delivers a message to every other tab, as BroadcastChannel does. */
 let listeners
 const channel = () => {
@@ -459,4 +463,33 @@ test('an agent in a locked tab cannot edit, but can move to a free project', asy
   await run(editor, other, 'add_component', { type: 'VBtn' })
   assert.equal(editor.rootNode.children.length, 1)
   editor.$dispose()
+})
+
+test('a locked tab shows what the editing tab saves, and writes nothing', async () => {
+  await session.start()
+  const id = session.currentProjectId.value
+  const { editor, other } = await secondTab()
+  store.addComponent('VBtn')
+  await store.flush()
+  await settle()
+
+  assert.equal(other.isLocked.value, true)
+  assert.equal(editor.rootNode.children.length, 1)
+  assert.equal(editor.saveState, 'saved')
+  assert.equal(await elements(id), 1)
+  editor.$dispose()
+})
+
+test('export_document and import_document carry the theme', async () => {
+  const run = await mcpTab()
+  await session.start()
+  theme.value = '{"mode":"dark"}'
+  const file = await run(store, session, 'export_document')
+  assert.deepEqual(JSON.parse(file).theme, { mode: 'dark' })
+
+  theme.value = null
+  await run(store, session, 'import_document', { json: file })
+  assert.equal(theme.value, '{"mode":"dark"}')
+  await run(store, session, 'import_document', { json: store.exportDocument() })
+  assert.equal(theme.value, '{"mode":"dark"}', 'a file without a theme keeps the current one')
 })

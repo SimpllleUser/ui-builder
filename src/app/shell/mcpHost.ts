@@ -24,5 +24,10 @@ export function createMcpHost(session: ProjectSession, lastNotice: () => string)
     open: async id => opened(await session.open(id)),
     rename: (id, name) => session.rename(id, name),
   }
-  return { projects, refusal: () => (session.isLocked.value ? LOCKED : null) }
+  return {
+    projects,
+    refusal: () => (session.isLocked.value ? LOCKED : null),
+    exportFile: () => session.exportFile(session.currentProjectId.value ?? ''),
+    applyFileTheme: session.applyFileTheme,
+  }
 }

@@ -9,6 +9,7 @@ import {
   ProjectDialogs,
   ProjectLockedScreen,
 } from '../modules/projects/widgets/project-switcher'
+import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { useUiTreeStore } from '../modules/ui-builder/entities/ui-node'
 import { useApplyTheme } from '../modules/theme/entities/theme-settings'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
@@ -50,7 +51,9 @@ onBeforeUnmount(() => disconnectMcp())
     <template v-if="view === AppView.Current">
       <template v-if="startup === StartupState.Ready && session">
         <ProjectConflictBanner :session="session" />
-        <ProjectLockedScreen v-if="session.isLocked.value" :session="session" @open="projectDialog = $event" />
+        <ProjectLockedScreen v-if="session.isLocked.value" :session="session" @open="projectDialog = $event">
+          <MainCanvas :key="session.openCount.value" preview-only />
+        </ProjectLockedScreen>
         <!-- A new key per project, so nothing a panel remembers is carried into another one. -->
         <BuilderApp v-else :key="session.openCount.value" :session="session" @open-projects="projectDialog = $event" />
         <ProjectDialogs v-model="projectDialog" :session="session" />

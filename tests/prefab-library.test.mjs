@@ -5,7 +5,14 @@ import { createServer } from 'vite'
 import { createPinia } from 'pinia'
 import { IDBFactory } from 'fake-indexeddb'
 
-let server, useStore, openPrefabRepository, factory, listeners
+let server, useStore, openPrefabRepository, factory, listeners, held
+const locks = {
+  tryAcquire: async name => {
+    if (held.has(name)) return null
+    held.add(name)
+    return { release: () => held.delete(name) }
+  },
+}
 
 before(async () => {
   server = await createServer({
@@ -23,6 +30,7 @@ before(async () => {
 })
 beforeEach(() => {
   factory = new IDBFactory()
+  held = new Set()
   listeners = []
 })
 after(() => server.close())
@@ -38,7 +46,12 @@ const channel = () => {
   }
 }
 const repository = (legacy = null) =>
-  openPrefabRepository({ factory, channel: channel(), legacyStorage: { getItem: () => legacy } })
+  openPrefabRepository({
+    factory,
+    channel: channel(),
+    locks,
+    legacyStorage: { getItem: () => legacy, removeItem: () => {} },
+  })
 const openTab = async legacy => {
   const store = useStore(createPinia())
   await store.openPrefabLibrary(await repository(legacy))
@@ -101,4 +114,36 @@ test('components from localStorage move over once, and broken entries are left o
   store.deletePrefab('a')
   await store.flushPrefabs()
   assert.deepEqual((await openTab(legacy)).prefabs, [], 'a deleted component does not come back')
+})
+
+test('a component is edited in one tab at a time', async () => {
+  const first = await openTab()
+  save(first, 'Card')
+  await first.flushPrefabs()
+  const second = await openTab()
+  const [{ prefabId }] = second.prefabs
+
+  first.editPrefab(prefabId)
+  await settle()
+  second.editPrefab(prefabId)
+  await settle()
+  assert.equal(second.editingPrefab, null)
+  assert.match(second.notice, /“Card” is being edited in another tab/)
+
+  first.stopEditingPrefab()
+  await settle()
+  second.editPrefab(prefabId)
+  await settle()
+  assert.equal(second.editingPrefab.prefabId, prefabId)
+})
+
+test('the old library key is removed after it was moved', async () => {
+  let value = '[]'
+  await openPrefabRepository({
+    factory,
+    channel: channel(),
+    locks,
+    legacyStorage: { getItem: () => value, removeItem: () => (value = null) },
+  })
+  assert.equal(value, null)
 })

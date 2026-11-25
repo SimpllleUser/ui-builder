@@ -23,7 +23,10 @@ after(() => server.close())
 const create = (name, document = '{}') => repository.createProject({ name, document })
 const names = async () => (await repository.listProjects()).map(project => project.name).sort()
 const checkpoint = (checkpointId, createdAt = 1) => ({ checkpointId, name: checkpointId, createdAt, snapshot: '{}' })
-const legacyStorage = values => ({ getItem: key => values[key] ?? null })
+const legacyStorage = values => {
+  const items = { ...values }
+  return { items, getItem: key => items[key] ?? null, removeItem: key => delete items[key] }
+}
 const legacyValues = {
   'ui-builder:document:v1': '{"pages":[]}',
   'ui-builder:active-page': 'page_1',
@@ -126,4 +129,16 @@ test('a failed import writes nothing and is tried again', async () => {
   await assert.rejects(repository.importOnce(() => ({ name: 'Old', document: '{}', preferences: { theme: () => {} } })))
   assert.deepEqual(await names(), [])
   assert.ok(await projects.migrateLegacyProject(repository, legacyStorage(legacyValues)))
+})
+
+test('old keys are removed only after a copy of them is stored, and the theme key stays', async () => {
+  const storage = legacyStorage(legacyValues)
+  await projects.migrateLegacyProject(repository, storage)
+
+  assert.deepEqual(Object.keys(storage.items), ['ui-builder-theme-settings'])
+  const [backup] = await repository.listBackups()
+  assert.equal(backup['ui-builder:document:v1'], legacyValues['ui-builder:document:v1'])
+  assert.equal(backup['ui-builder:history-checkpoints'], legacyValues['ui-builder:history-checkpoints'])
+  await projects.migrateLegacyProject(repository, storage)
+  assert.equal((await repository.listBackups()).length, 1)
 })

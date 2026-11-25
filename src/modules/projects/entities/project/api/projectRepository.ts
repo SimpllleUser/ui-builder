@@ -3,6 +3,7 @@ import {
   CHECKPOINTS_BY_PROJECT,
   DATABASE_NAME,
   DATABASE_VERSION,
+  LEGACY_BACKUP_PREFIX,
   LEGACY_IMPORTED_KEY,
   StoreName,
 } from '../config/database'
@@ -178,6 +179,24 @@ export async function openProjectRepository(factory: IDBFactory = indexedDB, dat
         if (!legacy) return null
         const name = uniqueProjectName(await allProjects(transaction), legacy.name)
         return writeProject(transaction, { ...legacy, name })
+      }),
+
+    /** Keeps raw values from the old storage, so removing them there loses nothing. */
+    keepBackup: (values: Record<string, string>) =>
+      write([StoreName.Meta], async transaction => {
+        transaction.objectStore(StoreName.Meta).put(values, `${LEGACY_BACKUP_PREFIX}${Date.now()}`)
+      }),
+
+    /** Every backup, oldest first. */
+    listBackups: () =>
+      read([StoreName.Meta], async transaction => {
+        const meta = transaction.objectStore(StoreName.Meta)
+        const keys = (await requestResult(meta.getAllKeys())).filter(key =>
+          String(key).startsWith(LEGACY_BACKUP_PREFIX),
+        )
+        const backups: Record<string, string>[] = []
+        for (const key of keys) backups.push(await requestResult(meta.get(key)))
+        return backups
       }),
 
     close: () => database.close(),

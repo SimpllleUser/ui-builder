@@ -22,6 +22,10 @@ export interface McpProjects {
 
 export interface McpHost {
   projects: McpProjects
+  /** The open project as a file, theme included. */
+  exportFile(): Promise<string>
+  /** Takes over the theme of an imported file, when it has one. */
+  applyFileTheme(text: string): void
   /** Why the editor cannot be changed now, or null when it can. */
   refusal(): string | null
 }
@@ -52,6 +56,8 @@ export async function runMcpCommand(store: Store, host: McpHost, command: string
   if (projectCommand) return projectCommand(host.projects, args)
   const reason = host.refusal()
   if (reason) throw new Error(reason)
+  if (command === 'export_document') return host.exportFile()
   const result = executeMcpCommand(store, command, args)
+  if (command === 'import_document') host.applyFileTheme(String(args.json))
   return command === 'get_status' ? { project: host.projects.current(), ...(result as object) } : result
 }

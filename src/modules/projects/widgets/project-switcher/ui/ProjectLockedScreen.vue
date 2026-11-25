@@ -32,25 +32,49 @@ const editHere = (takeover: Takeover) =>
 </script>
 
 <template>
-  <div class="d-flex flex-grow-1 align-center justify-center pa-4">
-    <VCard max-width="480" variant="outlined" :title="`“${name}” is open in another tab`">
-      <VCardText>
-        <p>One tab edits a project at a time, so no changes get lost.</p>
-        <p v-if="noAnswer" class="text-warning mt-2" role="alert">
-          The other tab did not let it go. Taking over anyway keeps what it has not saved only in that tab.
-        </p>
-        <p v-if="failure" class="text-error mt-2" role="alert">{{ failure }}</p>
-      </VCardText>
-      <VCardActions class="flex-wrap ga-2">
-        <VBtn color="primary" variant="flat" :loading="waiting" @click="editHere(Takeover.Ask)">Edit here</VBtn>
-        <VBtn v-if="noAnswer" color="warning" variant="tonal" :disabled="waiting" @click="editHere(Takeover.Force)">
+  <div class="locked-project">
+    <VAlert type="info" variant="tonal" density="compact" class="flex-grow-0 ma-2" icon="mdi-lock-outline">
+      <strong>“{{ name }}” is open in another tab.</strong>
+      This is a read-only view: one tab edits a project at a time, so no changes get lost.
+      <div v-if="noAnswer" class="text-warning mt-1" role="alert">
+        The other tab did not let it go. Taking over anyway keeps what it has not saved only in that tab.
+      </div>
+      <div v-if="failure" class="text-error mt-1" role="alert">{{ failure }}</div>
+      <div class="d-flex flex-wrap ga-2 mt-2">
+        <VBtn size="small" color="primary" variant="flat" :loading="waiting" @click="editHere(Takeover.Ask)">
+          Edit here
+        </VBtn>
+        <VBtn
+          v-if="noAnswer"
+          size="small"
+          color="warning"
+          variant="tonal"
+          :disabled="waiting"
+          @click="editHere(Takeover.Force)"
+        >
           Take over anyway
         </VBtn>
-        <VBtn v-if="hasUnsaved" variant="tonal" :disabled="waiting" @click="attempt(session.saveAsCopy)">
+        <VBtn v-if="hasUnsaved" size="small" variant="tonal" :disabled="waiting" @click="attempt(session.saveAsCopy)">
           Keep mine as a copy
         </VBtn>
-        <VBtn variant="text" @click="emit('open', ProjectDialog.List)">Other projects…</VBtn>
-      </VCardActions>
-    </VCard>
+        <VBtn size="small" variant="text" @click="emit('open', ProjectDialog.List)">Other projects…</VBtn>
+      </div>
+    </VAlert>
+    <div class="locked-project__view">
+      <slot />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.locked-project {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.locked-project__view {
+  flex: 1;
+  min-height: 0;
+}
+</style>

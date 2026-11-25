@@ -17,6 +17,7 @@ import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
 import { usePreviewRuntime } from './previewRuntime'
 import { usePrefabSync } from './prefabSync'
+import { usePrefabEditLock } from './prefabEditLock'
 import { snapshotPreview } from './previewSnapshot'
 import { resolveTableData } from './tableBindings'
 import { bindAction } from './runtime'
@@ -452,6 +453,15 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     editingPrefabId.value = null
     selectedNodeIds.value = []
   }
+  usePrefabEditLock(editingPrefabId, {
+    lock: prefabSync.lock,
+    save: prefabSync.flush,
+    onRefused: prefabId => {
+      const name = prefabs.value.find(prefab => prefab.prefabId === prefabId)?.name ?? 'This component'
+      stopEditingPrefab()
+      setNotice(`“${name}” is being edited in another tab.`)
+    },
+  })
   // The component being edited was removed, for example in another tab.
   watch(editingPrefab, prefab => {
     if (!prefab && editingPrefabId.value) stopEditingPrefab()
