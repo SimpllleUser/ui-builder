@@ -253,16 +253,52 @@ tool(
     vFor: z.string().optional(),
   },
 )
-tool('set_event', 'Set what a click does in preview, or null to clear.', {
-  id,
-  click: z.union([
-    z.object({ type: z.literal('navigate'), to: z.string().describe('Page path') }),
-    z.object({ type: z.literal('set'), key: z.string(), value: z.string().describe('JSON or text') }),
-    z.object({ type: z.literal('toggle'), key: z.string() }),
-    z.null(),
-  ]),
-})
-
+const action = z.union([
+  z.object({ type: z.literal('navigate'), to: z.string().describe('Page path') }),
+  z.object({ type: z.literal('set'), key: z.string(), value: z.string().describe('JSON or text') }),
+  z.object({ type: z.literal('toggle'), key: z.string() }),
+  z.object({ type: z.literal('append'), key: z.string().describe('List variable'), value: z.string() }),
+  z.object({ type: z.literal('remove'), key: z.string().describe('List variable'), value: z.string() }),
+  z.object({ type: z.literal('notify'), message: z.string() }),
+  z.object({ type: z.literal('resetForm') }),
+])
+const actions = z.union([action, z.array(action), z.null()]).optional()
+tool(
+  'set_event',
+  'Set what events of an element do in preview. Each is one action, a list that runs in order, or null to clear; events not given stay. click: any element (a table row gives {{item}}). change: form fields and controls ({{value}}). submit: VForm, only when its rules pass; the button needs props type "submit". mounted: when the element appears. resetForm resets the surrounding form.',
+  { id, click: actions, change: actions, submit: actions, mounted: actions },
+)
+const rules = z.union([
+  z.array(
+    z.object({
+      type: z.enum(['required', 'email', 'minLength', 'maxLength', 'min', 'max']),
+      value: z.union([z.string(), z.number()]).optional(),
+      message: z.string().optional(),
+    }),
+  ),
+  z.null(),
+])
+tool(
+  'set_rules',
+  'Set the validation rules of a form field (replaces them; null clears). value is the number a length or min/max rule compares with.',
+  { id, rules },
+)
+tool(
+  'set_computed',
+  'Define a variable worked out from others, e.g. total = length(rows) or fullName = first + " " + last. Operators of conditions and length, empty, contains. null removes it.',
+  { name: z.string(), expression: z.union([z.string(), z.null()]) },
+)
+tool(
+  'set_data_source',
+  'Load a variable from a mock REST endpoint: its starting value (set_state) is the answer. Preview starts empty, waits delayMs, then fills it without sending a request; loadingVariable is true meanwhile. Exported code uses fetch(url). url null removes it.',
+  {
+    name: z.string().describe('Existing variable'),
+    url: z.union([z.string(), z.null()]).describe('Path such as /api/orders, or an http(s) address'),
+    delayMs: z.number().optional(),
+    loadingVariable: z.string().optional(),
+  },
+)
+tool('preview_submit', 'Submit a form in Preview. Returns the broken rules, or runs the submit actions.', { id })
 const subtree = z.lazy(() =>
   z.object({
     type: z.string().describe('Component type, e.g. VCard, VBtn, div'),
@@ -276,13 +312,11 @@ const subtree = z.lazy(() =>
     vIf: z.string().optional(),
     vFor: z.string().optional(),
     click: z
-      .object({
-        type: z.enum(['navigate', 'set', 'toggle']),
-        to: z.string().optional(),
-        key: z.string().optional(),
-        value: z.string().optional(),
-      })
-      .optional(),
+      .union([action, z.array(action)])
+      .optional()
+      .describe('Short for events.click'),
+    events: z.object({ click: actions, change: actions, submit: actions, mounted: actions }).optional(),
+    rules: rules.optional().describe('Validation rules of a form field'),
     children: z.array(subtree).optional(),
     slots: z.record(z.string(), z.array(subtree)).optional(),
   }),

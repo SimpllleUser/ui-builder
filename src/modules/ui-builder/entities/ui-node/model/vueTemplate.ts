@@ -2,12 +2,16 @@ import { behaviorOf, clickEventOf, componentProps } from './componentBehaviors'
 import { CELL_SLOT_PREFIX, cellSlotName } from './componentDefinitions'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { actionToCode, lacksVariable, type CodeContext } from './actions'
-import { ClickEvent } from './enums'
+import { ActionType, ClickEvent, EventName } from './enums'
+import { actionsOf, eventEntries } from './events'
+import { formVariables, isForm } from './forms'
+import { walkNodes } from './treeUtils'
+import { rulesToCode } from './validationRules'
 import { responsiveRules } from './responsiveStyle'
 import { addHelper, expressionToJs, HelperName } from './expressionToJs'
 import { jsLiteral, jsString } from './jsLiteral'
 import { chipColumnKeys, STATUS_CHIP_PROPS } from './statusChips'
-import type { UiNode } from './types'
+import type { UiAction, UiNode } from './types'
 import { bindText, bindTextForTemplate, escapeAttribute, pathToJs } from './vueBindings'
 
 const INDENT = '  '
@@ -19,6 +23,15 @@ export interface TemplateContext extends CodeContext {
   known: ReadonlySet<string>
   /** Style rules the template needs, for elements that look different on smaller screens. */
   styles: Set<string>
+  /** The forms whose reset needs a function in the script. */
+  forms: ExportedForm[]
+}
+
+export interface ExportedForm {
+  /** Name of the template ref on the form. */
+  ref: string
+  resetName: string
+  variables: string[]
 }
 
 const jsLiteralInline = (texts: string[]) => `[${texts.map(jsString).join(', ')}]`
@@ -52,28 +65,76 @@ function propsToAttributes(node: UiNode, context: TemplateContext): string[] {
   return attributes
 }
 
-function eventAttributes(node: UiNode, context: TemplateContext): string[] {
-  const click = node.events?.click
-  if (!click) return []
-  const isRowClick = clickEventOf(node.type) === ClickEvent.Row
-  // Like Preview, an unfinished action does nothing, but an element's click still does not reach the row around it.
-  if (lacksVariable(click)) return isRowClick ? [] : [`@${ClickEvent.Element}.stop`]
-  const statement = actionToCode(click, context)
+const attribute = (name: string, code: string) => `${name}="${escapeAttribute(code)}"`
+
+/** The actions as statements. Like Preview, an action that is not finished does nothing. */
+const statementsOf = (actions: UiAction[], context: TemplateContext): string[] =>
+  actions
+    .filter(action => !lacksVariable(action))
+    .map(action => actionToCode(action, context))
+    .filter(Boolean)
+
+/** A handler with an argument; several statements need a block. */
+const arrow = (argument: string, statements: string[]) =>
+  statements.length === 1 ? `${argument} => ${statements[0]}` : `${argument} => { ${statements.join('; ')} }`
+
+function clickAttributes(node: UiNode, context: TemplateContext): string[] {
+  const actions = actionsOf(node.events, EventName.Click)
+  if (!actions.length) return []
+  const statements = statementsOf(actions, context)
   // A table row hands over its row as `item`; elsewhere the click must not also reach the row.
-  return isRowClick
-    ? [`@${ClickEvent.Row}="(_, { item }) => ${statement}"`]
-    : [`@${ClickEvent.Element}.stop="${statement}"`]
+  if (clickEventOf(node.type) === ClickEvent.Row)
+    return statements.length ? [attribute(`@${ClickEvent.Row}`, arrow('(_, { item })', statements))] : []
+  // An element's click does not reach the row around it, even when none of its actions is finished.
+  const name = `@${ClickEvent.Element}.stop`
+  return statements.length ? [attribute(name, statements.join('; '))] : [name]
 }
 
-/** A masked input formats what is typed before it reaches the variable, as in Preview. */
+function submitAttributes(node: UiNode, context: TemplateContext): string[] {
+  if (!isForm(node)) return []
+  const statements = statementsOf(actionsOf(node.events, EventName.Submit), context)
+  // Without `.prevent` the browser would reload the page.
+  if (!statements.length) return ['@submit.prevent']
+  const guarded = ['if (!(await event).valid) return', ...statements]
+  return [attribute('@submit.prevent', `async event => { ${guarded.join('; ')} }`)]
+}
+
+function mountedAttributes(node: UiNode, context: TemplateContext): string[] {
+  const statements = statementsOf(actionsOf(node.events, EventName.Mounted), context)
+  return statements.length ? [attribute('@vue:mounted', statements.join('; '))] : []
+}
+
+const eventAttributes = (node: UiNode, context: TemplateContext): string[] => [
+  ...clickAttributes(node, context),
+  ...submitAttributes(node, context),
+  ...mountedAttributes(node, context),
+]
+
+/**
+ * The link to a variable and the change actions. A masked input formats what is typed before it reaches the
+ * variable, as in Preview, and the actions then see the formatted value.
+ */
 function modelAttributes(node: UiNode, context: TemplateContext): string[] {
-  if (!node.model) return []
+  const changes = statementsOf(actionsOf(node.events, EventName.Change), context)
   const { mask } = node.props
-  if (typeof mask !== 'string' || !mask) return [`v-model="${node.model}"`]
+  const masked = !!node.model && typeof mask === 'string' && !!mask
+  const onChange = changes.length ? [attribute('@update:model-value', arrow('value', changes))] : []
+  if (!node.model) return onChange
+  if (!masked) return [`v-model="${node.model}"`, ...onChange]
+
   addHelper(context.helpers, HelperName.ApplyInputMask)
-  const bound = bindText(mask)
-  const maskCode = escapeAttribute(bound.dynamic ? bound.code : jsString(mask))
-  return [`:model-value="${node.model}"`, `@update:model-value="${node.model} = applyInputMask($event, ${maskCode})"`]
+  const bound = bindText(mask as string)
+  const maskCode = bound.dynamic ? bound.code : jsString(mask as string)
+  const assign = `${node.model} = applyInputMask($event, ${maskCode})`
+  const handler = changes.length
+    ? `input => { const value = applyInputMask(input, ${maskCode}); ${[`${node.model} = value`, ...changes].join('; ')} }`
+    : assign
+  return [`:model-value="${node.model}"`, attribute('@update:model-value', handler)]
+}
+
+function rulesAttributes(node: UiNode, context: TemplateContext): string[] {
+  const code = rulesToCode(node.rules, context.helpers)
+  return code ? [attribute(':rules', code)] : []
 }
 
 function conditionAttributes(node: UiNode, context: TemplateContext): string[] {
@@ -176,12 +237,38 @@ function renderText(node: UiNode, context: TemplateContext, depth: number): stri
   return [`${pad}<span ${directives.join(' ')}>${text}</span>`]
 }
 
+/** Writes an element while the form it starts, if any, is the one that "reset the form" means. */
 function renderElement(node: UiNode, context: TemplateContext, depth: number, withRepeat: boolean): string[] {
+  if (!isForm(node) || !resetsForm(node)) return renderTag(node, context, depth, withRepeat)
+  const number = context.forms.length + 1
+  const form = { ref: `form${number}`, resetName: `resetForm${number}`, variables: formVariables(node) }
+  context.forms.push(form)
+  const outer = context.resetFormCall
+  context.resetFormCall = `${form.resetName}()`
+  const lines = renderTag(node, context, depth, withRepeat, [`ref="${form.ref}"`])
+  context.resetFormCall = outer
+  return lines
+}
+
+const resetsForm = (form: UiNode) =>
+  [...walkNodes(form)].some(node =>
+    eventEntries(node.events).some(([, actions]) => actions.some(action => action.type === ActionType.ResetForm)),
+  )
+
+function renderTag(
+  node: UiNode,
+  context: TemplateContext,
+  depth: number,
+  withRepeat: boolean,
+  extra: string[] = [],
+): string[] {
   const pad = INDENT.repeat(depth)
   const attributes = [
+    ...extra,
     ...(withRepeat ? repeatAttributes(node) : []),
     ...conditionAttributes(node, context),
     ...modelAttributes(node, context),
+    ...rulesAttributes(node, context),
     ...propsToAttributes(node, context),
     ...eventAttributes(node, context),
   ]

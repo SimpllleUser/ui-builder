@@ -37,6 +37,12 @@ export interface ComponentBehavior {
   /** Names a slot receives from the component, or none for a plain slot. */
   slotParams?(slotName: string): readonly string[]
   clickEvent?: ClickEvent
+  /** A field with a value: it reports changes and can have validation rules. */
+  hasValue?: boolean
+  /** Its value can be checked by validation rules. */
+  hasRules?: boolean
+  /** It can be submitted, and its fields are checked and reset together. */
+  isForm?: boolean
   /** Set for overlays: they are drawn inline in the editor, with this note on their placeholder. */
   overlayNote?(props: Props): string
   /** Slot content is added from the component's settings, not from Layers. */
@@ -72,7 +78,24 @@ function summarizeTable(node: UiNode, scope: Scope): TableSummary {
   }
 }
 
+const VALUE_FIELDS = [
+  'VTextField',
+  'VTextarea',
+  'VSelect',
+  'VAutocomplete',
+  'VFileInput',
+  'VCheckbox',
+  'VSwitch',
+  'VSlider',
+  'VRadioGroup',
+]
+/** They report changes but have no rules of their own. */
+const VALUE_CONTROLS = ['VTabs', 'VBtnToggle', 'VPagination', 'VDatePicker']
+
 const BEHAVIORS: Readonly<Record<string, ComponentBehavior>> = {
+  ...Object.fromEntries(VALUE_FIELDS.map(type => [type, { hasValue: true, hasRules: true }])),
+  ...Object.fromEntries(VALUE_CONTROLS.map(type => [type, { hasValue: true }])),
+  VForm: { isForm: true },
   [DATA_TABLE_TYPE]: {
     editorOnlyProps: ['striped', 'bordered', 'headerColor'],
     editorClasses: tableStyleClasses,
@@ -102,6 +125,8 @@ const PLAIN_COMPONENT: ComponentBehavior = {}
 
 export const behaviorOf = (type: string): ComponentBehavior =>
   Object.hasOwn(BEHAVIORS, type) ? BEHAVIORS[type] : PLAIN_COMPONENT
+
+export const hasValidation = (type: string) => !!behaviorOf(type).hasRules
 
 export const clickEventOf = (type: string): ClickEvent => behaviorOf(type).clickEvent ?? ClickEvent.Element
 

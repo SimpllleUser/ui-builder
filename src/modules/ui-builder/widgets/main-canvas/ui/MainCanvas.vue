@@ -22,6 +22,7 @@ import { ThemeDefaultsProvider } from '../../../../theme/entities/theme-settings
 import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
 import BreakpointSwitcher from './BreakpointSwitcher.vue'
+import PreviewMessage from './PreviewMessage.vue'
 import MeasureOverlay from './MeasureOverlay.vue'
 import ResizeHandles from './ResizeHandles.vue'
 /** `previewOnly` shows the project without any way back to editing it. */
@@ -36,6 +37,8 @@ const zoom = ref(100)
 const previewTarget = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLElement>()
 const empty = computed(() => isNodeEmpty(rootNode.value))
+// A new key draws the page anew, so elements appear again. A shared layout stays while its pages change.
+const previewKey = computed(() => `${store.project.layout ? 'layout' : store.previewPage.id}:${store.previewRun}`)
 // In Preview the page itself may be empty even when a shared layout fills the screen around it.
 const previewPageEmpty = computed(() => isNodeEmpty(store.previewPage.root))
 const variables = computed(() =>
@@ -306,8 +309,9 @@ const leaveCanvas = (event: DragEvent) => {
         <div class="v-application preview-app" :class="`v-theme--${theme.global.name.value}`">
           <component :is="'style'">{{ previewStyles }}</component>
           <ThemeDefaultsProvider>
-            <NodeRenderer :key="store.previewPage.id" :node="store.previewRoot" :in-page="!store.project.layout" />
+            <NodeRenderer :key="previewKey" :node="store.previewRoot" :in-page="!store.project.layout" />
           </ThemeDefaultsProvider>
+          <PreviewMessage />
         </div>
       </Teleport>
     </div>
@@ -349,12 +353,13 @@ const leaveCanvas = (event: DragEvent) => {
       <div class="canvas-device" :style="{ width: isPreviewMode ? undefined : canvasWidth }">
         <ThemeDefaultsProvider>
           <NodeRenderer
-            :key="store.editingPrefab?.prefabId"
+            :key="`${store.editingPrefab?.prefabId}:${isPreviewMode ? store.previewRun : 'edit'}`"
             :node="isPreviewMode ? store.previewRoot : rootNode"
             :in-page="!!store.editingPrefab"
           />
         </ThemeDefaultsProvider>
       </div>
+      <PreviewMessage v-if="isPreviewMode" />
       <template v-if="!isPreviewMode">
         <HoverBadge :container="canvas" />
         <SelectionToolbar :container="canvas" />

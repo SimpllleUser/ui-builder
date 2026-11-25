@@ -17,7 +17,7 @@ interface Flat {
 
 const PROP_NAMES: Record<string, string> = { headers: 'columns', items: 'rows' }
 const MAX_PROPS_LISTED = 2
-const NO_BEHAVIOR = JSON.stringify([undefined, undefined, undefined, undefined])
+const NO_BEHAVIOR = JSON.stringify([undefined, undefined, undefined, undefined, undefined])
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 const quote = (text: string) => `“${text}”`
@@ -32,7 +32,7 @@ const flatten = (project: Project): Map<string, Flat> => {
       props: node.props,
       classes: node.classes.join(' '),
       responsive: JSON.stringify(node.responsive),
-      behavior: JSON.stringify([node.model, node.vIf, node.vFor, node.events]),
+      behavior: JSON.stringify([node.model, node.vIf, node.vFor, node.events, node.rules]),
       place: `${parent}|${slot}|${index}`,
       parent,
       slot,
@@ -95,6 +95,18 @@ function describePages(before: Project, after: Project): string | null {
 
 /** Variables are named last: an element that was added together with its variables is named after the element. */
 function describeState(before: Project, after: Project): string | null {
+  for (const [table, what] of [
+    ['computed', 'computed variable'],
+    ['sources', 'data source of'],
+  ] as const) {
+    const was: Record<string, unknown> = before[table] ?? {}
+    const now: Record<string, unknown> = after[table] ?? {}
+    for (const name of new Set([...Object.keys(was), ...Object.keys(now)])) {
+      if (!(name in was)) return `Added ${what} ${name}`
+      if (!(name in now)) return `Removed ${what} ${name}`
+      if (JSON.stringify(was[name]) !== JSON.stringify(now[name])) return `Changed ${what} ${name}`
+    }
+  }
   const names = new Set([...Object.keys(before.state), ...Object.keys(after.state)])
   for (const name of names) {
     if (!(name in before.state)) return `Added variable ${name}`

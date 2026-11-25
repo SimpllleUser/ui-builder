@@ -1,6 +1,6 @@
 import type { StepDirection } from './enums'
 import { TEXT_NODE_TYPE } from './constants'
-import type { UiNode, UiNodeEvents } from './types'
+import type { UiNode, UiNodeEvents, ValidationRule } from './types'
 import type { NodeLocation } from './treeUtils'
 
 export interface NodeMutationContext {
@@ -109,9 +109,10 @@ export interface NodeLogicPatch {
   vIf?: string
   vFor?: string
   events?: UiNodeEvents
+  rules?: ValidationRule[]
 }
 
-/** Sets bindings and events. An empty value, or `events` without a click action, removes that setting. */
+/** Sets bindings, events and rules. An empty value removes that setting. `events` replaces all events. */
 export function updateNodeLogic(context: NodeMutationContext, id: string, patch: NodeLogicPatch): boolean {
   const node = context.findNodeById(id)
   if (!node) return false
@@ -124,8 +125,13 @@ export function updateNodeLogic(context: NodeMutationContext, id: string, patch:
     else delete node[key]
   }
   if ('events' in patch) {
-    if (patch.events?.click) node.events = { click: patch.events.click }
+    const events = Object.fromEntries(Object.entries(patch.events ?? {}).filter(([, actions]) => actions))
+    if (Object.keys(events).length) node.events = events
     else delete node.events
+  }
+  if ('rules' in patch) {
+    if (patch.rules?.length) node.rules = patch.rules
+    else delete node.rules
   }
   context.commit()
   return true

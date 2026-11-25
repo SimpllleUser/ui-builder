@@ -23,7 +23,10 @@ Work in this order: `get_document` → build → `check_project` → try it with
 - `set_state` defines a variable. A value is JSON (`3`, `true`, `"text"`, `[1,2]`), so give text without extra quotes only when it is plain text.
 - Text and props accept `{{ name }}` and `{{ item.field }}`. Inside a repeated element (`vFor`) use `{{ item.field }}` and `{{ index }}`; inside a table cell slot use `{{ item.field }}` too.
 - `model` links an input to a variable. `vIf` shows an element only when true: `open`, `!loading`, `status == paid`, `step >= 2`, `role == "admin" and not loading`, `contains(tags, "new")`, `count > 0 ? a : b` (operators `== != < <= > >= && || ! and or not + - * / %`, functions `length`, `empty`, `contains`). `vFor` repeats for each item of an array variable (or `n` times).
-- A click does one of: `{type:"navigate", to:"/path"}`, `{type:"set", key, value}`, `{type:"toggle", key}`. Dialogs, drawers and snackbars open with `model` plus a click.
+- **Events** (`set_event`, or `events` in `add_subtree`): `click`, `change` (fields; `{{ value }}`), `submit` (VForm), `mounted`. Each is one action or a list that runs in order: `{type:"navigate", to}`, `{type:"set", key, value}`, `{type:"toggle", key}`, `{type:"append", key, value}`, `{type:"remove", key, value}` (first equal entry; `{{ item }}` inside a repeat), `{type:"notify", message}`, `{type:"resetForm"}`. Dialogs, drawers and snackbars open with `model` plus a click.
+- **Forms:** put linked fields in a `VForm`, give them `set_rules` (`required`, `email`, `minLength`, `maxLength`, `min`, `max`), set `props: { type: "submit" }` on the button and put the actions in the form's `submit`. They run only when every rule passes.
+- **Computed variables:** `set_computed` (`total` = `length(rows)`). They cannot be written by actions or `model`.
+- **Data:** give a list its sample rows with `set_state`, then `set_data_source` to make Preview load them from a mock endpoint, with an optional loading variable.
 - `{{ rows }}` alone keeps an array, so a table bound to a variable gets its rows.
 
 ## Tables
@@ -31,7 +34,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 
 ## Check your work
 - **`check_project`** lists problems (unknown variables, links to pages that do not exist, invalid conditions, empty tables, a layout without “Page content”). Fix every error.
-- **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document.
+- **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_submit`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Data sources arrive after their delay and `mounted` actions run once the page is drawn, so ask `preview_state` again for them. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document.
 - `undo` takes back your last step.
 
 ## Safety

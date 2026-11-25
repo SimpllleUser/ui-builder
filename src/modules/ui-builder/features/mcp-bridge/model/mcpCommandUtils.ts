@@ -15,6 +15,7 @@ export const summarize = (node: UiNode): unknown => ({
   ...(node.vIf ? { vIf: node.vIf } : {}),
   ...(node.vFor ? { vFor: node.vFor } : {}),
   ...(node.events ? { events: node.events } : {}),
+  ...(node.rules ? { rules: node.rules } : {}),
   ...(node.children.length ? { children: node.children.map(summarize) } : {}),
   ...(Object.keys(node.slots).length
     ? { slots: Object.fromEntries(Object.entries(node.slots).map(([k, v]) => [k, v.map(summarize)])) }

@@ -24,7 +24,9 @@ import { usePrefabSync } from './prefabSync'
 import { usePrefabEditLock } from './prefabEditLock'
 import { snapshotPreview } from './previewSnapshot'
 import { resolveTableData } from './tableBindings'
-import { bindAction } from './actions'
+import { actionsOf } from './events'
+import { createRuntimeState, isComputed } from './computedVariables'
+import { enclosingForm, formErrors, isForm, isSubmitButton, submitActions } from './forms'
 import {
   addPage as addPageMutation,
   deletePage as deletePageMutation,
@@ -35,6 +37,8 @@ import {
   removeStateVariable as removeStateVariableMutation,
   selectPage as selectPageMutation,
   setStateVariable as setStateVariableMutation,
+  setComputed as setComputedMutation,
+  setDataSource as setDataSourceMutation,
   updatePage as updatePageMutation,
   type ProjectMutationContext,
 } from './projectMutations'
@@ -80,9 +84,9 @@ import {
   type PrefabMutationContext,
 } from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateProps } from './templateFactory'
-import { type Breakpoint, type StepDirection, type TemplateKind } from './enums'
+import { EventName, type Breakpoint, type StepDirection, type TemplateKind } from './enums'
 import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
-import type { HistoryCheckpoint, Project, UiNode, Prefab } from './types'
+import type { DataSource, HistoryCheckpoint, Project, UiAction, UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
@@ -379,7 +383,17 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
         appendNode(mutationContext, parentId, node, slotName, prepare),
       ensureVariables: variables => {
         for (const [name, value] of Object.entries(variables)) {
-          if (!(name in project.value.state)) project.value.state[name] = value
+          if (!(name in project.value.state) && !isComputed(project.value, name)) project.value.state[name] = value
+        }
+      },
+      ensureDataSettings: (computed, sources) => {
+        for (const [name, formula] of Object.entries(computed)) {
+          if (!(name in project.value.state) && !isComputed(project.value, name))
+            project.value.computed = { ...project.value.computed, [name]: formula }
+        }
+        for (const [name, source] of Object.entries(sources)) {
+          if (name in project.value.state && !project.value.sources?.[name])
+            project.value.sources = { ...project.value.sources, [name]: source }
         }
       },
     }
@@ -469,7 +483,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     const picked = pickedElements(rootNode.value, selectedNodeIds.value)
     if (!picked.length) return null
     setNotice(`Copied ${picked.length === 1 ? picked[0].name : `${picked.length} elements`}.`)
-    return serializeElements(picked, project.value.state)
+    return serializeElements(picked, project.value)
   }
   const pasteElements = (text: string) => pasteElementsMutation(mutationContext, text, selectedNodeIds.value)
   /** Changes the element's style on the screen size being edited; `null` removes a property there. */
@@ -586,31 +600,54 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   )
   const findInPreview = (id: string) =>
     previewTrees.value.map(root => findNodeByIdInTree(id, root)).find(Boolean) ?? null
-  /** Clicks an element in Preview as a person would. For a table row, `row` says which one was clicked. */
-  const previewClick = (id: string, row?: number) => {
+  /** The element of Preview with the form it is in. Throws when Preview does not run or has no such element. */
+  const needInPreview = (id: string) => {
     if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
     const node = findInPreview(id)
     if (!node) throw new Error(`Node not found on the preview page: ${id}`)
-    const click = node.events?.click
-    if (!click) throw new Error(`“${node.name}” has no click action.`)
+    const root = previewTrees.value.find(tree => findNodeByIdInTree(id, tree))!
+    return { node, form: enclosingForm(root, id) }
+  }
+  /** Submits a form as a person would: its actions run only when every rule is satisfied. */
+  const submitForm = (form: UiNode) => {
+    const errors = formErrors(form, preview.state.value)
+    if (!errors.length) preview.runActions(submitActions(form), { form })
+    return errors
+  }
+  /** Clicks an element in Preview as a person would. For a table row, `row` says which one was clicked. */
+  const previewClick = (id: string, row?: number) => {
+    const { node, form } = needInPreview(id)
+    const actions = actionsOf(node.events, EventName.Click)
+    const submits = !!form && isSubmitButton(node)
+    if (!actions.length && !submits) throw new Error(`“${node.name}” has no click action.`)
     const data = { ...node.props, ...resolveTableData(node.props, preview.state.value) }
     const item = row === undefined ? undefined : (Array.isArray(data.items) ? data.items : [])[row]
     if (row !== undefined && item === undefined) throw new Error(`The table has no row ${row}.`)
-    preview.dispatch(bindAction(click, { ...preview.state.value, ...(row === undefined ? {} : { item, index: row }) }))
+    preview.runActions(actions, { form, scope: row === undefined ? {} : { item, index: row } })
+    return submits ? submitForm(form) : []
   }
-  /** Types into an input in Preview: sets the variable the input is linked to. */
+  /** Types into an input in Preview: sets the variable the input is linked to, then runs its change actions. */
   const previewInput = (id: string, value: unknown) => {
-    if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
-    const node = findInPreview(id)
-    if (!node?.model) throw new Error('That element is not linked to a variable.')
-    preview.state.value[node.model] = value
+    const { node, form } = needInPreview(id)
+    const actions = actionsOf(node.events, EventName.Change)
+    if (!node.model && !actions.length) throw new Error('That element is not linked to a variable.')
+    if (node.model) preview.state.value[node.model] = value
+    preview.runActions(actions, { form, scope: { value } })
+  }
+  const previewSubmit = (id: string) => {
+    const { node } = needInPreview(id)
+    if (!isForm(node)) throw new Error(`“${node.name}” is not a form.`)
+    return submitForm(node)
   }
   const describePreview = () =>
     snapshotPreview(
       project.value,
       editingPrefab.value ? { ...preview.page.value, root: previewRoot.value } : preview.page.value,
       preview.state.value,
+      preview.message.value?.text,
     )
+  /** What the canvas draws bindings with: every variable at its starting value, computed ones worked out. */
+  const startingState = computed(() => createRuntimeState(project.value.state, project.value.computed))
 
   const addTemplate = (kind: TemplateKind, props: TemplateProps = {}) =>
     addTemplateMutation(mutationContext, kind, props)
@@ -688,6 +725,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     startPreview,
     previewClick,
     previewInput,
+    previewSubmit,
+    startingState,
     describePreview,
     transaction,
     runtimeState: preview.state,
@@ -695,7 +734,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     previewPage: preview.page,
     previewRoot,
     navigate: preview.navigate,
-    dispatchAction: preview.dispatch,
+    previewMessage: preview.message,
+    previewRun: preview.run,
+    runActions: preview.runActions,
+    runAppearActions: preview.runAppearActions,
+    dispatchAction: (action: UiAction) => preview.runActions([action]),
+    setComputed: (name: string, formula: string | null) => setComputedMutation(projectContext, name, formula),
+    setDataSource: (name: string, source: DataSource | null) => setDataSourceMutation(projectContext, name, source),
     nodeLabel,
     findNodeById,
     findParentAndIndex,

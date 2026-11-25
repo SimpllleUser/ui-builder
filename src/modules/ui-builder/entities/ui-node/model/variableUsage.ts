@@ -1,5 +1,7 @@
 import { actionReferences } from './actions'
 import { TEXT_NODE_TYPE } from './constants'
+import { EventName } from './enums'
+import { eventEntries } from './events'
 import { expressionError, expressionVariables } from './expression'
 import { walkNodes } from './treeUtils'
 import type { Project, UiNode } from './types'
@@ -21,6 +23,7 @@ export enum UsageKind {
   Repeat = 'repeat',
   Condition = 'condition',
   Click = 'click',
+  Event = 'event',
 }
 
 export interface VariableReference {
@@ -42,11 +45,13 @@ export function variablesOfNode(node: UiNode): VariableReference[] {
   if (node.vFor) add(ROOT_NAME.exec(node.vFor)?.[1], UsageKind.Repeat)
   if (node.vIf && !expressionError(node.vIf))
     expressionVariables(node.vIf).forEach(name => add(name, UsageKind.Condition))
-  const click = node.events?.click
-  if (click) {
-    const { variable, text } = actionReferences(click)
-    add(variable, UsageKind.Click)
-    if (text) addBindings(text, UsageKind.Click)
+  for (const [event, actions] of eventEntries(node.events)) {
+    const kind = event === EventName.Click ? UsageKind.Click : UsageKind.Event
+    for (const action of actions) {
+      const { variable, text } = actionReferences(action)
+      add(variable, kind)
+      if (text) addBindings(text, kind)
+    }
   }
   return references
 }

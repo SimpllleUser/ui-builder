@@ -1,9 +1,11 @@
 import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_NODES, TEXT_NODE_TYPE } from './constants'
 import { isRecord, validateElements } from './documentValidator'
+import { withDependencies } from './computedVariables'
+import { isDataSource } from './dataSources'
 import { variableNameError } from './projectMutations'
 import { childNodes, findNodeById, getNodeList, walkNodes, type NodeLocation } from './treeUtils'
 import { variablesOfNode } from './variableUsage'
-import type { UiNode } from './types'
+import type { DataSource, Project, UiNode } from './types'
 import type { NodeMutationContext } from './nodeMutations'
 
 /** Marks clipboard text as elements of this editor, so any other text is left alone. */
@@ -13,11 +15,15 @@ export interface CopiedElements {
   nodes: UiNode[]
   /** Starting values of the variables the elements use, for a project that does not have them yet. */
   state: Record<string, unknown>
+  computed: Record<string, string>
+  sources: Record<string, DataSource>
 }
 
 export interface ClipboardMutationContext extends NodeMutationContext {
   getRoot(): UiNode
   ensureVariables(variables: Record<string, unknown>): void
+  /** Adds the computed variables and data sources the project does not have yet. */
+  ensureDataSettings(computed: Record<string, string>, sources: Record<string, DataSource>): void
   setSelectedNodeIds(ids: string[]): void
 }
 
@@ -34,10 +40,33 @@ export function pickedElements(root: UiNode, ids: readonly string[]): UiNode[] {
   return picked
 }
 
-export function serializeElements(nodes: UiNode[], state: Record<string, unknown>): string {
+export function serializeElements(nodes: UiNode[], project: Project): string {
   const used = nodes.flatMap(node => [...walkNodes(node)]).flatMap(variablesOfNode)
-  const variables = Object.fromEntries(used.filter(({ name }) => name in state).map(({ name }) => [name, state[name]]))
-  return JSON.stringify({ kind: CLIPBOARD_KIND, nodes, state: variables })
+  const names = new Set(
+    withDependencies(
+      used.map(({ name }) => name),
+      project.computed,
+    ),
+  )
+  for (const [name, { loadingVariable }] of Object.entries(project.sources ?? {}))
+    if (names.has(name) && loadingVariable) names.add(loadingVariable)
+  const pick = <T>(table: Record<string, T> = {}) =>
+    Object.fromEntries(Object.entries(table).filter(([name]) => names.has(name)))
+  return JSON.stringify({
+    kind: CLIPBOARD_KIND,
+    nodes,
+    state: pick(project.state),
+    computed: pick(project.computed),
+    sources: pick(project.sources),
+  })
+}
+
+/** The entries of a table from outside that have a usable variable name and a valid value. */
+function namedEntries<T>(table: unknown, isEntry: (item: unknown) => item is T): Record<string, T> {
+  const entries = Object.entries(isRecord(table) ? table : {})
+  return Object.fromEntries(
+    entries.filter((entry): entry is [string, T] => variableNameError(entry[0]) === null && isEntry(entry[1])),
+  )
 }
 
 /** Elements held by a clipboard text, or null when the text is something else. Throws when they are damaged. */
@@ -50,10 +79,11 @@ export function parseElements(text: string): CopiedElements | null {
   }
   if (!isRecord(data) || data.kind !== CLIPBOARD_KIND) return null
   if (!Array.isArray(data.nodes) || !data.nodes.length) throw new Error('The copied elements are empty.')
-  const state = isRecord(data.state) ? data.state : {}
   return {
     nodes: validateElements(data.nodes),
-    state: Object.fromEntries(Object.entries(state).filter(([name]) => variableNameError(name) === null)),
+    state: namedEntries(data.state, (_): _ is unknown => true),
+    computed: namedEntries(data.computed, (item): item is string => typeof item === 'string'),
+    sources: namedEntries(data.sources, isDataSource),
   }
 }
 
@@ -133,6 +163,7 @@ export function pasteElements(
 
   context.commit()
   context.ensureVariables(copied.state)
+  context.ensureDataSettings(copied.computed, copied.sources)
   const parent = findNodeById(target.parent.id, context.getRoot())!
   if (target.slotName) parent.slots[target.slotName] ??= []
   const list = getNodeList({ parent, slotName: target.slotName, index: target.index })

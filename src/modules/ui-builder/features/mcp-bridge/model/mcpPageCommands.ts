@@ -1,4 +1,5 @@
-import { StepDirection, type UiAction } from '../../../entities/ui-node'
+import { DEFAULT_DELAY_MS, hasValidation, StepDirection } from '../../../entities/ui-node'
+import { eventsFromInput, rulesFromInput } from './mcpLogic'
 import { need, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 export const pageSummary = (store: Store) =>
@@ -69,8 +70,25 @@ export const MCP_PAGE_COMMANDS: Record<string, McpCommand> = {
   },
   set_event(store, a) {
     const node = need(store, a.id)
-    const click = a.click as UiAction | null | undefined
-    store.updateNodeLogic(node.id, { events: click ? { click } : undefined })
+    store.updateNodeLogic(node.id, { events: eventsFromInput(node.events, a) })
     return summarize(node)
+  },
+  set_rules(store, a) {
+    const node = need(store, a.id)
+    if (!hasValidation(node.type)) throw new Error(`${node.type} is not a form field, so it has no rules.`)
+    store.updateNodeLogic(node.id, { rules: rulesFromInput(a.rules) })
+    return summarize(node)
+  },
+  set_computed(store, a) {
+    ok(store.setComputed(String(a.name), a.expression ?? null), store.notice || 'Invalid computed variable')
+    return { computed: store.project.computed ?? {} }
+  },
+  set_data_source(store, a) {
+    const source =
+      a.url === null || a.url === undefined
+        ? null
+        : { url: String(a.url), delayMs: a.delayMs ?? DEFAULT_DELAY_MS, loadingVariable: a.loadingVariable }
+    ok(store.setDataSource(String(a.name), source), store.notice || 'Invalid data source')
+    return { sources: store.project.sources ?? {} }
   },
 }

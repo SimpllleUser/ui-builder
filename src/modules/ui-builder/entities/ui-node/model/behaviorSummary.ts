@@ -1,12 +1,17 @@
 import { describeAction } from './actions'
+import { EventName } from './enums'
+import { eventEntries } from './events'
+import { ruleLabel } from './validationRules'
 import type { UiNode } from './types'
 
-/** The four things an element can be made to do in Preview, as they are shown on the canvas and in Layers. */
+/** The things an element can be made to do in Preview, as they are shown on the canvas and in Layers. */
 export enum BehaviorBadge {
   Repeat = 'repeat',
   Condition = 'condition',
   Link = 'link',
   Click = 'click',
+  Event = 'event',
+  Rules = 'rules',
 }
 
 export interface BehaviorNote {
@@ -19,7 +24,14 @@ export interface BehaviorNote {
 
 const filled = (text: string | undefined): text is string => !!text?.trim()
 
-/** What Behavior an element carries, in the order Preview applies it (repeat, condition, link, click). */
+const EVENT_PHRASES: Record<EventName, string> = {
+  [EventName.Click]: 'On click',
+  [EventName.Change]: 'On change',
+  [EventName.Submit]: 'On submit',
+  [EventName.Mounted]: 'When it appears',
+}
+
+/** What Behavior an element carries, in the order Preview applies it (repeat, condition, link, events, rules). */
 export function describeBehaviors(node: UiNode): BehaviorNote[] {
   const notes: BehaviorNote[] = []
   if (filled(node.vFor))
@@ -40,9 +52,18 @@ export function describeBehaviors(node: UiNode): BehaviorNote[] {
       shortLabel: 'link',
       description: `Linked to the variable ${node.model.trim()}`,
     })
-  const click = node.events?.click
-  if (click)
-    notes.push({ badge: BehaviorBadge.Click, shortLabel: 'click', description: `On click: ${describeAction(click)}` })
+  for (const [event, actions] of eventEntries(node.events))
+    notes.push({
+      badge: event === EventName.Click ? BehaviorBadge.Click : BehaviorBadge.Event,
+      shortLabel: event,
+      description: `${EVENT_PHRASES[event]}: ${actions.map(describeAction).join(', then ')}`,
+    })
+  if (node.rules?.length)
+    notes.push({
+      badge: BehaviorBadge.Rules,
+      shortLabel: 'rules',
+      description: `Checked: ${node.rules.map(rule => ruleLabel(rule.type).toLowerCase()).join(', ')}`,
+    })
   return notes
 }
 

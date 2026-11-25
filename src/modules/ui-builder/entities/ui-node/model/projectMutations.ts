@@ -3,8 +3,10 @@ import { RESERVED_NAMES } from './reservedNames'
 import { MAX_PAGES } from './constants'
 import { defaultLayout, emptyPage } from './document'
 import { isValidPagePath } from './documentValidator'
+import { formulaError } from './computedVariables'
+import { endpointError, MAX_DELAY_MS } from './dataSources'
 import { cloneNodeWithNewIds } from './nodeUtils'
-import type { Page, Project, UiNode } from './types'
+import type { DataSource, Page, Project, UiNode } from './types'
 
 const STATE_NAME = /^[A-Za-z_$][\w$]*$/
 
@@ -173,6 +175,10 @@ export function removeLayout(context: ProjectMutationContext) {
 }
 
 export function setStateVariable(context: ProjectMutationContext, name: string, value: unknown): boolean {
+  if (Object.hasOwn(context.project.computed ?? {}, name)) {
+    context.setNotice(`“${name}” is computed: change its expression instead.`)
+    return false
+  }
   // A variable saved before its name was refused can still be given a new value.
   const nameError = Object.hasOwn(context.project.state, name) ? null : variableNameError(name)
   if (nameError) {
@@ -185,8 +191,67 @@ export function setStateVariable(context: ProjectMutationContext, name: string, 
   return true
 }
 
+/** Removes an entry and, when it was the last, the whole table, so projects without it stay as they were. */
+function dropEntry(project: Project, table: 'computed' | 'sources', name: string) {
+  const entries = project[table]
+  if (!entries) return
+  delete entries[name]
+  if (!Object.keys(entries).length) delete project[table]
+}
+
 export function removeStateVariable(context: ProjectMutationContext, name: string) {
   undoable(context, () => {
     delete context.project.state[name]
+    dropEntry(context.project, 'sources', name)
   })
+}
+
+/** Defines or changes a computed variable; null removes it. */
+export function setComputed(context: ProjectMutationContext, name: string, formula: string | null): boolean {
+  const { project } = context
+  if (formula === null) {
+    undoable(context, () => dropEntry(project, 'computed', name))
+    return true
+  }
+  const exists = Object.hasOwn(project.computed ?? {}, name)
+  const problem =
+    (exists ? null : variableNameError(name)) ??
+    (Object.hasOwn(project.state, name) ? 'A variable with this name already exists.' : null) ??
+    formulaError(name, formula, project.computed)
+  if (problem) {
+    context.setNotice(`Computed variable ${name}: ${problem}`)
+    return false
+  }
+  undoable(context, () => {
+    project.computed = { ...project.computed, [name]: formula.trim() }
+  })
+  return true
+}
+
+/** Loads a variable from a mock endpoint, or stops doing so with null. */
+export function setDataSource(context: ProjectMutationContext, name: string, source: DataSource | null): boolean {
+  const { project } = context
+  if (!source) {
+    undoable(context, () => dropEntry(project, 'sources', name))
+    return true
+  }
+  const loading = source.loadingVariable?.trim()
+  const problem =
+    (Object.hasOwn(project.state, name) ? null : `There is no variable “${name}”.`) ??
+    endpointError(source.url) ??
+    (loading ? (loading === name ? 'Use another variable for loading.' : variableNameError(loading)) : null)
+  if (problem) {
+    context.setNotice(`Data source of ${name}: ${problem}`)
+    return false
+  }
+  undoable(context, () => {
+    const delayMs = Math.min(MAX_DELAY_MS, Math.max(0, source.delayMs || 0))
+    project.sources = {
+      ...project.sources,
+      [name]: { url: source.url, delayMs, ...(loading ? { loadingVariable: loading } : {}) },
+    }
+    if (loading && !Object.hasOwn(project.state, loading) && !Object.hasOwn(project.computed ?? {}, loading))
+      project.state[loading] = false
+  })
+  return true
 }

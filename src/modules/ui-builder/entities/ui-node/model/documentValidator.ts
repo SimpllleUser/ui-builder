@@ -1,10 +1,14 @@
 import { isValidAction } from './actions'
+import { isDataSource } from './dataSources'
+import { EventName } from './enums'
+import { MAX_ACTIONS_PER_EVENT } from './events'
+import { isRuleType } from './validationRules'
 import { behaviorOf } from './componentBehaviors'
 import { getComponentDef, getNodeSlots } from './componentDefinitions'
 import { DOCUMENT_VERSION, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_NODES, MAX_PAGES, ROOT_NODE_ID } from './constants'
 import { OVERRIDE_BREAKPOINTS } from './breakpoints'
 import { isCssDeclaration } from './responsiveStyle'
-import type { Page, Project, UiNode, UiNodeEvents } from './types'
+import type { DataSource, Page, Project, UiNode } from './types'
 
 export function validateProject(value: unknown): Project {
   if (!isRecord(value)) throw new Error('Unsupported document version.')
@@ -39,10 +43,14 @@ export function validateProject(value: unknown): Project {
     return { id: page.id, name: page.name, path: page.path, root: { ...validateTree(page.root), name: page.name } }
   })
   if (state !== undefined && !isRecord(state)) throw new Error('Invalid state in document.')
+  const computed = validateRecord(value.computed, (item): item is string => typeof item === 'string', 'computed')
+  const sources = validateRecord(value.sources, isDataSource, 'data source')
   return {
     pages: validPages,
     layout: layout === null || layout === undefined ? null : validateTree(layout),
     state: (state as Record<string, unknown>) ?? {},
+    ...(computed ? { computed } : {}),
+    ...(sources ? { sources } : {}),
   }
 }
 
@@ -51,6 +59,17 @@ export function validateElements(values: unknown[]): UiNode[] {
   const ids = new Set<string>()
   let nodeCount = 0
   return values.map(value => validateNode(value, ids, () => ++nodeCount, 0))
+}
+
+/** An optional table of project settings by variable name. */
+function validateRecord<T extends string | DataSource>(
+  value: unknown,
+  isEntry: (item: unknown) => item is T,
+  what: string,
+): Record<string, T> | undefined {
+  if (value === undefined) return undefined
+  if (!isRecord(value) || !Object.values(value).every(isEntry)) throw new Error(`Invalid ${what} in document.`)
+  return value as Record<string, T>
 }
 
 export const isValidPagePath = (path: string) => /^\/[A-Za-z0-9_\-/]*$/.test(path) && path.length <= 100
@@ -85,6 +104,7 @@ function validateNode(value: unknown, ids: Set<string>, countNode: () => number,
 
   validateLogic(value)
   validateResponsive(value.responsive)
+  validateRules(value.rules)
   ids.add(id)
   const definition = getComponentDef(type)!
   if (children.length && (definition.isLeaf || !definition.slots.some(slot => slot.name === 'default'))) {
@@ -130,13 +150,30 @@ function validateLogic({ model, vIf, vFor, events }: Record<string, unknown>) {
   const optionalString = (item: unknown) => item === undefined || (typeof item === 'string' && item.length <= 200)
   if (!optionalString(model) || !optionalString(vIf) || !optionalString(vFor))
     throw new Error('Invalid binding in document.')
-  if (events === undefined) return
-  const click = isRecord(events) ? (events as UiNodeEvents).click : undefined
+  if (events !== undefined && !isValidEvents(events)) throw new Error('Invalid event in document.')
+}
+
+const isValidActions = (actions: unknown) => {
+  const list = Array.isArray(actions) ? actions : [actions]
+  return list.length <= MAX_ACTIONS_PER_EVENT && list.every(action => isRecord(action) && isValidAction(action))
+}
+
+const isValidEvents = (events: unknown) =>
+  isRecord(events) &&
+  Object.entries(events).every(
+    ([name, actions]) =>
+      Object.values<string>(EventName).includes(name) && (actions === undefined || isValidActions(actions)),
+  )
+
+function validateRules(rules: unknown) {
+  const optionalText = (item: unknown) => item === undefined || (typeof item === 'string' && item.length <= 200)
   const valid =
-    isRecord(events) &&
-    Object.keys(events).every(key => key === 'click') &&
-    (click === undefined || (isRecord(click) && isValidAction(click)))
-  if (!valid) throw new Error('Invalid event in document.')
+    rules === undefined ||
+    (Array.isArray(rules) &&
+      rules.every(
+        rule => isRecord(rule) && isRuleType(rule.type) && optionalText(rule.value) && optionalText(rule.message),
+      ))
+  if (!valid) throw new Error('Invalid validation rule in document.')
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

@@ -2,6 +2,7 @@ import { behaviorOf, type TableSummary } from './componentBehaviors'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { evaluateCondition, interpolate, repeatItems, type Scope } from './runtime'
 import { childNodes } from './treeUtils'
+import { checkRules } from './validationRules'
 import type { Page, Project, UiNode } from './types'
 
 export interface PreviewSnapshot {
@@ -12,14 +13,16 @@ export interface PreviewSnapshot {
   /** Elements that “show only when” keeps out of sight right now. */
   hidden: Array<{ id: string; name: string; condition: string }>
   /** What each input shows, by the variable it is linked to. */
-  inputs: Array<{ id: string; name: string; variable: string; value: unknown }>
+  inputs: Array<{ id: string; name: string; variable: string; value: unknown; error?: string }>
+  /** The message an action showed last. */
+  message?: string
   tables: Array<{ id: string; name: string } & TableSummary>
 }
 
 const MAX_TEXTS = 300
 
 /** What a person would see in Preview, worked out from the project and the current variables, without drawing it. */
-export function snapshotPreview(project: Project, page: Page, state: Scope): PreviewSnapshot {
+export function snapshotPreview(project: Project, page: Page, state: Scope, message?: string): PreviewSnapshot {
   const snapshot: PreviewSnapshot = {
     page: { id: page.id, name: page.name, path: page.path },
     variables: state,
@@ -27,6 +30,7 @@ export function snapshotPreview(project: Project, page: Page, state: Scope): Pre
     hidden: [],
     inputs: [],
     tables: [],
+    ...(message ? { message } : {}),
   }
 
   const visit = (node: UiNode, scope: Scope) => {
@@ -50,8 +54,11 @@ export function snapshotPreview(project: Project, page: Page, state: Scope): Pre
       if (text && snapshot.texts.length < MAX_TEXTS) snapshot.texts.push(text)
       return
     }
-    if (node.model)
-      snapshot.inputs.push({ id: node.id, name: node.name, variable: node.model, value: scope[node.model] })
+    if (node.model) {
+      const value = scope[node.model]
+      const error = checkRules(node.rules, value)
+      snapshot.inputs.push({ id: node.id, name: node.name, variable: node.model, value, ...(error ? { error } : {}) })
+    }
     const summary = behaviorOf(node.type).summarize?.(node, scope)
     if (summary) snapshot.tables.push({ id: node.id, name: node.name, ...summary })
     visitChildren(node, scope)

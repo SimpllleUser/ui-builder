@@ -3,6 +3,28 @@ export enum ActionType {
   Navigate = 'navigate',
   Set = 'set',
   Toggle = 'toggle',
+  Append = 'append',
+  Remove = 'remove',
+  Notify = 'notify',
+  ResetForm = 'resetForm',
+}
+
+/** When an element's actions run. The values are saved in project files. */
+export enum EventName {
+  Click = 'click',
+  Change = 'change',
+  Submit = 'submit',
+  Mounted = 'mounted',
+}
+
+/** A check of what a form field holds. The values are saved in project files. */
+export enum RuleType {
+  Required = 'required',
+  Email = 'email',
+  MinLength = 'minLength',
+  MaxLength = 'maxLength',
+  Min = 'min',
+  Max = 'max',
 }
 
 /** How a click on an element reaches its action; the values are the events listened to. */
@@ -112,6 +134,10 @@ export enum IssueKind {
   EmptyTable = 'empty-table',
   MissingOutlet = 'missing-outlet',
   EmptyPage = 'empty-page',
+  ReadOnlyVariable = 'read-only-variable',
+  MissingForm = 'missing-form',
+  InvalidRule = 'invalid-rule',
+  InvalidFormula = 'invalid-formula',
 }
 
 /** How serious a problem is: an error breaks what the person built, a warning probably does, info is advice. */

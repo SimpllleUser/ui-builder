@@ -32,6 +32,11 @@ export const MCP_DIAGNOSTIC_COMMANDS: Record<string, McpCommand> = {
     store.previewClick(String(a.id), a.row)
     return store.describePreview()
   },
+  preview_submit: (store, a) => {
+    need(store, a.id)
+    const errors = store.previewSubmit(String(a.id))
+    return { submitted: !errors.length, errors, ...store.describePreview() }
+  },
   preview_input: (store, a) => {
     need(store, a.id)
     store.previewInput(String(a.id), a.value)

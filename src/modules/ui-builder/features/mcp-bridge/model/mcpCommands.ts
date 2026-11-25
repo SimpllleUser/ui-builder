@@ -38,6 +38,8 @@ export const MCP_COMMANDS: Record<string, McpCommand> = {
     pages: pageSummary(store),
     hasLayout: !!store.project.layout,
     state: store.project.state,
+    ...(store.project.computed ? { computed: store.project.computed } : {}),
+    ...(store.project.sources ? { sources: store.project.sources } : {}),
     root: summarize(store.rootNode),
     selected: store.selectedNodeIds,
   }),

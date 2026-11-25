@@ -34,6 +34,14 @@ export function interpolateProps(props: Record<string, unknown>, scope: Scope): 
   return Object.fromEntries(Object.entries(props).map(([key, value]) => [key, interpolate(value, scope)]))
 }
 
+/** Fills the bindings of every text inside a parsed value; a text that is one binding keeps the value's type. */
+export function interpolateDeep(value: unknown, scope: Scope): unknown {
+  if (Array.isArray(value)) return value.map(item => interpolateDeep(item, scope))
+  if (value !== null && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, interpolateDeep(item, scope)]))
+  return interpolate(value, scope)
+}
+
 export function parseLiteral(text: string): unknown {
   const trimmed = text.trim()
   try {

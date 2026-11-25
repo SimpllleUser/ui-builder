@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { actions, guideContent, parseProject, playground, runtime, store } from './support.mjs'
+import { actions, guideContent, parseProject, playground, runtime, server, store } from './support.mjs'
 
 test('bindings, events and state are validated and persisted', () => {
   store.addComponent('VBtn')
@@ -131,4 +131,21 @@ test('every example in the Behavior guide is a readable condition', () => {
   assert.ok(examples.length >= 10)
   for (const { condition, variables } of examples)
     assert.equal(playground.evaluateSample(condition, variables).problem, null, condition)
+})
+
+test('the guide names every event, action and rule the editor offers, so it cannot fall behind', async () => {
+  const model = '/src/modules/ui-builder/entities/ui-node/model/'
+  const { EVENT_LABELS } = await server.ssrLoadModule(`${model}events.ts`)
+  const { actionLabel } = await server.ssrLoadModule(`${model}actions.ts`)
+  const { ruleLabel } = await server.ssrLoadModule(`${model}validationRules.ts`)
+  const { ActionType, RuleType } = await server.ssrLoadModule(`${model}enums.ts`)
+  const firstCells = guideContent.GUIDE_SECTIONS.flatMap(section =>
+    section.blocks.flatMap(block => (block.kind === guideContent.GuideBlockKind.Table ? block.rows : [])),
+  ).map(row => row[0])
+  const offered = [
+    ...Object.values(EVENT_LABELS),
+    ...Object.values(ActionType).map(actionLabel),
+    ...Object.values(RuleType).map(ruleLabel),
+  ]
+  for (const label of offered) assert.ok(firstCells.includes(label), label)
 })

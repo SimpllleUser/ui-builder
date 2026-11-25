@@ -13,6 +13,7 @@ export enum HelperName {
   StatusChipColor = 'statusChipColor',
   StatusChipKeys = 'statusChipKeys',
   ApplyInputMask = 'applyInputMask',
+  WithoutFirst = 'withoutFirst',
 }
 
 /** Same behaviour as the editor's evaluator, so an exported page decides like Preview does. */
@@ -33,6 +34,10 @@ const statusChipColor = value => {
 }`,
   [HelperName.StatusChipKeys]:
     "const statusChipKeys = headers => (Array.isArray(headers) ? headers.filter(header => header?.chip && typeof header.key === 'string').map(header => header.key) : [])",
+  [HelperName.WithoutFirst]: `const withoutFirst = (list, value) => {
+  const index = list.findIndex(entry => JSON.stringify(entry) === JSON.stringify(value))
+  return index < 0 ? list : list.filter((_, position) => position !== index)
+}`,
   // The same steps as `applyMask` of the editor: `#` takes a digit, `A` a letter, anything else is written as it is.
   [HelperName.ApplyInputMask]: `const applyInputMask = (value, mask) => {
   if (typeof value !== 'string' || !mask) return value
@@ -82,7 +87,13 @@ export const helperSources = (helpers: ReadonlySet<HelperName>) =>
  * (optional chaining), numbers are compared as numbers, and a word that is not a variable next to `==` is text.
  * A condition that cannot be read is `true`, because Preview shows the element in that case.
  */
-export function expressionToJs(text: string, known: ReadonlySet<string>, helpers: Set<HelperName>): string {
+export function expressionToJs(
+  text: string,
+  known: ReadonlySet<string>,
+  helpers: Set<HelperName>,
+  /** How a variable is written; a script has to read a ref's `.value`, a template does not. */
+  identifier: (name: string) => string = name => name,
+): string {
   if (expressionError(text)) return 'true'
   const emit = (node: jsep.Expression): string => {
     if (!isCoreExpression(node)) return 'undefined'
@@ -90,7 +101,7 @@ export function expressionToJs(text: string, known: ReadonlySet<string>, helpers
       case 'Literal':
         return typeof node.value === 'string' ? jsString(node.value) : jsLiteral(node.value)
       case 'Identifier':
-        return FORBIDDEN_KEYS.has(node.name) ? 'undefined' : node.name
+        return FORBIDDEN_KEYS.has(node.name) ? 'undefined' : identifier(node.name)
       case 'MemberExpression': {
         if (!node.computed && isCoreExpression(node.property) && node.property.type === 'Identifier') {
           return FORBIDDEN_KEYS.has(node.property.name) ? 'undefined' : `${emit(node.object)}?.${node.property.name}`
