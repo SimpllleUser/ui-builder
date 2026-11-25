@@ -20,6 +20,7 @@ export function useProjectStartup(store: ReturnType<typeof useUiTreeStore>, onRe
       startup.value = StartupState.Ready
       onReady()
     } catch (error) {
+      // The screen says nothing was changed; the cause stays in the console for a bug report.
       console.error(error)
       startup.value = StartupState.Failed
     }

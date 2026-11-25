@@ -1,4 +1,5 @@
 import type { StepDirection } from './enums'
+import { RESERVED_NAMES } from './reservedNames'
 import { MAX_PAGES } from './constants'
 import { defaultLayout, emptyPage } from './document'
 import { isValidPagePath } from './documentValidator'
@@ -6,7 +7,6 @@ import { cloneNodeWithNewIds } from './nodeUtils'
 import type { Page, Project, UiNode } from './types'
 
 const STATE_NAME = /^[A-Za-z_$][\w$]*$/
-const RESERVED_STATE_NAMES = ['__proto__', 'constructor', 'prototype']
 
 /** Why `path` cannot be a page's route, or null when it can. `own` is the page that already has it. */
 export function pagePathError(pages: Page[], path: string, ownPageId?: string): string | null {
@@ -18,7 +18,7 @@ export function pagePathError(pages: Page[], path: string, ownPageId?: string): 
 /** Why `name` cannot name a variable, or null when it can. */
 export function variableNameError(name: string): string | null {
   if (!name) return 'Enter a name.'
-  if (RESERVED_STATE_NAMES.includes(name)) return 'This name is reserved. Choose another.'
+  if (RESERVED_NAMES.has(name)) return 'This name is reserved. Choose another.'
   if (!STATE_NAME.test(name)) return 'Use letters, digits and _, and do not start with a digit.'
   return null
 }
@@ -173,7 +173,8 @@ export function removeLayout(context: ProjectMutationContext) {
 }
 
 export function setStateVariable(context: ProjectMutationContext, name: string, value: unknown): boolean {
-  const nameError = variableNameError(name)
+  // A variable saved before its name was refused can still be given a new value.
+  const nameError = Object.hasOwn(context.project.state, name) ? null : variableNameError(name)
   if (nameError) {
     context.setNotice(`Variable name: ${nameError}`)
     return false

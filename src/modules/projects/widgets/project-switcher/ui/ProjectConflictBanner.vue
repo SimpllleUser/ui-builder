@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { ProjectConflict, type ProjectSession } from '../../../features/manage-projects'
+import { useAttempt } from '../model/useAttempt'
 
 const props = defineProps<{ session: ProjectSession }>()
 
 const conflict = computed(() => props.session.conflict.value)
-const failure = ref('')
-const attempt = async (action: () => Promise<unknown>) => {
-  failure.value = ''
-  try {
-    await action()
-  } catch (error) {
-    failure.value = error instanceof Error ? error.message : 'This did not work. Try again.'
-  }
-}
+const { failure, attempt } = useAttempt()
 </script>
 
 <template>

@@ -123,3 +123,24 @@ test('Cyrillic names become readable file and folder names', async () => {
   assert.ok(files['src/pages/Zamovlennia.vue'])
   assert.ok(files['src/pages/MoiTovary.vue'])
 })
+
+test('a name code cannot declare is refused, and one saved earlier blocks the export with its name', async () => {
+  for (const name of ['class', 'default', 'new', 'router', 'ref', 'props', '$patch']) {
+    assert.equal(store.setStateVariable(name, 1), false, name)
+  }
+  assert.equal(store.setStateVariable('classes', 1), true)
+
+  // A project saved before the names were refused.
+  const saved = JSON.parse(store.exportDocument())
+  saved.state.class = 1
+  store.importDocument(JSON.stringify(saved))
+  assert.equal(store.setStateVariable('class', 2), true, 'its value can still be changed')
+  await assert.rejects(build(), /“class”/)
+  const { auditProject } = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/projectAudit.ts')
+  assert.ok(auditProject(store.project).some(issue => issue.kind === 'unusable-name'))
+
+  store.removeStateVariable('class')
+  store.addComponent('VTextField')
+  store.updateNodeLogic(store.selectedNodeId, { model: 'default' })
+  await assert.rejects(build(), /“default”/, 'a name only referred to is found too')
+})

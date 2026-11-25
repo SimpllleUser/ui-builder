@@ -1,5 +1,6 @@
 import { helperSources, HelperName } from './expressionToJs'
 import { jsLiteral } from './jsLiteral'
+import { variableNameError } from './projectMutations'
 import { AMBIENT_NAMES, variablesOfNode, walkNodes } from './variableUsage'
 import type { Page, Prefab, UiNode } from './types'
 import { renderNodes, type TemplateContext } from './vueTemplate'
@@ -110,6 +111,12 @@ export function exportPrefab(
   source = StateSource.Local,
 ): VueFile {
   return { fileName, code: exportTree(prefab.node, state, source, prefab) }
+}
+
+/** Variables of a project that exported code cannot declare. */
+export function unusableVariableNames(roots: UiNode[], state: Record<string, unknown>): string[] {
+  const names = new Set([...Object.keys(state), ...roots.flatMap(collectVariables)])
+  return [...names].filter(name => variableNameError(name) !== null)
 }
 
 /** The store of an exported project: every variable the files use, or null when they use none. */

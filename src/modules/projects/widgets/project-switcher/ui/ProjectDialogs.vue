@@ -4,6 +4,7 @@ import { projectFileName } from '../../../entities/project'
 import type { ProjectDetails, ProjectSession } from '../../../features/manage-projects'
 import { downloadTextFile } from '../../../../../shared/lib/downloadTextFile'
 import { ProjectDialog } from '../model/projectDialog'
+import { useAttempt } from '../model/useAttempt'
 import ProjectList from './ProjectList.vue'
 import ProjectNameDialog from './ProjectNameDialog.vue'
 
@@ -13,20 +14,11 @@ const dialog = defineModel<ProjectDialog | null>({ required: true })
 const details = ref<ProjectDetails[]>([])
 const renaming = ref<ProjectDetails | null>(null)
 const deleting = ref<ProjectDetails | null>(null)
-const failure = ref('')
+const { failure, attempt } = useAttempt()
 const currentId = computed(() => props.session.currentProjectId.value)
 
 const reload = async () => {
   details.value = await props.session.listDetails()
-}
-/** Runs an action and shows what went wrong inside the dialog, where it was asked for. */
-const attempt = async (action: () => Promise<unknown>) => {
-  failure.value = ''
-  try {
-    await action()
-  } catch (error) {
-    failure.value = error instanceof Error ? error.message : 'This did not work. Try again.'
-  }
 }
 watch(dialog, value => {
   failure.value = ''

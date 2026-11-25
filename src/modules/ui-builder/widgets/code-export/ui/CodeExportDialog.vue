@@ -6,7 +6,7 @@ import { downloadFile, downloadTextFile } from '../../../../../shared/lib/downlo
 import tableCss from '../../../../../shared/tableStyles.css?raw'
 import { generateThemeCss, generateVuetifyConfig, useThemeSettings } from '../../../../theme/entities/theme-settings'
 import { zipProject } from '../model/projectArchive'
-import { buildVueProject } from '../model/vueProject'
+import { buildVueProject, ExportBlockedError, namingProblem } from '../model/vueProject'
 import { buildExportTargets, defaultTargetId, ExportTargetKind } from '../model/exportTargets'
 
 const COPIED_MESSAGE_MS = 2000
@@ -39,6 +39,11 @@ const downloadProject = () => {
     })
     downloadFile(`${exported.name}.zip`, new Uint8Array(zipProject(exported)), 'application/zip')
   } catch (error) {
+    if (error instanceof ExportBlockedError) {
+      failure.value = error.message
+      return
+    }
+    // Unexpected: the person gets a short message, the cause stays in the console for a bug report.
     console.error(error)
     failure.value = 'Could not build the project archive.'
   }
@@ -47,6 +52,7 @@ const store = useUiTreeStore()
 const { copy, copied } = useClipboard({ copiedDuring: COPIED_MESSAGE_MS })
 
 const targets = computed(() => buildExportTargets(store.project, store.prefabs))
+const warning = computed(() => namingProblem(store.project, store.prefabs))
 const selectedId = ref('')
 const selected = computed(() => targets.value.find(target => target.id === selectedId.value) ?? targets.value[0])
 
@@ -96,6 +102,7 @@ const download = () =>
           hide-details
           @update:model-value="id => (selectedId = String(id))"
         />
+        <VAlert v-if="warning" type="warning" variant="tonal" density="compact">{{ warning }}</VAlert>
         <pre v-if="selected" class="code-export__code" tabindex="0" aria-label="Generated code">{{
           selected.file.code
         }}</pre>

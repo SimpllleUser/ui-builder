@@ -1,5 +1,6 @@
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
 import { ActionType, IssueKind, IssueSeverity } from './enums'
+import { variableNameError } from './projectMutations'
 import { conditionError } from './runtime'
 import type { Project, UiNode } from './types'
 import { UsageKind, variablesOfNode, walkNodes, walkProject, type ProjectNode } from './variableUsage'
@@ -112,6 +113,15 @@ export function auditProject(project: Project): Issue[] {
         severity: IssueSeverity.Info,
         message: `The page “${page.name}” is empty.`,
         pageId: page.id,
+      })
+    }
+  }
+  for (const name of new Set([...defined, ...used])) {
+    if (variableNameError(name)) {
+      report({
+        kind: IssueKind.UnusableName,
+        severity: IssueSeverity.Error,
+        message: `The variable “${name}” has a name that exported code cannot use. Rename it.`,
       })
     }
   }
