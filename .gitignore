@@ -2,6 +2,9 @@
 node_modules
 /dist
 
+# graphify code graph (rebuild with `graphify update .`)
+graphify-out/
+
 # local env files
 .env.local
 .env.*.local
