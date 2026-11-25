@@ -150,8 +150,9 @@ The same material is built into the editor: **Help → Behavior guide**, or sear
 1. `npm run dev` and open http://localhost:3001 (the tab must stay open).
 2. Claude Code picks up `.mcp.json` automatically. For other clients, run `node mcp/server.mjs` over stdio.
 
-Tools (56):
+Tools (60):
 
+- **Projects:** `list_projects`, `create_project`, `open_project`, `rename_project`. Agents cannot delete projects, and `import_document` replaces the open one.
 - **Read:** `get_document`, `get_node`, `list_components`, `describe_component`, `list_pages`, `get_table`, `export_document`.
 - **Build:** `add_subtree` (a whole nested tree in one call and one Undo step; `ref` names come back as ids), `batch` (several tools as one Undo step; `"$0.id"` uses the result of step 0; if a step fails, all are undone), `add_component`, `add_template`, `move_node`, `duplicate_node`, `delete_node`, `import_document`.
 - **Change:** `update_node`, `set_style` (numbers are px, theme colour names such as `primary`, and values win over utility classes, like the Design tab), `set_binding`, `set_event`, `set_state`, and the table tools (`add_/update_/remove_table_column`, `add_/update_/remove_table_row`).
@@ -168,6 +169,7 @@ The code follows Feature-Sliced Design, from the top layer down:
 
 - `src/app`: the application shell (`App.vue`, `BuilderApp.vue`, and in `shell/` the panels, keyboard shortcuts, focus mode and project files). It puts the other layers together.
 - `src/modules/ui-builder/widgets/*`: blocks of the interface (canvas, layers, properties, search, component library, pages, quick tour, Behavior guide, code export).
+- `src/modules/projects`: several local projects: the repository (IndexedDB) in `entities/project`, opening, saving and tab locking in `features/manage-projects`, the switcher and dialogs in `widgets/project-switcher`.
 - `src/modules/ui-builder/features/mcp-bridge`: lets an MCP client edit the page open in the browser.
 - `src/modules/ui-builder/entities/ui-node`: the document, its store, validation and rendering. Conditions are read in `model/expression.ts` (parser `jsep` plus a fixed evaluator) and used by `model/runtime.ts`, the preview snapshot and the project check.
 - `src/shared`: code with no knowledge of the editor (icons, DOM helpers, `useCheckedDrafts`, table styles).

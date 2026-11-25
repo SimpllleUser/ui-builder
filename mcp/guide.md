@@ -2,6 +2,13 @@
 
 Work in this order: `get_document` → build → `check_project` → try it with `preview_*`.
 
+## Projects
+- The browser holds several projects; every tool edits the one that is open. `get_status` says which, `list_projects` lists them.
+- Check it is the right one before changing anything. Switch with `open_project`, or start apart with `create_project`.
+- One tab edits a project at a time. If a project is open in another tab, editor tools are refused: open a different project, or ask the person to press **Edit here** in this tab.
+- Undo, history and checkpoints belong to one project; saved components are shared. Projects cannot be deleted by an agent.
+- `import_document` replaces the **open** project (unlike Import in the editor's File menu, which adds a new one). `export_document` carries no theme.
+
 ## Building fast
 - Prefer **`add_subtree`**: one call builds a whole nested tree (any depth) and is a single Undo step. Give elements a `ref` and the answer maps each ref to its node id.
 - **`batch`** runs several tools as one Undo step. If a step fails, all earlier steps are put back. A later step can use an earlier result: `"$0.id"` is the `id` returned by step 0 (`"$1.refs.title"` works too).

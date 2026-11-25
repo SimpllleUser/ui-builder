@@ -2,6 +2,7 @@
 import { AppView } from './appView'
 import { ref, defineAsyncComponent, onBeforeUnmount } from 'vue'
 import { StartupState, useProjectStartup } from './shell/useProjectStartup'
+import { createMcpHost } from './shell/mcpHost'
 import {
   ProjectConflictBanner,
   ProjectDialog,
@@ -26,9 +27,11 @@ let disconnectMcp = () => {}
 const connectAgents = async () => {
   if (!import.meta.env.DEV) return
   const { connectMcpBridge } = await import('../modules/ui-builder/features/mcp-bridge')
-  disconnectMcp = connectMcpBridge(store, () =>
-    session.value?.isLocked.value ? 'This tab does not edit the project: it is open in another tab.' : null,
-  )
+  if (session.value)
+    disconnectMcp = connectMcpBridge(
+      store,
+      createMcpHost(session.value, () => store.notice),
+    )
 }
 const { startup, session } = useProjectStartup(store, connectAgents)
 const projectDialog = ref<ProjectDialog | null>(null)

@@ -66,9 +66,10 @@
 Ревізія лишається страховкою там, де Web Locks недоступний (HTTP не на `localhost`).
 
 ### 6. MCP і документація
-- `list_projects`, `create_project`, `open_project`, `rename_project` (без видалення); проєкт у `get_status`.
-- `open_project` і `create_project` заборонені в `batch`; `import_document` і далі замінює поточний проєкт.
-- Оновити `mcp/server.mjs`, `mcp/guide.md`, `README.md`.
+- [x] `list_projects`, `create_project`, `open_project`, `rename_project` (без видалення); проєкт у `get_status`.
+- [x] Інструменти проєктів заборонені в `batch`; `import_document` і далі замінює поточний проєкт.
+- [x] Оновлено `mcp/server.mjs`, `mcp/guide.md`, `README.md`.
+- [ ] Перевірити з MCP-клієнтом (потрібен перезапуск MCP-сервера).
 
 ## Готовність
 Наявні дані видно як перший проєкт; проєкти не впливають один на одного; проходять type-check, тести, build,

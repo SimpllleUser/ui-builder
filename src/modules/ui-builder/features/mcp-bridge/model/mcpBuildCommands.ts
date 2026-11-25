@@ -1,7 +1,10 @@
 import { need, ok, type Args, type McpCommand, type Store } from './mcpCommandUtils'
 import { buildSubtree, type SubtreeSpec } from './mcpSubtree'
 
-/** Commands that cannot run inside a batch: a batch is one undo step, and these work on history or replace everything. */
+/**
+ * Commands that cannot run inside a batch: a batch is one undo step, and these work on history or replace everything.
+ * The project commands are not in the command table at all, so a batch refuses them too.
+ */
 const NOT_IN_BATCH = new Set(['batch', 'undo', 'redo', 'import_document'])
 const REFERENCE = /^\$(\d+)((?:\.[A-Za-z_$][\w$-]*)*)$/
 

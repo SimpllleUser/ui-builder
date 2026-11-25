@@ -83,7 +83,7 @@ const server = new McpServer(
   { name: 'ui-builder', version: '0.2.0' },
   {
     instructions:
-      'Edits the page open in the UI Builder editor. Read the ui-builder://guide resource first. Build with add_subtree or batch (one Undo step), style with set_style, then run check_project and try the page with preview_start and preview_click.',
+      'Edits the project open in the UI Builder editor. Read the ui-builder://guide resource first. Build with add_subtree or batch (one Undo step), style with set_style, then run check_project and try the page with preview_start and preview_click.',
   },
 )
 server.registerResource(
@@ -193,6 +193,18 @@ tool('redo', 'Redo the last undone change.', {})
 tool('export_document', 'Export the page as JSON text.', {})
 tool('import_document', 'Replace the page with exported JSON (undoable).', { json: z.string() })
 
+const projectRef = z.string().describe('Project id or exact name')
+tool('list_projects', 'The projects saved in this browser, and which one is open.', {})
+tool('create_project', 'Create an empty project and open it. Later tools edit this project.', {
+  name: z.string().describe('A name no other project has'),
+})
+tool(
+  'open_project',
+  'Open another project; later tools edit it. When lockedElsewhere is true, another tab edits it and editor tools are refused here.',
+  { id: projectRef },
+)
+tool('rename_project', 'Rename a project.', { id: projectRef, name: z.string() })
+
 const pageRef = z.string().describe('Page id or path')
 tool('list_pages', 'List pages (id, name, path), whether a shared layout exists and what is being edited.', {})
 tool('add_page', 'Add a page and switch the editor to it. Path defaults to a slug of the name.', {
@@ -271,7 +283,7 @@ tool(
 )
 tool(
   'batch',
-  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document.',
+  'Run several tools as one Undo step; if a step fails, all earlier steps are undone. Later steps can use earlier results: "$0.id" is the id returned by step 0. Steps: [{ tool: "add_component", args: {...} }, ...]. Not allowed: undo, redo, import_document and the project tools.',
   {
     steps: z
       .array(z.object({ tool: z.string(), args: z.record(z.string(), z.unknown()).optional() }))
@@ -286,7 +298,7 @@ tool(
 )
 tool(
   'get_status',
-  'Where the editor is: current page, variables, selection, whether Preview runs, undo/redo, counts of saved components and checkpoints. Cheap; use it to check the editor is connected.',
+  'Where the editor is: project, current page, variables, selection, whether Preview runs, undo/redo, counts of saved components and checkpoints. Cheap; use it to check the editor is connected.',
   {},
 )
 tool(

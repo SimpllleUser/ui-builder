@@ -415,3 +415,48 @@ test('the lock adapter works with the real Web Locks API', { skip: !globalThis.n
   assert.ok(third)
   third.release()
 })
+
+const mcpTab = async () => {
+  const { createMcpHost } = await server.ssrLoadModule('/src/app/shell/mcpHost.ts')
+  const { runMcpCommand } = await server.ssrLoadModule(
+    '/src/modules/ui-builder/features/mcp-bridge/model/mcpProjectCommands.ts',
+  )
+  return (editor, projectSession, command, args) =>
+    runMcpCommand(
+      editor,
+      createMcpHost(projectSession, () => editor.notice),
+      command,
+      args,
+    )
+}
+
+test('an agent can list, create, rename and open projects, and sees which one it edits', async () => {
+  const run = await mcpTab()
+  await session.start()
+  const first = session.currentProjectId.value
+  const shop = await run(store, session, 'create_project', { name: 'Shop' })
+  assert.deepEqual(shop, { id: session.currentProjectId.value, name: 'Shop', lockedElsewhere: false })
+  assert.deepEqual((await run(store, session, 'get_status')).project, { id: shop.id, name: 'Shop' })
+  assert.equal((await run(store, session, 'list_projects')).projects.length, 2)
+  await run(store, session, 'rename_project', { id: 'Shop', name: 'Store' })
+  assert.equal((await run(store, session, 'open_project', { id: first })).id, first)
+  assert.equal((await run(store, session, 'open_project', { id: 'Store' })).id, shop.id)
+  await assert.rejects(run(store, session, 'open_project', { id: 'nope' }), /No project nope/)
+  await assert.rejects(run(store, session, 'create_project', { name: 'Store' }), /already has this name/)
+  await assert.rejects(
+    run(store, session, 'batch', { steps: [{ tool: 'create_project', args: { name: 'x' } }] }),
+    /cannot be used in a batch/,
+  )
+})
+
+test('an agent in a locked tab cannot edit, but can move to a free project', async () => {
+  const run = await mcpTab()
+  await session.start()
+  const { editor, other } = await secondTab()
+  await assert.rejects(run(editor, other, 'add_component', { type: 'VBtn' }), /open in another tab/)
+  const created = await run(editor, other, 'create_project', { name: 'Agent' })
+  assert.equal(created.lockedElsewhere, false)
+  await run(editor, other, 'add_component', { type: 'VBtn' })
+  assert.equal(editor.rootNode.children.length, 1)
+  editor.$dispose()
+})
