@@ -6,6 +6,7 @@ import {
   LEGACY_IMPORTED_KEY,
   StoreName,
 } from '../config/database'
+import { ProjectChangedError, ProjectMissingError } from '../model/errors'
 import { projectNameError, uniqueProjectName } from '../model/projectName'
 import type { NewProject, ProjectCheckpoint, ProjectMeta, ProjectPreferences } from '../model/types'
 
@@ -28,7 +29,7 @@ const allProjects = (transaction: IDBTransaction): Promise<ProjectMeta[]> =>
 /** Fails for a deleted project, so a late save (for example from another tab) cannot bring parts of it back. */
 async function existingProject(transaction: IDBTransaction, id: string): Promise<ProjectMeta> {
   const project: ProjectMeta | undefined = await requestResult(transaction.objectStore(StoreName.Projects).get(id))
-  if (!project) throw new Error('This project no longer exists.')
+  if (!project) throw new ProjectMissingError()
   return project
 }
 
@@ -109,11 +110,27 @@ export async function openProjectRepository(factory: IDBFactory = indexedDB, dat
         return document ?? null
       }),
 
-    saveDocument: (id: string, document: string) =>
+    /** The document together with its revision, read at one moment. */
+    readContent: (id: string) =>
+      read([StoreName.Projects, StoreName.Documents], async transaction => {
+        const project = await existingProject(transaction, id)
+        const document: string = await requestResult(transaction.objectStore(StoreName.Documents).get(id))
+        return { document, revision: project.revision ?? 0 }
+      }),
+
+    /**
+     * Resolves with the new revision. With `baseRevision`, the write is refused when the document
+     * has been written since that revision was read.
+     */
+    saveDocument: (id: string, document: string, baseRevision?: number) =>
       write([StoreName.Projects, StoreName.Documents], async transaction => {
         const project = await existingProject(transaction, id)
-        transaction.objectStore(StoreName.Projects).put({ ...project, updatedAt: Date.now() })
+        const current = project.revision ?? 0
+        if (baseRevision !== undefined && baseRevision !== current) throw new ProjectChangedError()
+        const revision = current + 1
+        transaction.objectStore(StoreName.Projects).put({ ...project, revision, updatedAt: Date.now() })
         transaction.objectStore(StoreName.Documents).put(document, id)
+        return revision
       }),
 
     readPreferences: (id: string) =>

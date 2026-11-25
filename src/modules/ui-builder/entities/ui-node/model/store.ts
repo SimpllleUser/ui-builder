@@ -11,7 +11,7 @@ import {
   TEXT_NODE_TYPE,
 } from './constants'
 import { emptyProject, parseProject, serializeProject } from './document'
-import type { OpenedProject, ProjectStorage } from './persistence'
+import { SaveRejectedError, UnsavedChanges, type OpenedProject, type ProjectStorage } from './persistence'
 import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
@@ -90,9 +90,13 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     writes = writes.then(async () => {
       try {
         await write()
-      } catch {
+      } catch (error) {
         saveState.value = SaveState.Error
-        setNotice('Could not save in this browser. Export your page to keep a backup.')
+        setNotice(
+          error instanceof SaveRejectedError
+            ? error.message
+            : 'Could not save in this browser. Export your page to keep a backup.',
+        )
       }
     })
     return writes
@@ -486,11 +490,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
 
   /**
    * Replaces everything with another project. A damaged document throws before anything changes.
-   * Unsaved changes of the project being left are written to its own storage first.
+   * Unsaved changes of the project being left are written to its own storage, unless they are to be discarded.
    */
-  const openProject = (opened: OpenedProject) => {
+  const openProject = (opened: OpenedProject, unsaved = UnsavedChanges.Write) => {
     const next = parseProject(opened.document)
-    if (saveState.value !== SaveState.Saved) saveDocument()
+    if (unsaved === UnsavedChanges.Write && saveState.value !== SaveState.Saved) saveDocument()
     clearTimeout(historyTimer)
     clearTimeout(saveTimer)
     isOpening = true

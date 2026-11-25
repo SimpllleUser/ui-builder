@@ -3,6 +3,8 @@ export interface ProjectMeta {
   name: string
   createdAt: number
   updatedAt: number
+  /** Grows with every write of the document; missing until the first one. */
+  revision?: number
 }
 
 /** What is remembered about a project besides its content. */

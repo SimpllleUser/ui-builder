@@ -29,6 +29,7 @@ beforeEach(async () => {
   repository = await projects.openProjectRepository(new IDBFactory())
   theme = ref(null)
   values = new Map()
+  listeners = []
   session = newSession()
 })
 afterEach(() => {
@@ -37,12 +38,27 @@ afterEach(() => {
 })
 after(() => server.close())
 
-const newSession = () =>
+const memoryStorage = map => ({ getItem: key => map.get(key) ?? null, setItem: (key, value) => map.set(key, value) })
+/** Delivers a message to every other tab, as BroadcastChannel does. */
+let listeners
+const channel = () => {
+  let own
+  return {
+    post: message => listeners.filter(listener => listener !== own).forEach(listener => listener(message)),
+    subscribe: listener => {
+      own = listener
+      listeners.push(listener)
+    },
+  }
+}
+const newSession = (editor = store, tab = new Map()) =>
   createProjectSession({
     repository,
-    store,
-    theme,
-    browserStorage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) },
+    store: editor,
+    theme: editor === store ? theme : ref(null),
+    browserStorage: memoryStorage(values),
+    tabStorage: memoryStorage(tab),
+    channel: channel(),
   })
 const emptyDocument = () => store.exportDocument()
 const create = (name, document = emptyDocument()) => repository.createProject({ name, document })
@@ -183,4 +199,81 @@ test('an invalid file creates no project', async () => {
   await assert.rejects(session.importProject('broken.json', '{oops'))
   assert.equal((await repository.listProjects()).length, 1)
   assert.equal(session.currentProjectId.value, first)
+})
+
+/** A second tab: its own editor and session over the same browser storage. */
+const secondTab = async () => {
+  const editor = useStore(createPinia())
+  const other = newSession(editor)
+  await other.start()
+  return { editor, other }
+}
+
+test('a tab reopens its own project, and a new tab the one used last', async () => {
+  const shop = await create('Shop')
+  const blog = await create('Blog')
+  const tab = new Map()
+  await newSession(store, tab).open(shop.id)
+  await session.open(blog.id)
+
+  const reloaded = newSession(useStore(createPinia()), tab)
+  await reloaded.start()
+  assert.equal(reloaded.currentProjectId.value, shop.id)
+  const { other } = await secondTab()
+  assert.equal(other.currentProjectId.value, shop.id, 'the reload above was the last use')
+})
+
+test('a tab left behind does not overwrite what another tab saved', async () => {
+  await session.start()
+  const id = session.currentProjectId.value
+  const { editor, other } = await secondTab()
+  editor.addComponent('VBtn')
+  await editor.flush()
+  assert.equal(session.conflict.value, 'changed')
+  assert.equal(other.conflict.value, null)
+
+  store.addComponent('VCard')
+  await store.flush()
+  assert.equal(store.saveState, 'error')
+  assert.match(store.notice, /changed in another tab/)
+  assert.equal(await elements(id), 1)
+
+  assert.equal(await session.reloadCurrent(), true)
+  assert.equal(session.conflict.value, null)
+  assert.equal(store.rootNode.children[0].type, 'VBtn')
+  assert.equal(store.saveState, 'saved')
+  editor.$dispose()
+})
+
+test('the changes of a tab left behind can be kept as a copy', async () => {
+  await session.start()
+  const id = session.currentProjectId.value
+  const { editor } = await secondTab()
+  editor.addComponent('VBtn')
+  await editor.flush()
+  store.addComponent('VCard')
+  store.addComponent('VBtn', 'root-canvas')
+
+  assert.equal(await session.saveAsCopy(), true)
+  assert.equal(session.currentProject.value.name, 'My project copy')
+  assert.equal(await elements(session.currentProjectId.value), 2)
+  assert.equal(await elements(id), 1)
+  editor.$dispose()
+})
+
+test('a project deleted in another tab is not written back', async () => {
+  await session.start()
+  const id = session.currentProjectId.value
+  const { editor, other } = await secondTab()
+  await other.remove(id)
+  assert.equal(session.conflict.value, 'deleted')
+
+  store.addComponent('VBtn')
+  await store.flush()
+  assert.equal(await repository.readDocument(id), null)
+  await session.leaveDeleted()
+  assert.notEqual(session.currentProjectId.value, id)
+  assert.equal(session.conflict.value, null)
+  assert.equal(store.saveState, 'saved')
+  editor.$dispose()
 })

@@ -6,6 +6,7 @@ import {
   useThemeSettings,
 } from '../../../../theme/entities/theme-settings'
 import { openProjectRepository } from '../../../entities/project'
+import { openProjectChannel } from './projectChannel'
 import { createProjectSession } from './projectSession'
 
 function parseTheme(text: string | null) {
@@ -30,6 +31,8 @@ export async function startProjectSession(store: ReturnType<typeof useUiTreeStor
     store,
     theme,
     browserStorage: window.localStorage,
+    tabStorage: window.sessionStorage,
+    channel: openProjectChannel(),
   })
   await session.start()
   return session
