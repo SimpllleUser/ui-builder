@@ -72,7 +72,7 @@ export function useEditorShortcuts({
   // Writing takes a moment: ask before the page is closed while something is not written yet.
   const onBeforeUnload = (event: BeforeUnloadEvent) => {
     flushSave()
-    if (store.saveState !== SaveState.Saved) event.preventDefault()
+    if (store.saveState !== SaveState.Saved || store.hasUnsavedPrefabs) event.preventDefault()
   }
 
   onMounted(() => {

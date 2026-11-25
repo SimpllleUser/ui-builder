@@ -1,5 +1,5 @@
 import { onMounted, ref, shallowRef } from 'vue'
-import type { useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
+import { openPrefabRepository, type useUiTreeStore } from '../../modules/ui-builder/entities/ui-node'
 import { startProjectSession, type ProjectSession } from '../../modules/projects/features/manage-projects'
 
 export enum StartupState {
@@ -15,6 +15,7 @@ export function useProjectStartup(store: ReturnType<typeof useUiTreeStore>, onRe
   const session = shallowRef<ProjectSession | null>(null)
   onMounted(async () => {
     try {
+      await store.openPrefabLibrary(await openPrefabRepository())
       session.value = await startProjectSession(store)
       startup.value = StartupState.Ready
       onReady()

@@ -16,6 +16,7 @@ import { describeChange } from './historyLabels'
 import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
 import * as tableMutations from './tableMutations'
 import { usePreviewRuntime } from './previewRuntime'
+import { usePrefabSync } from './prefabSync'
 import { snapshotPreview } from './previewSnapshot'
 import { resolveTableData } from './tableBindings'
 import { bindAction } from './runtime'
@@ -115,7 +116,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const activePage = computed(
     () => project.value.pages.find(page => page.id === activePageId.value) ?? project.value.pages[0],
   )
-  const prefabs = useStorage<Prefab[]>('ui-builder:prefabs', [])
+  /** My components. They belong to no project. */
+  const prefabs = ref<Prefab[]>([])
+  const prefabSync = usePrefabSync(prefabs, () => setNotice('Could not save My components in this browser.'))
   /** A saved component opened for editing in place of the page, or null while a page or the layout is edited. */
   const editingPrefabId = ref<string | null>(null)
   const editingPrefab = computed(() => prefabs.value.find(prefab => prefab.prefabId === editingPrefabId.value) ?? null)
@@ -275,6 +278,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   onScopeDispose(() => {
     clearTimeout(historyTimer)
     clearTimeout(saveTimer)
+    prefabSync.stop()
   })
 
   const findParentAndIndex = (id: string, parent: UiNode = rootNode.value): NodeLocation | null =>
@@ -448,6 +452,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     editingPrefabId.value = null
     selectedNodeIds.value = []
   }
+  // The component being edited was removed, for example in another tab.
+  watch(editingPrefab, prefab => {
+    if (!prefab && editingPrefabId.value) stopEditingPrefab()
+  })
   // Writing `{{props.name}}` in the edited component adds a parameter for it, deleting the last one removes it.
   watch(
     () => editingPrefab.value?.node,
@@ -627,6 +635,9 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     saveDocument,
     flush,
     openProject,
+    openPrefabLibrary: prefabSync.open,
+    flushPrefabs: prefabSync.flush,
+    hasUnsavedPrefabs: prefabSync.pending,
     importDocument,
     exportDocument: () => serializeProject(project.value),
     selectPage: (id: string) => selectPageMutation(projectContext, id),

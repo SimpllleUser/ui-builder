@@ -119,7 +119,10 @@ useEditorShortcuts({
   narrow,
   toggleFocus,
   closePanels,
-  flushSave: () => void store.flush(),
+  flushSave: () => {
+    store.flush()
+    store.flushPrefabs()
+  },
 })
 </script>
 
