@@ -38,5 +38,14 @@ export function parseProject(text: string): Project {
 
 export const serializeProject = (project: Project) => JSON.stringify({ version: DOCUMENT_VERSION, ...project }, null, 2)
 
+/** How many pages a saved document has, or null when it cannot be read. */
+export function countPages(text: string): number | null {
+  try {
+    return parseProject(text).pages.length
+  } catch {
+    return null
+  }
+}
+
 /** The document of a project nothing was done in yet. */
 export const emptyProjectDocument = () => serializeProject(emptyProject())

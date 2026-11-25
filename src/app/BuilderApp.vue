@@ -22,6 +22,8 @@ import { CommandPalette, type CommandHost } from '../modules/ui-builder/widgets/
 import { PageTabs, PagesPanel } from '../modules/ui-builder/widgets/pages-panel'
 import { PropertyPanel, useDesignTabPreference } from '../modules/ui-builder/widgets/property-panel'
 import EditorMenus from './shell/EditorMenus.vue'
+import type { ProjectSession } from '../modules/projects/features/manage-projects'
+import { ProjectDialog, ProjectSwitcher } from '../modules/projects/widgets/project-switcher'
 import { useEditorPanels } from './shell/useEditorPanels'
 import { useGuideLocation } from './shell/useGuideLocation'
 import { useEditorShortcuts } from './shell/useEditorShortcuts'
@@ -29,6 +31,8 @@ import { platformModifierKey } from '../shared/lib/platform'
 import { useFocusMode } from './shell/useFocusMode'
 import { useProjectFiles } from './shell/useProjectFiles'
 
+defineProps<{ session: ProjectSession }>()
+const emit = defineEmits<{ openProjects: [dialog: ProjectDialog] }>()
 const store = useUiTreeStore()
 const narrow = useMediaQuery('(max-width: 1100px)')
 const modifierKey = platformModifierKey()
@@ -84,6 +88,8 @@ const commandHost: CommandHost = {
   openBehaviorGuide: () => (guideOpen.value = true),
   openCodeExport: () => (codeExportOpen.value = true),
   openThemeSettings: () => (themeOpen.value = true),
+  openProjects: () => emit('openProjects', ProjectDialog.List),
+  newProject: () => emit('openProjects', ProjectDialog.Create),
   addTemplate,
   openStructureGraph: () => (graphOpen.value = true),
   toggleFocus,
@@ -128,6 +134,7 @@ useEditorShortcuts({
         :aria-expanded="leftOpen"
         @click="togglePanel(PanelSide.Left)"
       />
+      <ProjectSwitcher :session="session" @open="emit('openProjects', $event)" />
       <PagesPanel />
       <VBtn
         size="small"

@@ -502,6 +502,11 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       editingPrefabId.value = null
       selectedNodeIds.value = []
       project.value = next
+      // An offer to undo belongs to the project being left.
+      if (noticeUndo.value) {
+        notice.value = ''
+        noticeUndo.value = false
+      }
       activePageId.value = (next.pages.find(page => page.id === opened.activePageId) ?? next.pages[0]).id
       checkpoints.value = [...opened.checkpoints]
       history.reset()

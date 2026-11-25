@@ -2,6 +2,7 @@
 import { AppView } from './appView'
 import { ref, defineAsyncComponent, onBeforeUnmount } from 'vue'
 import { StartupState, useProjectStartup } from './shell/useProjectStartup'
+import { ProjectDialog, ProjectDialogs } from '../modules/projects/widgets/project-switcher'
 import { useUiTreeStore } from '../modules/ui-builder/entities/ui-node'
 import { useApplyTheme } from '../modules/theme/entities/theme-settings'
 const BuilderApp = defineAsyncComponent(() => import('./BuilderApp.vue'))
@@ -22,7 +23,8 @@ const connectAgents = async () => {
   const { connectMcpBridge } = await import('../modules/ui-builder/features/mcp-bridge')
   disconnectMcp = connectMcpBridge(store)
 }
-const { startup } = useProjectStartup(store, connectAgents)
+const { startup, session } = useProjectStartup(store, connectAgents)
+const projectDialog = ref<ProjectDialog | null>(null)
 const reload = () => window.location.reload()
 onBeforeUnmount(() => disconnectMcp())
 </script>
@@ -36,7 +38,15 @@ onBeforeUnmount(() => disconnectMcp())
       </template>
     </VToolbar>
     <template v-if="view === AppView.Current">
-      <BuilderApp v-if="startup === StartupState.Ready" />
+      <template v-if="startup === StartupState.Ready && session">
+        <!-- A new key per project, so nothing a panel remembers is carried into another one. -->
+        <BuilderApp
+          :key="session.currentProjectId.value ?? ''"
+          :session="session"
+          @open-projects="projectDialog = $event"
+        />
+        <ProjectDialogs v-model="projectDialog" :session="session" />
+      </template>
       <div v-else-if="startup === StartupState.Failed" class="pa-4">
         <VAlert type="error" variant="tonal" title="Could not open your projects">
           The browser's storage did not answer. Nothing was changed.

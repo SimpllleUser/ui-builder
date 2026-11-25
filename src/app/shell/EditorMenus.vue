@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 /** The three menus of the top bar. Each holds one kind of thing, so a name says what is behind it. */
 defineProps<{ modifierKey: string }>()

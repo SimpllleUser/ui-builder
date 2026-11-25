@@ -21,7 +21,7 @@ before(async () => {
   const load = path => server.ssrLoadModule(path)
   ;({ useUiTreeStore: useStore } = await load('/src/modules/ui-builder/entities/ui-node/model/store.ts'))
   projects = await load('/src/modules/projects/entities/project/index.ts')
-  ;({ createProjectSession } = await load('/src/modules/projects/features/open-project/model/projectSession.ts'))
+  ;({ createProjectSession } = await load('/src/modules/projects/features/manage-projects/model/projectSession.ts'))
 })
 beforeEach(async () => {
   setActivePinia(createPinia())
@@ -114,4 +114,51 @@ test('a project that cannot be saved is not left', async () => {
 
   assert.equal(await session.open(blog.id), false)
   assert.equal(store.rootNode.children.length, 1)
+})
+
+const names = () => session.projects.value.map(project => project.name).sort()
+
+test('a created project is opened, and a copy includes the latest change', async () => {
+  await session.start()
+  assert.equal(await session.create('Shop'), true)
+  assert.equal(session.currentProject.value.name, 'Shop')
+  await assert.rejects(session.create('shop'), /already has this name/)
+
+  store.addComponent('VBtn')
+  await session.duplicate(session.currentProjectId.value)
+  assert.deepEqual(names(), ['My project', 'Shop', 'Shop copy'])
+  const copy = session.projects.value.find(project => project.name === 'Shop copy')
+  assert.equal(await elements(copy.id), 1)
+})
+
+test('deleting the open project opens another, and deleting the last one leaves an empty one', async () => {
+  await session.start()
+  await session.create('Shop')
+  store.addComponent('VBtn')
+  await session.remove(session.currentProjectId.value)
+  assert.deepEqual(names(), ['My project'])
+  assert.equal(store.rootNode.children.length, 0)
+
+  const last = session.currentProjectId.value
+  await session.remove(last)
+  assert.equal(session.projects.value.length, 1)
+  assert.notEqual(session.currentProjectId.value, last)
+})
+
+test('deleting another project leaves the open one alone', async () => {
+  const shop = await create('Shop')
+  const blog = await create('Blog')
+  await session.open(shop.id)
+  await session.remove(blog.id)
+  assert.equal(session.currentProjectId.value, shop.id)
+  assert.deepEqual(names(), ['Shop'])
+})
+
+test('the list counts pages and marks a damaged project, whose text can still be taken out', async () => {
+  await create('Shop')
+  const broken = await create('Broken', '{oops')
+  const details = await session.listDetails()
+  assert.deepEqual(Object.fromEntries(details.map(item => [item.name, item.pageCount])), { Shop: 1, Broken: null })
+  assert.equal(await session.readDocument(broken.id), '{oops')
+  assert.equal(projects.projectFileName('a/b: c?'), 'a-b- c-.json')
 })
