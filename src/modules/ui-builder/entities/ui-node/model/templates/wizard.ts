@@ -10,7 +10,9 @@ const STEP_COUNT = 3
 const DONE_STEP = STEP_COUNT + 1
 
 /**
- * Props: `title`, `accountTitle`, `planTitle`, `reviewTitle`, `finishLabel`, `successMessage`, `plans` (list of names).
+ * Props: `title`, `accountTitle`, `planTitle`, `reviewTitle`, `finishLabel`, `successMessage`, `plans` (list of names),
+ * and the words of the controls: `stepLabel` (with `{number}` and `{total}`), `nameLabel`, `emailLabel`, `planLabel`,
+ * `backLabel`, `nextLabel`, `restartLabel`.
  * One step shows at a time, driven by the `wizardStep` variable. Each step is a form, so Next works only when
  * its fields are filled in correctly.
  */
@@ -26,7 +28,7 @@ export const buildWizard: Builder = (context, props) => {
       children: [
         element(context, 'VCardText', {
           name: 'Progress',
-          text: `Step ${number} of ${STEP_COUNT}`,
+          text: read('stepLabel').replace('{number}', String(number)).replace('{total}', String(STEP_COUNT)),
           classes: ['text-medium-emphasis', 'px-0'],
         }),
         element(context, 'VCardTitle', { text: title, classes: ['text-h6', 'px-0', 'mb-2', 'text-wrap'] }),
@@ -38,7 +40,7 @@ export const buildWizard: Builder = (context, props) => {
             element(context, 'VBtn', {
               name: 'Back',
               props: { variant: 'text', disabled: number === 1 },
-              text: 'Back',
+              text: read('backLabel'),
               click: goTo(Math.max(1, number - 1)),
             }),
             element(context, 'VBtn', {
@@ -51,24 +53,24 @@ export const buildWizard: Builder = (context, props) => {
       ],
     })
 
-  const account = stepForm(1, read('accountTitle'), 'Next', [
+  const account = stepForm(1, read('accountTitle'), read('nextLabel'), [
     element(context, 'VTextField', {
       name: 'Name',
-      props: { label: 'Name', variant: 'outlined' },
+      props: { label: read('nameLabel'), variant: 'outlined' },
       model: 'wizardName',
       rules: [{ type: RuleType.Required }],
     }),
     element(context, 'VTextField', {
       name: 'Email',
-      props: { label: 'Email', type: 'email', variant: 'outlined' },
+      props: { label: read('emailLabel'), type: 'email', variant: 'outlined' },
       model: 'wizardEmail',
       rules: [{ type: RuleType.Required }, { type: RuleType.Email }],
     }),
   ])
-  const plan = stepForm(2, read('planTitle'), 'Next', [
+  const plan = stepForm(2, read('planTitle'), read('nextLabel'), [
     element(context, 'VSelect', {
       name: 'Plan',
-      props: { label: 'Plan', items: readTexts(props, 'plans', DEFAULT_PLANS), variant: 'outlined' },
+      props: { label: read('planLabel'), items: readTexts(props, 'plans', DEFAULT_PLANS), variant: 'outlined' },
       model: 'wizardPlan',
       rules: [{ type: RuleType.Required }],
     }),
@@ -93,7 +95,7 @@ export const buildWizard: Builder = (context, props) => {
       element(context, 'VBtn', {
         name: 'Start again',
         props: { variant: 'text' },
-        text: 'Start again',
+        text: read('restartLabel'),
         click: goTo(1),
       }),
     ],
