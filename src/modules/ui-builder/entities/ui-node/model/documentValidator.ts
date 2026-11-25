@@ -1,5 +1,6 @@
-import { CELL_SLOT_PREFIX, getComponentDef, getNodeSlots } from './componentDefinitions'
-import { ActionType } from './enums'
+import { isValidAction } from './actions'
+import { behaviorOf } from './componentBehaviors'
+import { getComponentDef, getNodeSlots } from './componentDefinitions'
 import { DOCUMENT_VERSION, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_NODES, MAX_PAGES, ROOT_NODE_ID } from './constants'
 import type { Page, Project, UiNode, UiNodeEvents } from './types'
 
@@ -83,11 +84,7 @@ function validateNode(value: unknown, ids: Set<string>, countNode: () => number,
   const validatedSlots: Record<string, UiNode[]> = {}
   for (const [slotName, slotValue] of Object.entries(slots)) {
     // Cell content of a column that no longer exists is dropped rather than making the document unreadable.
-    if (
-      type === 'VDataTable' &&
-      slotName.startsWith(CELL_SLOT_PREFIX) &&
-      !getNodeSlots({ type, props }).some(slot => slot.name === slotName)
-    )
+    if (behaviorOf(type).canDropStaleSlot?.(slotName) && !getNodeSlots({ type, props }).some(s => s.name === slotName))
       continue
     if (
       slotName === 'default' ||
@@ -115,11 +112,7 @@ function validateLogic({ model, vIf, vFor, events }: Record<string, unknown>) {
   const valid =
     isRecord(events) &&
     Object.keys(events).every(key => key === 'click') &&
-    (click === undefined ||
-      (isRecord(click) &&
-        ((click.type === ActionType.Navigate && typeof click.to === 'string') ||
-          (click.type === ActionType.Set && typeof click.key === 'string' && typeof click.value === 'string') ||
-          (click.type === ActionType.Toggle && typeof click.key === 'string'))))
+    (click === undefined || (isRecord(click) && isValidAction(click)))
   if (!valid) throw new Error('Invalid event in document.')
 }
 

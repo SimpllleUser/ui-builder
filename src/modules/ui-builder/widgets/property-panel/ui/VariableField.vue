@@ -6,7 +6,14 @@ import { useUiTreeStore, parseLiteral, variableNameError } from '../../../entiti
  * Picks a variable by name. A name that does not exist yet is accepted and the parent creates the variable,
  * so nobody has to leave the inspector to define it. The variable's starting value can be edited here too.
  */
-const props = defineProps<{ modelValue?: string; label: string; title?: string; hint?: string }>()
+const props = defineProps<{
+  modelValue?: string
+  label: string
+  title?: string
+  hint?: string
+  /** What is wrong with the current choice, said by the parent. */
+  problem?: string
+}>()
 const emit = defineEmits<{ 'update:modelValue': [name: string] }>()
 const store = useUiTreeStore()
 
@@ -59,7 +66,7 @@ const setStartValue = (text: string) => {
       :title="title"
       :hint="hint"
       :persistent-hint="!!hint"
-      :error-messages="nameProblem ?? []"
+      :error-messages="nameProblem ?? problem ?? []"
       variant="outlined"
       density="compact"
       hide-details="auto"

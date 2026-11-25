@@ -3,6 +3,7 @@ import {
   StepDirection,
   type UiNode,
   describeBehaviors,
+  behaviorOf,
   useUiTreeStore,
   getComponentDef,
   getNodeSlots,
@@ -35,7 +36,9 @@ const slots = computed(() =>
 // Named areas (slots) that are still empty are offered from the actions menu instead of cluttering the tree.
 // A data table's cell content is added from its Content settings.
 const hasEmptySlots = computed(
-  () => props.node.type !== 'VDataTable' && slots.value.some(slot => !props.node.slots[slot.name]?.length),
+  () =>
+    !behaviorOf(props.node.type).slotsAddedInInspector &&
+    slots.value.some(slot => !props.node.slots[slot.name]?.length),
 )
 const showSlots = () => {
   expanded.value = true

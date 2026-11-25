@@ -1,26 +1,24 @@
+import { behaviorOf, clickEventOf, componentProps } from './componentBehaviors'
+import { CELL_SLOT_PREFIX, cellSlotName } from './componentDefinitions'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from './constants'
-import { ActionType } from './enums'
+import { actionToCode, lacksVariable, type CodeContext } from './actions'
+import { ClickEvent } from './enums'
 import { addHelper, expressionToJs, HelperName } from './expressionToJs'
-import { jsLiteral } from './jsLiteral'
-import { parseLiteral } from './runtime'
-import { tableHeight, tableStyleClasses } from './tableBindings'
-import type { UiAction, UiNode } from './types'
-import { bindText, bindTextForTemplate, escapeAttribute, pathToJs, textToJsExpression } from './vueBindings'
+import { jsLiteral, jsString } from './jsLiteral'
+import { chipColumnKeys, STATUS_CHIP_PROPS } from './statusChips'
+import type { UiNode } from './types'
+import { bindText, bindTextForTemplate, escapeAttribute, pathToJs } from './vueBindings'
 
 const INDENT = '  '
 const LINE_LIMIT = 100
-const CELL_SLOT_PREFIX = 'item.'
 const DEFAULT_SLOT = 'default'
-/** Props that exist only in the editor; they become classes or are left out. */
-const EDITOR_ONLY_PROPS = new Set(['mask', 'striped', 'bordered', 'headerColor', 'class', 'style'])
-const TABLE_TYPE = 'VDataTable'
 
-export interface TemplateContext {
+export interface TemplateContext extends CodeContext {
   /** Names of variables; a word that is not one next to `==` is read as text. */
   known: ReadonlySet<string>
-  helpers: Set<HelperName>
-  usage: { router: boolean }
 }
+
+const jsLiteralInline = (texts: string[]) => `[${texts.map(jsString).join(', ')}]`
 
 function propToAttribute(key: string, value: unknown): string {
   if (typeof value === 'string') {
@@ -32,16 +30,13 @@ function propToAttribute(key: string, value: unknown): string {
 }
 
 function propsToAttributes(node: UiNode): string[] {
-  const entries = Object.entries(node.props).filter(([key]) => !EDITOR_ONLY_PROPS.has(key))
-  const attributes = entries.map(([key, value]) =>
-    node.type === TABLE_TYPE && key === 'height'
-      ? propToAttribute(key, tableHeight(value))
-      : propToAttribute(key, value),
+  const attributes = Object.entries(componentProps(node.type, node.props)).map(([key, value]) =>
+    propToAttribute(key, value),
   )
   const classes = [
     ...(typeof node.props.class === 'string' ? [node.props.class] : []),
     ...node.classes,
-    ...(node.type === TABLE_TYPE ? tableStyleClasses(node.props) : []),
+    ...(behaviorOf(node.type).editorClasses?.(node.props) ?? []),
   ].filter(Boolean)
   if (classes.length) attributes.push(`class="${escapeAttribute(classes.join(' '))}"`)
   const { style } = node.props
@@ -50,32 +45,28 @@ function propsToAttributes(node: UiNode): string[] {
   return attributes
 }
 
-function actionToStatement(action: UiAction, context: TemplateContext): string {
-  if (action.type === ActionType.Navigate) {
-    context.usage.router = true
-    return `router.push(${textToJsExpression(action.to)})`
-  }
-  if (action.type === ActionType.Toggle) return `${action.key} = !${action.key}`
-  const bound = bindText(action.value)
-  if (!bound.dynamic) return `${action.key} = ${jsLiteral(parseLiteral(action.value))}`
-  // A single value keeps its type and is copied, like Preview stores a table row.
-  if (/^\s*\{\{[^{}]+\}\}\s*$/.test(action.value)) {
-    addHelper(context.helpers, HelperName.CopyOf)
-    return `${action.key} = copyOf(${bound.code})`
-  }
-  return `${action.key} = ${bound.code}`
-}
-
 function eventAttributes(node: UiNode, context: TemplateContext): string[] {
   const click = node.events?.click
   if (!click) return []
-  const statement = actionToStatement(click, context)
+  const isRowClick = clickEventOf(node.type) === ClickEvent.Row
+  // Like Preview, an unfinished action does nothing, but an element's click still does not reach the row around it.
+  if (lacksVariable(click)) return isRowClick ? [] : [`@${ClickEvent.Element}.stop`]
+  const statement = actionToCode(click, context)
   // A table row hands over its row as `item`; elsewhere the click must not also reach the row.
-  return node.type === TABLE_TYPE ? [`@click:row="(_, { item }) => ${statement}"`] : [`@click.stop="${statement}"`]
+  return isRowClick
+    ? [`@${ClickEvent.Row}="(_, { item }) => ${statement}"`]
+    : [`@${ClickEvent.Element}.stop="${statement}"`]
 }
 
-function modelAttributes(node: UiNode): string[] {
-  return node.model ? [`v-model="${node.model}"`] : []
+/** A masked input formats what is typed before it reaches the variable, as in Preview. */
+function modelAttributes(node: UiNode, context: TemplateContext): string[] {
+  if (!node.model) return []
+  const { mask } = node.props
+  if (typeof mask !== 'string' || !mask) return [`v-model="${node.model}"`]
+  addHelper(context.helpers, HelperName.ApplyInputMask)
+  const bound = bindText(mask)
+  const maskCode = escapeAttribute(bound.dynamic ? bound.code : jsString(mask))
+  return [`:model-value="${node.model}"`, `@update:model-value="${node.model} = applyInputMask($event, ${maskCode})"`]
 }
 
 function conditionAttributes(node: UiNode, context: TemplateContext): string[] {
@@ -95,8 +86,65 @@ function openTag(pad: string, tag: string, attributes: string[], selfClosing: bo
   ]
 }
 
-const slotAttribute = (name: string) =>
-  name.startsWith(CELL_SLOT_PREFIX) ? `#${name}="{ item, value, index }"` : `#${name}`
+function slotAttribute(type: string, name: string): string {
+  const params = behaviorOf(type).slotParams?.(name) ?? []
+  return params.length ? `#${name}="{ ${params.join(', ')} }"` : `#${name}`
+}
+
+/** A key that can be written into a slot name as it is. */
+const PLAIN_SLOT_KEY = /^[\w$.-]+$/
+
+function statusChip(context: TemplateContext, depth: number): string[] {
+  addHelper(context.helpers, HelperName.StatusChipColor)
+  const attributes = Object.entries(STATUS_CHIP_PROPS).map(([key, value]) => propToAttribute(key, value))
+  const chip = `<VChip ${attributes.join(' ')} :color="statusChipColor(value)">`
+  return [`${INDENT.repeat(depth)}${chip}{{ String(value ?? '') }}</VChip>`]
+}
+
+/** One cell template for every column in `keys`, a list that is only known when the page runs. */
+function chipLoop(keys: string, context: TemplateContext, depth: number): string[] {
+  const pad = INDENT.repeat(depth)
+  const slot = `#[\`${CELL_SLOT_PREFIX}\${key}\`]="{ value }"`
+  return [
+    `${pad}<template v-for="key in ${escapeAttribute(keys)}" ${slot}>`,
+    ...statusChip(context, depth + 1),
+    `${pad}</template>`,
+  ]
+}
+
+/** The cells of "Status chip" columns, as Preview draws them. Cells with content of their own are left alone. */
+function statusChipTemplates(node: UiNode, context: TemplateContext, depth: number): string[] {
+  if (!behaviorOf(node.type).hasStatusChips) return []
+  const ownCells = Object.entries(node.slots)
+    .filter(([, nodes]) => nodes.length)
+    .map(([name]) => name)
+  const { headers } = node.props
+
+  if (typeof headers === 'string') {
+    const bound = bindText(headers)
+    if (!bound.dynamic) return []
+    addHelper(context.helpers, HelperName.StatusChipKeys)
+    const taken = ownCells
+      .filter(name => name.startsWith(CELL_SLOT_PREFIX))
+      .map(name => name.slice(CELL_SLOT_PREFIX.length))
+    const skip = taken.length ? `.filter(key => !${jsLiteralInline(taken)}.includes(key))` : ''
+    return chipLoop(`statusChipKeys(${bound.code})${skip}`, context, depth)
+  }
+
+  const pad = INDENT.repeat(depth)
+  const keys = chipColumnKeys(headers).filter(key => !ownCells.includes(cellSlotName(key)))
+  const unusual = keys.filter(key => !PLAIN_SLOT_KEY.test(key))
+  return [
+    ...keys
+      .filter(key => PLAIN_SLOT_KEY.test(key))
+      .flatMap(key => [
+        `${pad}<template #${cellSlotName(key)}="{ value }">`,
+        ...statusChip(context, depth + 1),
+        `${pad}</template>`,
+      ]),
+    ...(unusual.length ? chipLoop(jsLiteralInline(unusual), context, depth) : []),
+  ]
+}
 
 function renderChildren(node: UiNode, context: TemplateContext, depth: number): string[] {
   const pad = INDENT.repeat(depth)
@@ -104,11 +152,12 @@ function renderChildren(node: UiNode, context: TemplateContext, depth: number): 
   for (const [name, nodes] of Object.entries(node.slots)) {
     if (name === DEFAULT_SLOT || !nodes.length) continue
     lines.push(
-      `${pad}<template ${slotAttribute(name)}>`,
+      `${pad}<template ${slotAttribute(node.type, name)}>`,
       ...renderNodes(nodes, context, depth + 1),
       `${pad}</template>`,
     )
   }
+  lines.push(...statusChipTemplates(node, context, depth))
   return lines
 }
 
@@ -125,7 +174,7 @@ function renderElement(node: UiNode, context: TemplateContext, depth: number, wi
   const attributes = [
     ...(withRepeat ? repeatAttributes(node) : []),
     ...conditionAttributes(node, context),
-    ...modelAttributes(node),
+    ...modelAttributes(node, context),
     ...propsToAttributes(node),
     ...eventAttributes(node, context),
   ]

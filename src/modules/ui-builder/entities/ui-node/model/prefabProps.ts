@@ -1,3 +1,4 @@
+import { childNodes } from './treeUtils'
 import type { PrefabProp, UiNode } from './types'
 
 /**
@@ -25,10 +26,6 @@ function mapStrings<T>(value: T, transform: (text: string) => string): T {
   if (value !== null && typeof value === 'object')
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mapStrings(item, transform)])) as T
   return value
-}
-
-function childNodes(node: UiNode): UiNode[] {
-  return [...node.children, ...Object.values(node.slots).flat()]
 }
 
 /** What an element holds itself, without its children. */

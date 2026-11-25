@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { guideContent, parseProject, playground, runtime, store } from './support.mjs'
+import { actions, guideContent, parseProject, playground, runtime, store } from './support.mjs'
 
 test('bindings, events and state are validated and persisted', () => {
   store.addComponent('VBtn')
@@ -79,13 +79,13 @@ test('preview actions change state and navigate between pages', () => {
 
 test('a click can store a whole table row and conditions can read its fields', () => {
   const row = { id: 1002, customer: 'Ivan', step: 1 }
-  const action = runtime.bindAction({ type: 'set', key: 'selected', value: '{{item}}' }, { item: row })
+  const action = actions.bindAction({ type: 'set', key: 'selected', value: '{{item}}' }, { item: row })
   assert.deepEqual(action.value, row)
   assert.notEqual(action.value, row, 'the stored row is a copy')
   const state = { selected: 'none' }
-  runtime.runAction(action, { state, navigate() {} })
+  actions.runAction(action, { state, navigate() {} })
   assert.equal(state.selected.customer, 'Ivan')
-  const text = runtime.bindAction({ type: 'set', key: 'name', value: '{{item.customer}}' }, { item: row })
+  const text = actions.bindAction({ type: 'set', key: 'name', value: '{{item.customer}}' }, { item: row })
   assert.equal(text.value, 'Ivan')
 })
 

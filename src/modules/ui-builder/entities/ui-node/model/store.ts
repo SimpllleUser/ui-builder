@@ -21,7 +21,7 @@ import { usePrefabSync } from './prefabSync'
 import { usePrefabEditLock } from './prefabEditLock'
 import { snapshotPreview } from './previewSnapshot'
 import { resolveTableData } from './tableBindings'
-import { bindAction } from './runtime'
+import { bindAction } from './actions'
 import {
   addPage as addPageMutation,
   deletePage as deletePageMutation,
@@ -39,9 +39,20 @@ import {
   findNodeById as findNodeByIdInTree,
   findParentAndIndex as findParentAndIndexInTree,
   getNodeList,
+  walkNodes,
   type NodeLocation,
 } from './treeUtils'
 import { createHistory } from './history'
+import {
+  editedPrefabId,
+  isOnLayout,
+  LAYOUT_TARGET,
+  leavePrefabTarget,
+  openPrefabTarget,
+  PAGE_TARGET,
+  withoutLayout,
+  type EditTarget,
+} from './editTarget'
 import {
   appendNode,
   updateNodeLogic as updateNodeLogicMutation,
@@ -84,7 +95,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   let isOpening = false
   const project = ref<Project>(emptyProject())
   const activePageId = ref(project.value.pages[0].id)
-  const editingLayout = ref(false)
+  const editTarget = ref<EditTarget>(PAGE_TARGET)
+  const editingLayout = computed(() => isOnLayout(editTarget.value))
   const persistence = useDocumentPersistence(() => serializeProject(project.value), setNotice)
   const { saveState, flush, save: saveDocument } = persistence
   watch(
@@ -100,8 +112,8 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   /** My components. They belong to no project. */
   const prefabs = ref<Prefab[]>([])
   const prefabSync = usePrefabSync(prefabs, () => setNotice('Could not save My components in this browser.'))
-  /** A saved component opened for editing in place of the page, or null while a page or the layout is edited. */
-  const editingPrefabId = ref<string | null>(null)
+  /** The saved component opened for editing in place of the page, or null while a page or the layout is edited. */
+  const editingPrefabId = computed(() => editedPrefabId(editTarget.value))
   const editingPrefab = computed(() => prefabs.value.find(prefab => prefab.prefabId === editingPrefabId.value) ?? null)
   /** The tree being edited: a saved component, the shared layout or the active page. Every editing command works on it. */
   const rootNode = computed<UiNode>({
@@ -127,7 +139,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     // Checkpoints saved before pages existed hold a single page tree.
     if (Array.isArray(data?.pages)) project.value = data
     else rootNode.value = data
-    if (!project.value.layout) editingLayout.value = false
+    if (!project.value.layout) editTarget.value = withoutLayout(editTarget.value)
     activePageId.value = activePage.value.id
     selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
   }
@@ -296,12 +308,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   /** `Data table`, then `Data table 2`, `Data table 3`… so similar elements can be told apart in Layers. */
   const uniqueNodeName = (name: string) => {
     const taken = new Set<string>()
-    const collect = (node: UiNode) => {
-      taken.add(node.name)
-      node.children.forEach(collect)
-      Object.values(node.slots).flat().forEach(collect)
-    }
-    collect(rootNode.value)
+    for (const node of walkNodes(rootNode.value)) taken.add(node.name)
     if (!taken.has(name)) return name
     let n = 2
     while (taken.has(`${name} ${n}`)) n++
@@ -398,14 +405,14 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const editPrefab = (prefabId: string) => {
     const prefab = prefabs.value.find(item => item.prefabId === prefabId)
     if (!prefab) return false
-    editingPrefabId.value = prefabId
+    editTarget.value = openPrefabTarget(editTarget.value, prefabId)
     // The component's own settings open at once: the properties panel stays collapsed while nothing is selected.
     selectedNodeIds.value = [prefab.node.id]
     return true
   }
   const stopEditingPrefab = () => {
     if (!editingPrefabId.value) return
-    editingPrefabId.value = null
+    editTarget.value = leavePrefabTarget(editTarget.value)
     selectedNodeIds.value = []
   }
   usePrefabEditLock(editingPrefabId, {
@@ -453,8 +460,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     commit()
     project.value = imported
     activePageId.value = imported.pages[0].id
-    editingLayout.value = false
-    editingPrefabId.value = null
+    editTarget.value = PAGE_TARGET
     selectedNodeIds.value = []
     commit()
     saveDocument()
@@ -472,8 +478,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     isOpening = true
     try {
       isPreviewMode.value = false
-      editingLayout.value = false
-      editingPrefabId.value = null
+      editTarget.value = PAGE_TARGET
       selectedNodeIds.value = []
       project.value = next
       // An offer to undo belongs to the project being left.
@@ -498,11 +503,10 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     getActivePageId: () => activePageId.value,
     setActivePageId: id => {
       activePageId.value = id
-      editingPrefabId.value = null
+      editTarget.value = leavePrefabTarget(editTarget.value)
     },
     setEditingLayout: editing => {
-      editingLayout.value = editing
-      editingPrefabId.value = null
+      editTarget.value = editing ? LAYOUT_TARGET : PAGE_TARGET
     },
     clearSelection: () => {
       selectedNodeIds.value = []

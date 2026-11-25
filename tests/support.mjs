@@ -9,6 +9,7 @@ export let server,
   parseProject,
   serializeProject,
   runtime,
+  actions,
   parseDocument,
   serializeDocument,
   readSpacing,
@@ -73,6 +74,7 @@ before(async () => {
     '/src/modules/ui-builder/entities/ui-node/model/document.ts',
   ))
   runtime = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/runtime.ts')
+  actions = await server.ssrLoadModule('/src/modules/ui-builder/entities/ui-node/model/actions.ts')
   // Single-page helpers: tests edit one page tree and import it as a v1 document (also exercises migration).
   parseDocument = text => parseProject(text).pages[0].root
   serializeDocument = root => JSON.stringify({ version: 1, root })

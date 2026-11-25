@@ -9,7 +9,7 @@ export type NodeLocation = {
 export function findNodeById(id: string, node: UiNode): UiNode | null {
   if (node.id === id) return node
 
-  for (const child of getChildren(node)) {
+  for (const child of childNodes(node)) {
     const found = findNodeById(id, child)
     if (found) return found
   }
@@ -26,7 +26,7 @@ export function findParentAndIndex(id: string, parent: UiNode): NodeLocation | n
     if (slotIndex !== -1) return { parent, index: slotIndex, slotName }
   }
 
-  for (const child of getChildren(parent)) {
+  for (const child of childNodes(parent)) {
     const found = findParentAndIndex(id, child)
     if (found) return found
   }
@@ -38,6 +38,13 @@ export function getNodeList(location: NodeLocation): UiNode[] {
   return location.slotName ? location.parent.slots[location.slotName] : location.parent.children
 }
 
-function getChildren(node: UiNode): UiNode[] {
+/** Everything directly inside an element: its children, then the content of its slots. */
+export function childNodes(node: UiNode): UiNode[] {
   return [...node.children, ...Object.values(node.slots).flat()]
+}
+
+/** The element and everything inside it, each parent before its content. */
+export function* walkNodes(node: UiNode): Generator<UiNode> {
+  yield node
+  for (const child of childNodes(node)) yield* walkNodes(child)
 }

@@ -5,28 +5,17 @@ import { storeToRefs } from 'pinia'
 import { useUiTreeStore } from '../model/store'
 import { getComponentDef } from '../model/componentDefinitions'
 import { OUTLET_NODE_TYPE, TEXT_NODE_TYPE } from '../model/constants'
-import {
-  applyMask,
-  bindAction,
-  evaluateCondition,
-  interpolate,
-  interpolateProps,
-  repeatItems,
-  type Scope,
-} from '../model/runtime'
+import { applyMask, evaluateCondition, interpolate, interpolateProps, repeatItems, type Scope } from '../model/runtime'
+import { bindAction } from '../model/actions'
 import type { UiNode } from '../model/types'
+import { childNodes } from '../model/treeUtils'
 import { canvasDragTargetId, createDropHandlers } from './canvasDrag'
 import { behaviorMarker } from '../model/behaviorSummary'
-import { resolveTableData, tableHeight, tableStyleClasses } from '../model/tableBindings'
-import { statusChipSlots } from './dataTableRendering'
+import { behaviorOf, clickEventOf, componentProps } from '../model/componentBehaviors'
+import { ClickEvent } from '../model/enums'
+import { generatedSlots } from './generatedSlots'
 
 export { canvasDragTargetId }
-
-const NO_IMAGE_PLACEHOLDER =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="100%" height="100%" fill="%23e0e0e0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%23999">No image</text></svg>'
-
-/** Overlays are drawn inline in the editor so their content can be edited; they are real overlays in preview. */
-const OVERLAY_TYPES = new Set(['VDialog', 'VMenu', 'VSnackbar', 'VTooltip'])
 
 const NodeRenderer = defineComponent({
   name: 'NodeRenderer',
@@ -97,11 +86,16 @@ const NodeRenderer = defineComponent({
       )
     }
 
-    const renderOverlayPlaceholder = (node: UiNode, classes: unknown[], render: (nodes: UiNode[]) => VNode[]) => {
+    const renderOverlayPlaceholder = (
+      node: UiNode,
+      note: string,
+      classes: unknown[],
+      render: (nodes: UiNode[]) => VNode[],
+    ) => {
       const label = h(
         'div',
         { class: 'overlay-placeholder__label' },
-        `${getComponentDef(node.type)?.label ?? node.type} — ${node.type === 'VTooltip' ? String(node.props.text ?? '') : 'opens in preview'}`,
+        `${getComponentDef(node.type)?.label ?? node.type} — ${note}`,
       )
       const isLeaf = !!getComponentDef(node.type)?.isLeaf
       return h(
@@ -121,21 +115,24 @@ const NodeRenderer = defineComponent({
           onClick: (e: MouseEvent) => select(e, node.id),
           ...(isLeaf ? {} : createDropHandlers(store, node)),
         },
-        [label, ...render(node.children), ...Object.values(node.slots).flatMap(render)],
+        [label, ...render(childNodes(node))],
       )
     }
 
-    /** Default and named slots. A data table's cell slots receive the row (`item`), cell `value` and `index`. */
+    /** Default and named slots. A scoped slot, such as a table cell, adds what the component passes to the variables. */
     const buildSlots = (node: UiNode, render: (nodes: UiNode[], base?: Scope) => VNode[]): Record<string, Slot> => {
       const slots: Record<string, Slot> = {}
       if (!getComponentDef(node.type)?.isLeaf) slots.default = () => render(node.children)
       for (const [slotName, slotChildren] of Object.entries(node.slots)) {
         if (!slotChildren.length) continue
-        slots[slotName] =
-          node.type === 'VDataTable'
-            ? ({ item, value, index }: { item: unknown; value: unknown; index: number }) =>
-                render(slotChildren, { ...props.scope, item, value, index })
-            : () => render(slotChildren)
+        const params = behaviorOf(node.type).slotParams?.(slotName) ?? []
+        slots[slotName] = params.length
+          ? (passed: Scope) =>
+              render(slotChildren, {
+                ...props.scope,
+                ...Object.fromEntries(params.map(name => [name, passed[name]])),
+              })
+          : () => render(slotChildren)
       }
       return slots
     }
@@ -153,7 +150,7 @@ const NodeRenderer = defineComponent({
       }
       const click = node.events?.click
       if (click) {
-        if (node.type === 'VDataTable') {
+        if (clickEventOf(node.type) === ClickEvent.Row) {
           bindings['onClick:row'] = (_: Event, row: { item: unknown }) =>
             store.dispatchAction(bindAction(click, { ...scope, item: row.item }))
         } else {
@@ -171,22 +168,17 @@ const NodeRenderer = defineComponent({
       const isLeaf = !!getComponentDef(node.type)?.isLeaf
       const resolvedProps = preview ? interpolateProps(node.props, scope) : { ...node.props }
       // `class`/`style` set through MCP or import must not be lost when the editor adds its own classes.
-      const { class: propClass, style: propStyle, mask, ...componentProps } = resolvedProps
-      const classes = [propClass, ...node.classes]
+      const { class: propClass, style: propStyle, mask } = resolvedProps
       const render = (nodes: UiNode[], base: Scope = props.scope) => renderNodes(nodes, base, scope, preview)
 
-      const slots = buildSlots(node, render)
+      const behavior = behaviorOf(node.type)
+      // In the editor a binding shows the variable's starting value, so the canvas always has real data to draw.
+      const shownProps = behavior.previewProps?.(resolvedProps, preview ? scope : store.project.state) ?? resolvedProps
+      const classes = [propClass, ...node.classes, ...(behavior.editorClasses?.(shownProps) ?? [])]
+      const slots = { ...generatedSlots(node.type, shownProps), ...buildSlots(node, render) }
+      const givenProps = componentProps(node.type, shownProps)
       const extraProps: Record<string, unknown> = {}
       if (propStyle !== undefined) extraProps.style = propStyle
-      if (node.type === 'VImg' && !componentProps.src) extraProps.src = NO_IMAGE_PLACEHOLDER
-      if (node.type === 'VDataTable') {
-        // In the editor a binding shows the variable's starting value, so the canvas always has real data to draw.
-        Object.assign(componentProps, resolveTableData(componentProps, preview ? scope : store.project.state))
-        for (const [name, slot] of Object.entries(statusChipSlots(componentProps.headers))) slots[name] ??= slot
-        componentProps.height = tableHeight(componentProps.height)
-        classes.push(...tableStyleClasses(componentProps))
-        for (const prop of ['striped', 'bordered', 'headerColor']) delete componentProps[prop]
-      }
 
       const VComponent = resolveDynamicComponent(
         node.type in Components ? Components[node.type as keyof typeof Components] : node.type,
@@ -195,14 +187,14 @@ const NodeRenderer = defineComponent({
       if (preview)
         return h(
           VComponent,
-          { ...componentProps, ...extraProps, ...previewBindings(node, mask, scope), class: classes },
+          { ...givenProps, ...extraProps, ...previewBindings(node, mask, scope), class: classes },
           slots,
         )
 
       return h(
         VComponent,
         {
-          ...componentProps,
+          ...givenProps,
           ...extraProps,
           'data-node-id': node.id,
           ...behaviorMarker(node),
@@ -229,9 +221,12 @@ const NodeRenderer = defineComponent({
 
       if (node.type === TEXT_NODE_TYPE) return renderText(node, preview, scope)
       if (node.type === OUTLET_NODE_TYPE) return renderOutlet(node, preview)
-      if (!preview && OVERLAY_TYPES.has(node.type)) {
+      const overlayNote = preview ? undefined : behaviorOf(node.type).overlayNote?.(node.props)
+      if (overlayNote !== undefined) {
         const classes = [node.props.class, ...node.classes]
-        return renderOverlayPlaceholder(node, classes, nodes => renderNodes(nodes, props.scope, scope, preview))
+        return renderOverlayPlaceholder(node, overlayNote, classes, nodes =>
+          renderNodes(nodes, props.scope, scope, preview),
+        )
       }
       return renderComponent(node, preview, scope)
     }
