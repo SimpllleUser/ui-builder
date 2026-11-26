@@ -1,4 +1,12 @@
-import { WRAP_CONTAINER_TYPES, type PrefabPropValues } from '../../../entities/ui-node'
+import {
+  findPrefabPropNames,
+  prefabValuesError,
+  WRAP_CONTAINER_TYPES,
+  type PrefabProp,
+  type PrefabPropValues,
+  type UiNode,
+} from '../../../entities/ui-node'
+import { parameterFromInput } from './mcpParameters'
 import { editingTarget, need, needEditable, ok, summarize, type McpCommand, type Store } from './mcpCommandUtils'
 
 /** Parameter values given by an agent as `{ name: text }`; anything else is ignored. */
@@ -11,6 +19,21 @@ const needSaved = (store: Store, prefabId: unknown) => {
   const prefab = store.prefabs.find(item => item.prefabId === prefabId)
   if (!prefab) throw new Error(`No saved component ${String(prefabId)} (see list_saved_components).`)
   return prefab
+}
+
+/** The definitions for a component being saved; those the element does not use yet are kept as declared. */
+function newParameters(node: UiNode, input: unknown, defaults: PrefabPropValues): PrefabProp[] {
+  if (input === undefined) return []
+  ok(Array.isArray(input), 'parameters is a list.')
+  const used = findPrefabPropNames(node)
+  const parameters = (input as unknown[]).map(item => {
+    const parameter = parameterFromInput(item, name => !used.includes(name))
+    return used.includes(parameter.name) ? parameter : { ...parameter, isDeclared: true }
+  })
+  ok(new Set(parameters.map(item => item.name)).size === parameters.length, 'Each parameter needs its own name.')
+  const invalid = prefabValuesError(parameters, defaults)
+  ok(!invalid, invalid ?? '')
+  return parameters
 }
 
 const WRAP_TYPES = WRAP_CONTAINER_TYPES.map(item => item.type)
@@ -28,10 +51,32 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
     const node = need(store, a.id)
     const name = String(a.name ?? '').trim()
     ok(!!name, 'A saved component needs a name.')
+    const defaults = propValues(a.props)
+    const parameters = newParameters(node, a.parameters, defaults)
     const countBefore = store.prefabs.length
-    store.savePrefab(node.id, name, propValues(a.props))
+    store.savePrefab(node.id, name, defaults, parameters)
     ok(store.prefabs.length > countBefore, 'Could not save the component.')
     return { prefabId: store.prefabs[store.prefabs.length - 1].prefabId, name }
+  },
+  set_parameter: (store, a) => {
+    const prefab = needSaved(store, a.prefabId)
+    const find = (name: string) => prefab.props?.find(item => item.name === name)
+    const parameter = parameterFromInput(a.parameter, name => !find(name))
+    const current = find(parameter.name)
+    // A new one nothing uses yet must be marked, or the next edit of the component would drop it.
+    const isDeclared = current ? current.isDeclared : true
+    const error = store.setPrefabParameter(prefab.prefabId, { ...parameter, ...(isDeclared ? { isDeclared } : {}) })
+    ok(!error, error ?? '')
+    return { prefabId: prefab.prefabId, props: needSaved(store, prefab.prefabId).props }
+  },
+  remove_parameter: (store, a) => {
+    const prefab = needSaved(store, a.prefabId)
+    const name = String(a.name ?? '')
+    ok(!!prefab.props?.some(item => item.name === name), `“${prefab.name}” has no parameter “${name}”.`)
+    store.removePrefabParameter(prefab.prefabId, name)
+    const props = needSaved(store, prefab.prefabId).props ?? []
+    // A used name stays: it only loses its type.
+    return { prefabId: prefab.prefabId, props, stillUsed: props.some(item => item.name === name) }
   },
   insert_saved_component: (store, a) => {
     if (a.parentId) needEditable(store, a.parentId)
@@ -43,7 +88,7 @@ export const MCP_COMPONENT_COMMANDS: Record<string, McpCommand> = {
     const node = need(store, a.id)
     ok(
       store.setInstanceProps(node.id, propValues(a.props)),
-      `“${node.name}” is not an instance of a component in My components.`,
+      store.originalOf(node.id) ? store.notice : `“${node.name}” is not an instance of a component in My components.`,
     )
     return summarize(need(store, node.id))
   },

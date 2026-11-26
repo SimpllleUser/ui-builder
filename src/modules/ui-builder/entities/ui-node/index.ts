@@ -31,6 +31,7 @@ export {
   ClickEvent,
   IssueKind,
   IssueSeverity,
+  PrefabPropType,
   ColumnAlign,
   EventName,
   RuleType,
@@ -109,6 +110,16 @@ export type { TemplateProps } from './model/templateFactory'
 export type { TextRecord } from './model/templates/templateProps'
 export { applyPrefabProps, declarePrefabProps, findPrefabPropNames } from './model/prefabProps'
 export type { PrefabPropValues } from './model/prefabProps'
+export {
+  BooleanText,
+  PREFAB_PROP_TYPE_LABELS,
+  prefabPropErrors,
+  prefabPropNameError,
+  prefabPropType,
+  prefabValueError,
+  prefabValuesError,
+} from './model/prefabParameters'
+export type { PrefabPropErrors } from './model/prefabParameters'
 export type {
   DataSource,
   InstanceLink,

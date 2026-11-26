@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiTreeStore, getComponentDef, type Prefab, type PrefabPropValues } from '../../../entities/ui-node'
+import {
+  useUiTreeStore,
+  getComponentDef,
+  prefabValuesError,
+  type Prefab,
+  type PrefabPropValues,
+} from '../../../entities/ui-node'
+import { ParameterValueField } from '../../../features/component-parameters'
 
 /** Elements saved to reuse: insert one into the page or remove it from the library. */
 const store = useUiTreeStore()
@@ -25,12 +32,12 @@ const insert = (prefab: Prefab) => {
   propValues.value = Object.fromEntries(prefab.props.map(prop => [prop.name, prop.defaultValue]))
   configuring.value = prefab
 }
+// The reason is shown beside the field; the button only waits until it is gone.
+const isInsertBlocked = computed(() => !!prefabValuesError(configuring.value?.props ?? [], propValues.value))
 const confirmInsert = () => {
-  if (configuring.value) store.insertPrefab(configuring.value.prefabId, undefined, null, propValues.value)
+  if (!configuring.value || isInsertBlocked.value) return
+  store.insertPrefab(configuring.value.prefabId, undefined, null, propValues.value)
   configuring.value = null
-}
-const updatePropValue = (propName: string, value: unknown) => {
-  if (typeof value === 'string') propValues.value[propName] = value
 }
 
 const restore = (prefabId: string) => {
@@ -110,23 +117,19 @@ const confirmDelete = () => {
     <VDialog :model-value="!!configuring" max-width="420" @update:model-value="configuring = null">
       <VCard v-if="configuring" :title="`Insert ${configuring.name}`">
         <VCardText>
-          <VTextField
+          <ParameterValueField
             v-for="prop in configuring.props"
             :key="prop.name"
-            :model-value="propValues[prop.name]"
-            :label="prop.name"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="mb-2"
-            @update:model-value="updatePropValue(prop.name, $event)"
+            :parameter="prop"
+            :model-value="propValues[prop.name] ?? ''"
+            @update:model-value="value => (propValues[prop.name] = value)"
             @keydown.enter="confirmInsert"
           />
         </VCardText>
         <VCardActions>
           <VSpacer />
           <VBtn @click="configuring = null">Cancel</VBtn>
-          <VBtn color="primary" @click="confirmInsert">Insert</VBtn>
+          <VBtn color="primary" :disabled="isInsertBlocked" @click="confirmInsert">Insert</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

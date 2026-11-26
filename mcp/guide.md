@@ -41,7 +41,7 @@ Work in this order: `get_document` → build → **look** (`preview_screenshot`)
 - Use `get_table`, then `add_table_column`, `add_table_row` and so on. Content of one cell goes in the slot `item.<column key>`.
 
 ## Check your work
-- **`check_project`** lists problems (unknown variables, links to pages that do not exist, invalid conditions, empty tables, a layout without “Page content”). Fix every error.
+- **`check_project`** lists problems (unknown variables, links to pages that do not exist, invalid conditions, empty tables, a layout without “Page content”, instance parameter values that do not fit their type). Fix every error.
 - **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_submit`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Data sources arrive after their delay and `mounted` actions run once the page is drawn, so ask `preview_state` again for them. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document. Like a person, you can only use what is there: clicking or typing into an element that is hidden by a condition or disabled is refused with the reason. An element a repeat shows several times needs `copy` (0 is the first one shown), and its actions then see that copy's `item` and `index`.
 - `undo` takes back your last step.
 
@@ -50,6 +50,7 @@ Work in this order: `get_document` → build → **look** (`preview_screenshot`)
 - While the person edits a saved component, `get_history`, `undo`, `redo` and `restore_version` act on that component's own history (`scope` says which). Right after `delete_saved_component`, `undo` brings the component back.
 - **`get_status`** is a cheap check of the page, variables, selection and whether Preview runs.
 - **`save_component`** stores an element in My components (write `{{props.title}}` in a property to make it a parameter). **`insert_saved_component`** adds an **instance** of it (pass `props: { title: "Hi" }`): every instance follows the original, and nothing inside one can be edited. Change its parameters with **`update_instance`**, or **`detach_instance`** to get an editable copy.
+- Parameters have a **type** (`text`, `number`, `boolean`, `choice`, `color`, `link`) with limits. Give them when saving (`save_component` with `parameters`) or later with **`set_parameter`** / **`remove_parameter`**. Values are always written as text; one that does not fit is refused. After changing a type run **`check_project`** and fix the instances with `update_instance`.
 - To change the **original**, call **`edit_saved_component`**, edit with the usual tools (the page is not what you are editing then; `get_status` shows `editing: { component }`), and call **`close_saved_component`**. Every instance, in every project, follows, so check with `list_saved_components` that it is the right one. It has its own `undo` and `get_history`. Templates cannot be added inside it, and these two tools do not work in `batch`.
 - **`list_deleted_components`** / **`restore_saved_component`** bring back a deleted component.
 - **`wrap_nodes`** / **`unwrap_node`** group or ungroup siblings.
