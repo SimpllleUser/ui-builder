@@ -191,6 +191,10 @@ const leaveCanvas = (event: DragEvent) => {
   margin-left: auto;
 }
 .main-canvas-wrapper {
+  /* The editor's colours for its marks on the page, where the theme variables are the project's. */
+  --editor-primary: var(--v-theme-primary);
+  --editor-info: var(--v-theme-info);
+  --editor-on-info: var(--v-theme-on-info);
   position: relative;
   flex: 1;
   overflow: auto;
@@ -201,6 +205,10 @@ const leaveCanvas = (event: DragEvent) => {
 }
 .canvas-device {
   margin-inline: auto;
+}
+/* A component edited on its own has no page behind it. No specificity, so its own background wins. */
+:where(.canvas-device .ui-page-style > *) {
+  background-color: rgb(var(--v-theme-background));
 }
 .drop-hint {
   font-size: 14px;

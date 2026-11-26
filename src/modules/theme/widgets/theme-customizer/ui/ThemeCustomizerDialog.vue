@@ -43,9 +43,9 @@ const colorOptions = computed(() => [
 
 <template>
   <VDialog v-model="open" max-width="640" scrollable>
-    <VCard aria-label="Theme settings">
+    <VCard aria-label="Project theme settings">
       <VCardTitle class="d-flex align-center theme-dialog__fixed">
-        Theme
+        Project theme
         <VSpacer />
         <VBtn size="small" variant="text" prepend-icon="mdi-restore" :disabled="!isCustomized()" @click="resetSettings">
           Reset

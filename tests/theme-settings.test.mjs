@@ -23,6 +23,8 @@ before(async () => {
     ...(await server.ssrLoadModule(`${THEME}baseTheme.ts`)),
     ...(await server.ssrLoadModule(`${THEME}themeCss.ts`)),
     ...(await server.ssrLoadModule(`${THEME}designPresets.ts`)),
+    ...(await server.ssrLoadModule(`${THEME}editorAppearance.ts`)),
+    ...(await server.ssrLoadModule(`${THEME}pageScope.ts`)),
   }
   colorLib = await server.ssrLoadModule('/src/shared/lib/hexColor.ts')
   literal = await server.ssrLoadModule('/src/shared/lib/objectLiteral.ts')
@@ -203,4 +205,24 @@ test('a theme change from outside is applied whole or refused with what is allow
   assert.throws(() => applyThemePatch(settings({}), { customPrimary: 'red' }), /hex colour/)
   assert.throws(() => applyThemePatch(settings({}), { shadows: 'none' }), /Unknown theme setting/)
   assert.throws(() => applyThemePatch(settings({}), { preset: 'neon' }), /Unknown design preset/)
+})
+
+test("the project's tokens, corners and shadows stay inside the page", () => {
+  const scope = theme.PAGE_THEME_SCOPE
+  assert.equal(theme.buildScopedThemeCss(settings({}), scope), '')
+  const css = theme.buildScopedThemeCss(settings({ radius: 8, shadowProfile: theme.ShadowProfile.Soft }), scope)
+  assert.doesNotMatch(css, /:root/)
+  assert.ok(css.startsWith(`${scope} {`))
+  assert.match(css, /\.v-card[\s\S]*border-radius: 8px/)
+})
+
+test('the editor keeps only its own appearance and falls back on bad values', () => {
+  const appearance = theme.sanitizeEditorAppearance({ mode: 'dark', colorPreset: 'nonsense', radius: 8 })
+  assert.deepEqual(appearance, { ...theme.DEFAULT_EDITOR_APPEARANCE, mode: 'dark' })
+  for (const variant of Object.values(theme.ThemeVariant)) {
+    assert.deepEqual(
+      theme.resolveEditorColors(theme.DEFAULT_EDITOR_APPEARANCE, variant),
+      theme.BASE_THEME_COLORS[variant],
+    )
+  }
 })

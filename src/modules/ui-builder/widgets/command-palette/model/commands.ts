@@ -358,7 +358,7 @@ export function buildCommands(store: Store, host: CommandHost): Command[] {
   })
   add({
     id: 'editor:theme',
-    title: 'Theme settings',
+    title: 'Project theme',
     group: 'Editor',
     icon: 'mdi-palette-swatch-outline',
     keywords: 'colors colours dark light mode radius density corners brand primary style appearance',
