@@ -60,6 +60,7 @@ const EXPORTED_CODE_NAMES = [
   'defineStore',
   'isEmpty',
   'lengthOf',
+  'lowerText',
   'computed',
   'nextTick',
   'showMessage',

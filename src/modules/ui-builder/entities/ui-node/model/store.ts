@@ -26,7 +26,8 @@ import { usePrefabEditLock } from './prefabEditLock'
 import { holdsRecursion, prefabLookup } from './componentInstances'
 import { LOCKED_NOTICE, useComponentInstances } from './instanceStore'
 import { snapshotPreview } from './previewSnapshot'
-import { previewObstacle } from './previewReach'
+import type { Scope } from './runtime'
+import { previewReach } from './previewReach'
 import { resolveTableData } from './tableBindings'
 import { actionsOf } from './events'
 import { createRuntimeState, isComputed } from './computedVariables'
@@ -742,46 +743,56 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     }
     return null
   }
-  /** The element of Preview with the form it is in. Throws when a person could not use it now. */
-  const needInPreview = (id: string) => {
+  /**
+   * The element of Preview with the form it is in and the names of the copy meant. Throws when a person could not
+   * use it now, or when it is shown several times and `copy` (0-based, as shown) does not say which one.
+   */
+  const needInPreview = (id: string, copy?: number) => {
     if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
     const path = pathInPreview(id)
     if (!path) throw new Error(`Node not found on the preview page: ${id}`)
-    const obstacle = previewObstacle(path, preview.state.value)
+    const { copies, obstacle } = previewReach(path, preview.state.value)
     if (obstacle) throw new Error(obstacle)
+    const node = path[path.length - 1]
+    if (copy === undefined && copies.length > 1)
+      throw new Error(
+        `“${node.name}” is shown ${copies.length} times: say which with copy (0 to ${copies.length - 1}).`,
+      )
+    const scope = copies[copy ?? 0]
+    if (!scope) throw new Error(`“${node.name}” has no copy ${copy}: it is shown ${copies.length} time(s).`)
     const root = previewTrees.value.find(tree => findNodeByIdInTree(id, tree))!
-    return { node: path[path.length - 1], form: enclosingForm(root, id) }
+    return { node, form: enclosingForm(root, id), scope }
   }
   /** Submits a form as a person would: its actions run only when every rule is satisfied. */
-  const submitForm = (form: UiNode) => {
+  const submitForm = (form: UiNode, scope: Scope = {}) => {
     const errors = formErrors(form, preview.state.value)
-    if (!errors.length) preview.runActions(submitActions(form), { form })
+    if (!errors.length) preview.runActions(submitActions(form), { form, scope })
     return errors
   }
   /** Clicks an element in Preview as a person would. For a table row, `row` says which one was clicked. */
-  const previewClick = (id: string, row?: number) => {
-    const { node, form } = needInPreview(id)
+  const previewClick = (id: string, row?: number, copy?: number) => {
+    const { node, form, scope } = needInPreview(id, copy)
     const actions = actionsOf(node.events, EventName.Click)
     const submits = !!form && isSubmitButton(node)
     if (!actions.length && !submits) throw new Error(`“${node.name}” has no click action.`)
     const data = { ...node.props, ...resolveTableData(node.props, preview.state.value) }
     const item = row === undefined ? undefined : (Array.isArray(data.items) ? data.items : [])[row]
     if (row !== undefined && item === undefined) throw new Error(`The table has no row ${row}.`)
-    preview.runActions(actions, { form, scope: row === undefined ? {} : { item, index: row } })
-    return submits ? submitForm(form) : []
+    preview.runActions(actions, { form, scope: row === undefined ? scope : { ...scope, item, index: row } })
+    return submits ? submitForm(form, scope) : []
   }
   /** Types into an input in Preview: sets the variable the input is linked to, then runs its change actions. */
-  const previewInput = (id: string, value: unknown) => {
-    const { node, form } = needInPreview(id)
+  const previewInput = (id: string, value: unknown, copy?: number) => {
+    const { node, form, scope } = needInPreview(id, copy)
     const actions = actionsOf(node.events, EventName.Change)
     if (!node.model && !actions.length) throw new Error('That element is not linked to a variable.')
     if (node.model) preview.state.value[node.model] = value
-    preview.runActions(actions, { form, scope: { value } })
+    preview.runActions(actions, { form, scope: { ...scope, value } })
   }
-  const previewSubmit = (id: string) => {
-    const { node } = needInPreview(id)
+  const previewSubmit = (id: string, copy?: number) => {
+    const { node, scope } = needInPreview(id, copy)
     if (!isForm(node)) throw new Error(`“${node.name}” is not a form.`)
-    return submitForm(node)
+    return submitForm(node, scope)
   }
   const describePreview = () =>
     snapshotPreview(

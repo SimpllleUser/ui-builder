@@ -1,6 +1,9 @@
 # UI Builder: how to build pages with these tools
 
-Work in this order: `get_document` → build → `check_project` → try it with `preview_*`.
+Work in this order: `get_document` → build → **look** (`preview_screenshot`) → `check_project` → try it with `preview_*`.
+
+## Look at what you build
+- **`preview_screenshot`** returns a picture of a page with the project's theme. Do not judge a design from the element tree: take one after the first layout and after changes, and check a phone too (`{ "width": 390 }`). While Preview runs it shows the current variables, so you can picture a state after clicking.
 
 ## Projects
 - The browser holds several projects; every tool edits the one that is open. `get_status` says which, `list_projects` lists them.
@@ -26,7 +29,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 ## Variables, bindings and events
 - `set_state` defines a variable. A value is JSON (`3`, `true`, `"text"`, `[1,2]`), so give text without extra quotes only when it is plain text.
 - Text and props accept `{{ name }}` and `{{ item.field }}`. Inside a repeated element (`vFor`) use `{{ item.field }}` and `{{ index }}`; inside a table cell slot use `{{ item.field }}` too.
-- `model` links an input to a variable. `vIf` shows an element only when true: `open`, `!loading`, `status == paid`, `step >= 2`, `role == "admin" and not loading`, `contains(tags, "new")`, `count > 0 ? a : b` (operators `== != < <= > >= && || ! and or not + - * / %`, functions `length`, `empty`, `contains`). `vFor` repeats for each item of an array variable (or `n` times).
+- `model` links an input to a variable. `vIf` shows an element only when true: `open`, `!loading`, `status == paid`, `step >= 2`, `role == "admin" and not loading`, `contains(tags, "new")`, `contains(lower(name), lower(query))` (search whatever the case), `count > 0 ? a : b` (operators `== != < <= > >= && || ! and or not + - * / %`, functions `length`, `empty`, `contains`, `lower`). `vFor` repeats for each item of an array variable (or `n` times).
 - **Events** (`set_event`, or `events` in `add_subtree`): `click`, `change` (fields; `{{ value }}`), `submit` (VForm), `mounted`. Each is one action or a list that runs in order: `{type:"navigate", to}`, `{type:"set", key, value}`, `{type:"toggle", key}`, `{type:"append", key, value}`, `{type:"remove", key, value}` (first equal entry; `{{ item }}` inside a repeat), `{type:"notify", message}`, `{type:"resetForm"}`. Dialogs, drawers and snackbars open with `model` plus a click.
 - **Forms:** put linked fields in a `VForm`, give them `set_rules` (`required`, `email`, `minLength`, `maxLength`, `min`, `max`), set `props: { type: "submit" }` on the button and put the actions in the form's `submit`. They run only when every rule passes.
 - **Computed variables:** `set_computed` (`total` = `length(rows)`). They cannot be written by actions or `model`.
@@ -38,7 +41,7 @@ Work in this order: `get_document` → build → `check_project` → try it with
 
 ## Check your work
 - **`check_project`** lists problems (unknown variables, links to pages that do not exist, invalid conditions, empty tables, a layout without “Page content”). Fix every error.
-- **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_submit`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Data sources arrive after their delay and `mounted` actions run once the page is drawn, so ask `preview_state` again for them. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document. Like a person, you can only use what is there: clicking or typing into an element that is hidden by a condition or disabled is refused with the reason.
+- **`preview_start`** → **`preview_click`** / **`preview_input`** / **`preview_submit`** / **`preview_navigate`** → read the answer: variables, visible texts, hidden elements and table rows. Data sources arrive after their delay and `mounted` actions run once the page is drawn, so ask `preview_state` again for them. Use `preview_reset` to start over and `preview_stop` when done. Preview never changes the document. Like a person, you can only use what is there: clicking or typing into an element that is hidden by a condition or disabled is refused with the reason. An element a repeat shows several times needs `copy` (0 is the first one shown), and its actions then see that copy's `item` and `index`.
 - `undo` takes back your last step.
 
 ## Safety

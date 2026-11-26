@@ -178,7 +178,7 @@ export const GUIDE_SECTIONS: GuideSectionContent[] = [
           ['Arithmetic', '+, -, *, /, %   (+ joins text when either side is text)'],
           [
             'Functions',
-            'length(x) for a text or list, empty(x) for nothing, empty text or an empty list, contains(x, y) for a piece of text or an item of a list',
+            'length(x) for a text or list, empty(x) for nothing, empty text or an empty list, contains(x, y) for a piece of text or an item of a list, lower(x) for a text in small letters: contains(lower(name), lower(query)) searches whatever the case',
           ],
         ],
       },
@@ -339,7 +339,7 @@ export const GUIDE_SECTIONS: GuideSectionContent[] = [
       list(
         'Text with spaces or a number-like word without quotes: write city == "New York", not city == New York.',
         'A typo in a variable name creates a new, empty variable, so the condition is never true. Look at the list of variables.',
-        'A single = instead of ==, or a function that is not in the list (only length, empty and contains exist).',
+        'A single = instead of ==, or a function that is not in the list (only length, empty, contains and lower exist).',
         'Comparing a list or an object with ==: compare one of its fields instead (item.stock == 0).',
         'A form that does not send: its button needs the type submit, and every field must pass its rules.',
         'Behavior runs only in Preview. The editing canvas always shows every element so a hidden one can still be selected.',
