@@ -78,7 +78,7 @@ function textVariables(settings: ThemeSettings): string[] {
 }
 
 /** Only what differs from the defaults every reference carries; empty when nothing does. */
-export function buildTokenCss(settings: ThemeSettings): string {
+export function buildTokenCss(settings: ThemeSettings, selector = ':root'): string {
   const variables = [...spaceVariables(settings), ...radiusVariables(settings), ...textVariables(settings)]
-  return variables.length ? `:root {\n${variables.map(line => `  ${line}`).join('\n')}\n}\n` : ''
+  return variables.length ? `${selector} {\n${variables.map(line => `  ${line}`).join('\n')}\n}\n` : ''
 }

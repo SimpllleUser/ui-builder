@@ -14,7 +14,7 @@ import { MainCanvas } from '../modules/ui-builder/widgets/main-canvas'
 import { SidebarTree } from '../modules/ui-builder/widgets/sidebar-tree'
 import { TemplateSettingsDialog } from '../modules/ui-builder/features/add-template'
 import { CodeExportDialog } from '../modules/ui-builder/widgets/code-export'
-import { ThemeCustomizerDialog } from '../modules/theme/widgets/theme-customizer'
+import { EditorAppearanceMenu, ThemeCustomizerDialog } from '../modules/theme/widgets/theme-customizer'
 import { BehaviorGuide, GuideSection } from '../modules/ui-builder/widgets/behavior-guide'
 import { OPEN_CONDITIONS_HELP } from '../shared/lib/conditionsHelp'
 import { OnboardingTour, useFirstRunTour } from '../modules/ui-builder/widgets/onboarding'
@@ -182,6 +182,7 @@ useEditorShortcuts({
           @start-tour="startTour"
           @open-guide="guideOpen = true"
         />
+        <EditorAppearanceMenu />
         <VBtn
           icon="mdi-tune-variant"
           size="small"

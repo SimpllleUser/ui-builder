@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useTheme } from 'vuetify'
-import { useThemeSettings } from '../../../../../theme/entities/theme-settings'
+import {
+  resolveThemeColors,
+  useProjectThemeVariant,
+  useThemeSettings,
+} from '../../../../../theme/entities/theme-settings'
 import { inputValue } from '../../../../../../shared/lib/dom'
 import { THEME_COLORS, parseThemeColor, themeColorValue } from '../../../../../../shared/lib/themeColors'
 
@@ -15,11 +18,12 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i
 const props = defineProps<{ modelValue: string | undefined; label: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 
-const theme = useTheme()
+const { variant } = useProjectThemeVariant()
 const { settings } = useThemeSettings()
 const ownColors = computed(() => Object.keys(settings.value.extraColors))
 const swatches = computed(() => [...THEME_COLORS, ...ownColors.value])
-const shown = (color: string) => theme.current.value.colors[color] ?? DEFAULT_COLOR
+const colors = computed(() => resolveThemeColors(settings.value, variant.value))
+const shown = (color: string) => colors.value[color] ?? DEFAULT_COLOR
 const selected = computed(() => parseThemeColor(props.modelValue, ownColors.value))
 const pickerValue = computed(() =>
   props.modelValue && HEX_COLOR.test(props.modelValue) ? props.modelValue : DEFAULT_COLOR,

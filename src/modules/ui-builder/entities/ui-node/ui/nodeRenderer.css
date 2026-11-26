@@ -5,11 +5,11 @@
   position: relative;
 }
 .ui-builder-element.is-selected {
-  outline: 2px solid rgb(var(--v-theme-primary)) !important;
+  outline: 2px solid rgb(var(--editor-primary, var(--v-theme-primary))) !important;
 }
 .ui-builder-element.is-drag-over {
-  outline: 2px dashed rgb(var(--v-theme-primary)) !important;
-  background: rgba(var(--v-theme-primary), 0.08) !important;
+  outline: 2px dashed rgb(var(--editor-primary, var(--v-theme-primary))) !important;
+  background: rgba(var(--editor-primary, var(--v-theme-primary)), 0.08) !important;
 }
 /* A small marker names the behavior an element has (repeat, condition, link, click), so logic is visible while editing. */
 .ui-builder-element[data-behavior]::after {
@@ -20,8 +20,8 @@
   z-index: 2;
   padding: 0 6px;
   border-radius: 999px;
-  background: rgb(var(--v-theme-info));
-  color: rgb(var(--v-theme-on-info));
+  background: rgb(var(--editor-info, var(--v-theme-info)));
+  color: rgb(var(--editor-on-info, var(--v-theme-on-info)));
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
@@ -44,7 +44,7 @@
 .overlay-placeholder {
   padding: 8px;
   border-radius: 8px;
-  background: rgba(var(--v-theme-primary), 0.05);
+  background: rgba(var(--editor-primary, var(--v-theme-primary)), 0.05);
 }
 .overlay-placeholder__label {
   font-size: 12px;
@@ -58,5 +58,5 @@
   min-height: 160px;
   font-size: 13px;
   opacity: 0.75;
-  background: rgba(var(--v-theme-primary), 0.05);
+  background: rgba(var(--editor-primary, var(--v-theme-primary)), 0.05);
 }

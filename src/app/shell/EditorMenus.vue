@@ -60,8 +60,8 @@ defineEmits<{
         />
         <VListItem
           prepend-icon="mdi-palette-swatch-outline"
-          title="Theme…"
-          subtitle="Colours, corners, density and dark mode"
+          title="Project theme…"
+          subtitle="Colours, corners and dark mode of your pages"
           @click="$emit('openTheme')"
         />
         <VListItem
