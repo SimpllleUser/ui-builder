@@ -8,11 +8,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { takeScreenshot } from './screenshot.mjs'
+import { pickTab } from './tabs.mjs'
 
 const PORT = Number(process.env.UI_BUILDER_MCP_PORT ?? 3002)
 const TIMEOUT_MS = 10_000
 const RETRY_LISTEN_MS = 3_000
-// Open editor tabs, each with the time its page was loaded and the address it is served from.
+// Open editor tabs by their event stream: the tab's id, when its page was loaded, the address it is served from and
+// whether it edits its project now.
 const clients = new Map()
 const pending = new Map()
 
@@ -24,8 +26,28 @@ const bridge = http.createServer((req, res) => {
   if (url.pathname === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')
-    clients.set(res, { loaded: Number(url.searchParams.get('loaded')) || 0, origin: req.headers.origin })
+    clients.set(res, {
+      id: url.searchParams.get('tab'),
+      loaded: Number(url.searchParams.get('loaded')) || 0,
+      origin: req.headers.origin,
+      editing: url.searchParams.get('editing') !== 'false',
+    })
     req.on('close', () => clients.delete(res))
+    return
+  }
+  // A tab says when it starts or stops editing its project, such as after “Edit here” in another tab.
+  if (req.url === '/tab' && req.method === 'POST') {
+    let data = ''
+    req.on('data', c => {
+      data += c
+    })
+    req.on('end', () => {
+      try {
+        const { tab, editing } = JSON.parse(data)
+        for (const client of clients.values()) if (client.id === tab) client.editing = editing === true
+      } catch {}
+      res.writeHead(204).end()
+    })
     return
   }
   if (req.url === '/result' && req.method === 'POST') {
@@ -67,9 +89,11 @@ bridge.on('error', e => {
 })
 listen()
 
-// The most recently loaded tab is the one the person has just opened or reloaded. An old tab left open must not take
-// the commands, and tabs reconnect in any order after the server restarts, so the order of connecting says nothing.
-const currentTab = () => [...clients].sort(([, a], [, b]) => b.loaded - a.loaded)[0] ?? []
+/** The event stream of the tab that gets the commands, with what is known about it; empty when none is open. */
+const currentTab = () => {
+  const best = pickTab(clients.values())
+  return [...clients].find(([, tab]) => tab === best) ?? []
+}
 
 function call(command, args = {}) {
   if (bridgeProblem) return Promise.reject(new Error(bridgeProblem))

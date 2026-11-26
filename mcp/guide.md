@@ -8,7 +8,7 @@ Work in this order: `get_document` → build → **look** (`preview_screenshot`)
 ## Projects
 - The browser holds several projects; every tool edits the one that is open. `get_status` says which, `list_projects` lists them.
 - Check it is the right one before changing anything. Switch with `open_project`, or start apart with `create_project`.
-- One tab edits a project at a time. If a project is open in another tab, editor tools are refused: open a different project, or ask the person to press **Edit here** in this tab.
+- One tab edits a project at a time. With several editor tabs open, your tools go to a tab that edits its project (the one loaded last among those). Editor tools are refused only when every open tab has its project locked by another browser window or profile that is not connected: open a different project, or ask the person to press **Edit here**.
 - Undo, history and checkpoints belong to one project; saved components are shared. Projects cannot be deleted by an agent.
 - `import_document` replaces the **open** project (unlike Import in the editor's File menu, which adds a new one). `export_document` includes the theme and `import_document` applies it; `undo` restores the content, not the theme.
 
