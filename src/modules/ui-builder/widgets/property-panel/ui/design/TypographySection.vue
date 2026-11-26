@@ -7,6 +7,7 @@ import { type UiNode } from '../../../../entities/ui-node'
 import DesignSection from './DesignSection.vue'
 import NumberField from './NumberField.vue'
 import TokenChips from './TokenChips.vue'
+import './designGrid.css'
 
 const TEXT_TOKENS = Object.values(TextToken)
 
@@ -29,7 +30,7 @@ const setWeight = (value: number | null) => apply({ fontWeight: value === null ?
       :selected="selected"
       @pick="token => apply(textStylePatch(token))"
     />
-    <div class="type-row">
+    <div class="design-grid">
       <NumberField
         label="S"
         title="Font size"
@@ -51,12 +52,3 @@ const setWeight = (value: number | null) => apply({ fontWeight: value === null ?
     </div>
   </DesignSection>
 </template>
-
-<style scoped>
-.type-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 8px;
-}
-</style>

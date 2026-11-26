@@ -1,0 +1,7 @@
+/* Pairs of number fields in a design section. */
+.design-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}

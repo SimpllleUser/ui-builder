@@ -8,6 +8,7 @@ import ColorField from './ColorField.vue'
 import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
 import NumberField from './NumberField.vue'
+import './designGrid.css'
 
 const SIDES = [
   { side: Side.Top, label: 'T' },
@@ -49,7 +50,7 @@ const sideWidth = (side: Side) => parsePx(style.value[sideWidthProperty(side)]) 
         @click="perSide = !perSide"
       />
     </div>
-    <div v-if="perSide" class="stroke-sides">
+    <div v-if="perSide" class="design-grid">
       <NumberField
         v-for="item in SIDES"
         :key="item.side"
@@ -70,11 +71,5 @@ const sideWidth = (side: Side) => parsePx(style.value[sideWidthProperty(side)]) 
   grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
-}
-.stroke-sides {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 8px;
 }
 </style>
