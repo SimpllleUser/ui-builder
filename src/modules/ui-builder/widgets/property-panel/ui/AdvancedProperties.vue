@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { type UiNode } from '../../../entities/ui-node'
+import StyleOverrideNotice from './StyleOverrideNotice.vue'
 
 defineProps<{
   node: UiNode
@@ -33,6 +34,7 @@ const emit = defineEmits<{
       >
     </div>
     <div v-else class="text-caption text-medium-emphasis mb-2">No classes applied</div>
+    <StyleOverrideNotice :node="node" />
 
     <VTextField
       :model-value="classSearch"

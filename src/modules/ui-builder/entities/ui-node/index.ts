@@ -78,6 +78,16 @@ export {
 export { BREAKPOINT_MIN_WIDTHS, BREAKPOINT_WIDTHS, BREAKPOINTS, overrideTarget } from './model/breakpoints'
 export { COLUMN_PROPS, columnPropFor, columnsForWidth, GRID_COLUMN_TYPE, GRID_COLUMNS } from './model/grid'
 export type { ResponsiveStyles } from './model/types'
+export {
+  appliedStyleClasses,
+  hasShareableStyle,
+  sharedStyleOf,
+  styleClassCssName,
+  styleClassNameError,
+  styleClassSheet,
+} from './model/styleClasses'
+export { overriddenUtilities, StyleSource } from './model/utilityOverlap'
+export type { OverriddenUtility } from './model/utilityOverlap'
 export { openPrefabRepository } from './api/prefabRepository'
 export type { PrefabLibrary } from './model/prefabSync'
 export { countPages, emptyProjectDocument, normalizeDocument } from './model/document'
@@ -106,6 +116,7 @@ export type {
   Prefab,
   PrefabProp,
   Project,
+  StyleClasses,
   UiAction,
   UiNode,
   UiNodeEvents,

@@ -141,7 +141,7 @@ const leaveCanvas = (event: DragEvent) => {
         add a parameter. Every instance follows these changes; Undo takes them back.
         <VBtn size="small" variant="text" class="ml-2" @click="store.stopEditingPrefab()">Done</VBtn>
       </VAlert>
-      <component :is="'style'" v-if="isPreviewMode">{{ previewStyles }}</component>
+      <component :is="'style'">{{ previewStyles }}</component>
       <div class="canvas-device" :style="{ width: isPreviewMode ? undefined : canvasWidth }">
         <ThemeDefaultsProvider>
           <NodeRenderer
