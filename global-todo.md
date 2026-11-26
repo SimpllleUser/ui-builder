@@ -100,3 +100,11 @@ packages/
 - [ ] Модель state: local, page, global, URL і data.
 - [ ] Collaboration і спільне редагування поверх версійованого mutation log (CRDT/Yjs).
 - [ ] Розглядати WebAssembly (WASM) **виключно** після профілювання на великих проєктах, якщо JS Web Worker стане вузьким місцем (кандидати: normalization, dependency analysis, template/CSS generation). На етапі MVP — не застосовувати.
+
+## Відомі проблеми
+
+- [ ] Preview: меню `VSelect` (і, ймовірно, інші оверлеї) зміщене на відступ iframe. Vuetify кладе його в `body` редактора, а координати поля бере всередині фрейма.
+  - Перевірений напрямок: у `PreviewPage` задати через `VDefaultsProvider` `attach` для `VOverlay`, `VMenu`, `VDialog`, `VTooltip`, `VSnackbar` на шар `position: fixed; inset: 0; overflow: scroll; pointer-events: none`. Меню стає під полем.
+  - Щоб меню йшло за прокруткою фрейма, у `PreviewFrame` на `scroll` фрейма слати `resize` на `window` редактора.
+  - Перед злиттям з'ясувати: в одному прогоні headless Chrome меню після повторного відкриття опинилося в (0, 0); діалоги не перевірені.
+- [ ] Preview: клік по сторінці поза меню `VSelect` його не закриває (так і без змін вище: Vuetify слухає кліки лише в документі редактора).
