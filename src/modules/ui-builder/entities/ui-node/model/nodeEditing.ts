@@ -22,6 +22,7 @@ import {
   type NodeLogicPatch,
 } from './nodeMutations'
 import { patchNodeStyle, setOverride } from './responsiveStyle'
+import { useStyleClassEditing } from './styleClassEditing'
 import * as tableMutations from './tableMutations'
 import type { Prefab, Project, UiNode } from './types'
 
@@ -164,7 +165,10 @@ export function useNodeEditing(sources: NodeEditingSources) {
     return false
   }
 
+  const styleClasses = useStyleClassEditing({ project, rootNode, changeable, commit })
+
   return {
+    ...styleClasses,
     updateSlotChildren,
     updateNodeClasses,
     updateNodeName,

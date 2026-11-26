@@ -9,11 +9,12 @@ import ShadowSection from './ShadowSection.vue'
 import StrokeSection from './StrokeSection.vue'
 import SizeSection from './SizeSection.vue'
 import SpacingSection from './SpacingSection.vue'
+import StyleClassSection from './StyleClassSection.vue'
 import TypographySection from './TypographySection.vue'
 
 /**
  * Figma-style controls for the look of an element: size, layout and alignment, spacing, corner radius, fill and stroke.
- * They write to the element's inline style, next to the class-based settings of the other tabs, which stay as they are.
+ * They write to the element's inline style (or, through the style classes, to a shared rule), next to the class-based settings of the other tabs, which stay as they are.
  */
 defineProps<{ node: UiNode }>()
 </script>
@@ -21,6 +22,7 @@ defineProps<{ node: UiNode }>()
 <template>
   <div class="design-tab">
     <BreakpointNotice :node="node" />
+    <StyleClassSection :node="node" />
     <GridSection v-if="node.type === GRID_COLUMN_TYPE" :node="node" />
     <SizeSection :node="node" />
     <LayoutSection :node="node" />
@@ -31,7 +33,8 @@ defineProps<{ node: UiNode }>()
     <StrokeSection :node="node" />
     <ShadowSection :node="node" />
     <p class="design-tab__note">
-      These settings are saved as the element's own style and take priority over the classes set in the other tabs.
+      These settings are saved as the element's own style. It wins over style classes, and both win over Vuetify's
+      classes and component options (all values are <code>!important</code>).
     </p>
   </div>
 </template>

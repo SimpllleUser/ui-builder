@@ -8,7 +8,8 @@ import { getComponentDef, getNodeSlots } from './componentDefinitions'
 import { DOCUMENT_VERSION, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_NODES, MAX_PAGES, ROOT_NODE_ID } from './constants'
 import { OVERRIDE_BREAKPOINTS } from './breakpoints'
 import { isCssDeclaration } from './responsiveStyle'
-import type { DataSource, Page, Project, UiNode } from './types'
+import { isStyleClassName } from './styleClasses'
+import type { DataSource, Page, Project, StyleClasses, UiNode } from './types'
 
 export function validateProject(value: unknown): Project {
   if (!isRecord(value)) throw new Error('Unsupported document version.')
@@ -45,12 +46,14 @@ export function validateProject(value: unknown): Project {
   if (state !== undefined && !isRecord(state)) throw new Error('Invalid state in document.')
   const computed = validateRecord(value.computed, (item): item is string => typeof item === 'string', 'computed')
   const sources = validateRecord(value.sources, isDataSource, 'data source')
+  const styleClasses = validateStyleClasses(value.styleClasses)
   return {
     pages: validPages,
     layout: layout === null || layout === undefined ? null : validateTree(layout),
     state: (state as Record<string, unknown>) ?? {},
     ...(computed ? { computed } : {}),
     ...(sources ? { sources } : {}),
+    ...(styleClasses ? { styleClasses } : {}),
   }
 }
 
@@ -134,15 +137,22 @@ function validateNode(value: unknown, ids: Set<string>, countNode: () => number,
   } as UiNode
 }
 
+const isStyle = (style: unknown) =>
+  isRecord(style) && Object.entries(style).every(([name, item]) => isCssDeclaration(name, item))
+
+function validateStyleClasses(value: unknown): StyleClasses | undefined {
+  if (value === undefined) return undefined
+  if (!isRecord(value) || !Object.entries(value).every(([name, style]) => isStyleClassName(name) && isStyle(style)))
+    throw new Error('Invalid style class in document.')
+  return value as StyleClasses
+}
+
 function validateResponsive(responsive: unknown) {
   if (responsive === undefined) return
   const valid =
     isRecord(responsive) &&
     Object.entries(responsive).every(
-      ([breakpoint, style]) =>
-        OVERRIDE_BREAKPOINTS.some(known => known === breakpoint) &&
-        isRecord(style) &&
-        Object.entries(style).every(([name, item]) => isCssDeclaration(name, item)),
+      ([breakpoint, style]) => OVERRIDE_BREAKPOINTS.some(known => known === breakpoint) && isStyle(style),
     )
   if (!valid) throw new Error('Invalid responsive style in document.')
 }

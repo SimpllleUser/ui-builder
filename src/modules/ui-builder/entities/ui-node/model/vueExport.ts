@@ -7,6 +7,7 @@ import { eventEntries } from './events'
 import { variableNameError } from './projectMutations'
 import { walkNodes } from './treeUtils'
 import { AMBIENT_NAMES, variablesOfNode } from './variableUsage'
+import { styleClassSheet } from './styleClasses'
 import type { Page, Prefab, Project, UiNode } from './types'
 import { renderNodes, type ExportedForm, type TemplateContext } from './vueTemplate'
 
@@ -28,8 +29,8 @@ export interface VueFile {
   code: string
 }
 
-/** What a project knows about its variables besides their starting values. */
-export type VariableSettings = Pick<Project, 'computed' | 'sources'>
+/** What a project knows besides the starting values of its variables: how they are filled, and its shared styles. */
+export type VariableSettings = Pick<Project, 'computed' | 'sources' | 'styleClasses'>
 
 const MESSAGES_IMPORT = "import { useMessagesStore } from '../stores/messages'"
 const SNACKBAR = [
@@ -181,7 +182,8 @@ function exportTree(
   const markup = renderNodes([root], context, 1)
   if (context.usage.messages && source === StateSource.Local) markup.push(...SNACKBAR)
   const script = renderScript({ variables, state, settings, context, source, prefab })
-  const styles = context.styles.size ? `\n<style>\n${[...context.styles].join('\n')}\n</style>\n` : ''
+  const rules = [styleClassSheet(settings.styleClasses, [root]), ...context.styles].filter(Boolean)
+  const styles = rules.length ? `\n<style>\n${rules.join('\n')}\n</style>\n` : ''
   return `${script}<template>\n${markup.join('\n')}\n</template>\n${styles}`
 }
 

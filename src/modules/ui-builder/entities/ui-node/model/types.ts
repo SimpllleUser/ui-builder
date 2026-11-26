@@ -78,6 +78,9 @@ export interface Page {
   root: UiNode
 }
 
+/** Shared styles by name; elements use one through a CSS class. */
+export type StyleClasses = Record<string, StyleMap>
+
 export interface Project {
   pages: Page[]
   /** Shared layout. Its `PageOutlet` element is replaced by the current page in preview. */
@@ -88,6 +91,7 @@ export interface Project {
   computed?: Record<string, string>
   /** Variables of `state` that are loaded from an endpoint. */
   sources?: Record<string, DataSource>
+  styleClasses?: StyleClasses
 }
 
 /** A parameter of a saved component: `{{props.<name>}}` inside it is replaced when the component is inserted. */

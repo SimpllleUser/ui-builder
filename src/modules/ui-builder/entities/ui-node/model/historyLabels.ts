@@ -93,6 +93,17 @@ function describePages(before: Project, after: Project): string | null {
   return null
 }
 
+function describeStyleClasses(before: Project, after: Project): string | null {
+  const was = before.styleClasses ?? {}
+  const now = after.styleClasses ?? {}
+  for (const name of new Set([...Object.keys(was), ...Object.keys(now)])) {
+    if (!(name in was)) return `Added style class ${name}`
+    if (!(name in now)) return `Deleted style class ${name}`
+    if (JSON.stringify(was[name]) !== JSON.stringify(now[name])) return `Changed style class ${name}`
+  }
+  return null
+}
+
 /** Variables are named last: an element that was added together with its variables is named after the element. */
 function describeState(before: Project, after: Project): string | null {
   for (const [table, what] of [
@@ -157,7 +168,7 @@ export function describeChange(previous: string, next: string): string {
     return 'Edited the page'
   }
 
-  const pageChange = describePages(before, after)
+  const pageChange = describePages(before, after) ?? describeStyleClasses(before, after)
   if (pageChange) return pageChange
 
   const was = flatten(before)
