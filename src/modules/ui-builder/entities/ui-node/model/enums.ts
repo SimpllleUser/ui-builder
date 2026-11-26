@@ -142,6 +142,7 @@ export enum IssueKind {
   MissingForm = 'missing-form',
   InvalidRule = 'invalid-rule',
   InvalidFormula = 'invalid-formula',
+  InvalidParameter = 'invalid-parameter',
 }
 
 /** How serious a problem is: an error breaks what the person built, a warning probably does, info is advice. */
@@ -149,4 +150,14 @@ export enum IssueSeverity {
   Error = 'error',
   Warning = 'warning',
   Info = 'info',
+}
+
+/** What a parameter of a saved component holds. Values are written as text; the type says which texts are valid. */
+export enum PrefabPropType {
+  Text = 'text',
+  Number = 'number',
+  Boolean = 'boolean',
+  Choice = 'choice',
+  Color = 'color',
+  Link = 'link',
 }

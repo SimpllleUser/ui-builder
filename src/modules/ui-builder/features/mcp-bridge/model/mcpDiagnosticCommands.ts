@@ -4,7 +4,7 @@ import type { McpCommand } from './mcpCommandUtils'
 export const MCP_DIAGNOSTIC_COMMANDS: Record<string, McpCommand> = {
   /** Problems that would break the page in Preview, found without running it. */
   check_project: store => {
-    const issues = auditProject(store.project)
+    const issues = auditProject(store.project, store.prefabs)
     const count = (severity: IssueSeverity) => issues.filter(issue => issue.severity === severity).length
     return {
       ok: count(IssueSeverity.Error) === 0,

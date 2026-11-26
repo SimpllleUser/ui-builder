@@ -1,5 +1,5 @@
 import type { StyleMap } from '../../../../../shared/lib/inlineStyle'
-import type { ActionType, Breakpoint, EventName, RuleType } from './enums'
+import type { ActionType, Breakpoint, EventName, PrefabPropType, RuleType } from './enums'
 
 /** What a larger screen changes in the element's style; everything else is inherited. `xs` is the style itself. */
 export type ResponsiveStyles = Partial<Record<Exclude<Breakpoint, Breakpoint.Xs>, StyleMap>>
@@ -98,6 +98,19 @@ export interface Project {
 export interface PrefabProp {
   name: string
   defaultValue: string
+  /** Text when missing, as in components saved before parameters had types. */
+  type?: PrefabPropType
+  /** An instance may not leave it empty. */
+  required?: boolean
+  /** Bounds of a number. */
+  min?: number
+  max?: number
+  /** Longest text allowed. */
+  maxLength?: number
+  /** What a choice can be. */
+  options?: string[]
+  /** Created by hand, so it stays while nothing in the component uses it. */
+  isDeclared?: boolean
 }
 
 export interface Prefab {

@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ParameterList } from '../../../features/component-parameters'
+import { type PrefabProp } from '../../../entities/ui-node'
 import { canSavePrefabName } from '../model/propertyPanelUtils'
 
 const props = defineProps<{
   modelValue: boolean
   name: string
+  /** Names the element already uses. */
   propNames: string[]
-  defaults: Record<string, string>
+  parameters: PrefabProp[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'update:name': [value: string]
-  'update:default': [name: string, value: string]
+  'save-parameter': [parameter: PrefabProp]
+  'remove-parameter': [name: string]
   save: []
 }>()
 
@@ -33,10 +37,6 @@ const save = () => {
 const updateName = (value: unknown) => {
   if (typeof value === 'string') emit('update:name', value)
 }
-
-const updateDefault = (propName: string, value: unknown) => {
-  if (typeof value === 'string') emit('update:default', propName, value)
-}
 </script>
 
 <template>
@@ -56,20 +56,13 @@ const updateDefault = (propName: string, value: unknown) => {
         <div class="text-caption text-medium-emphasis mt-3">
           Write <code v-pre>{{ props.title }}</code> in a text or property to make it a parameter of the component.
         </div>
-        <template v-if="propNames.length">
-          <div class="text-subtitle-2 mt-3 mb-2">Parameters (default values)</div>
-          <VTextField
-            v-for="propName in propNames"
-            :key="propName"
-            :model-value="defaults[propName] ?? ''"
-            :label="propName"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="mb-2"
-            @update:model-value="updateDefault(propName, $event)"
-          />
-        </template>
+        <ParameterList
+          class="mt-3"
+          :parameters="parameters"
+          :used-names="propNames"
+          @save="parameter => emit('save-parameter', parameter)"
+          @remove="name => emit('remove-parameter', name)"
+        />
       </VCardText>
       <VCardActions>
         <VSpacer />

@@ -396,7 +396,7 @@ tool(
 )
 tool(
   'check_project',
-  'Find problems without running anything: unknown variables, links to missing pages, invalid conditions, empty tables, a layout without Page content, unused variables. Each issue names the page and node.',
+  'Find problems without running anything: unknown variables, links to missing pages, invalid conditions, empty tables, a layout without Page content, unused variables, instance parameter values that do not fit their type. Each issue names the page and node.',
   {},
 )
 tool(
@@ -423,10 +423,30 @@ tool('delete_checkpoint', 'Delete a checkpoint.', { checkpointId: z.string() })
 tool('restore_version', 'Go back to a step of the history by its index (see get_history).', { index: z.number() })
 tool('list_saved_components', 'The elements saved in My components, with their ids.', {})
 const propValues = z.record(z.string(), z.string()).optional()
+const parameter = z.object({
+  name: z.string().describe('Used in the component as {{props.name}}'),
+  type: z.enum(['text', 'number', 'boolean', 'choice', 'color', 'link']).optional().describe('Defaults to text'),
+  defaultValue: z.string().optional().describe('Written as text, also for numbers and booleans ("5", "true")'),
+  required: z.boolean().optional().describe('An instance may not leave it empty'),
+  min: z.number().optional().describe('number only'),
+  max: z.number().optional().describe('number only'),
+  maxLength: z.number().optional().describe('text only'),
+  options: z.array(z.string()).optional().describe('choice only, at least one'),
+})
 tool(
   'save_component',
-  'Save an element (with its children) in My components for reuse. Every {{props.name}} inside it becomes a parameter; `props` gives their default values.',
-  { id, name: z.string(), props: propValues },
+  'Save an element (with its children) in My components for reuse. Every {{props.name}} inside it becomes a parameter; `props` gives their default values; `parameters` gives their types and limits (values that do not fit are refused).',
+  { id, name: z.string(), props: propValues, parameters: z.array(parameter).optional() },
+)
+tool(
+  'set_parameter',
+  'Create a parameter of a saved component, or replace the definition of the one with the same name (give the whole definition). Instances follow; run check_project to find instance values the new type does not accept.',
+  { prefabId: z.string(), parameter },
+)
+tool(
+  'remove_parameter',
+  'Remove a parameter of a saved component. One the component still uses comes back as plain text (stillUsed: true).',
+  { prefabId: z.string(), name: z.string() },
 )
 tool(
   'insert_saved_component',

@@ -7,8 +7,10 @@ import { eventEntries } from './events'
 import { enclosingForm } from './forms'
 import { ruleError, ruleLabel } from './validationRules'
 import { variableNameError } from './projectMutations'
+import { prefabLookup, type PrefabLookup } from './componentInstances'
+import { prefabValueError } from './prefabParameters'
 import { conditionError } from './runtime'
-import type { Project, UiNode } from './types'
+import type { Prefab, Project, UiNode } from './types'
 import { isNodeEmpty } from './nodeUtils'
 import { walkNodes } from './treeUtils'
 import { UsageKind, variablesOfNode, walkProject, type ProjectNode } from './variableUsage'
@@ -44,8 +46,23 @@ const USAGE_SUFFIX: Record<UsageKind, string> = {
   [UsageKind.Event]: ' (event)',
 }
 
-/** Problems that would make a project misbehave in Preview, found without running it. */
-export function auditProject(project: Project): Issue[] {
+/** Parameter values of an instance that its component no longer accepts, such as after a type was changed. */
+function parameterProblems(node: UiNode, library: PrefabLookup): string[] {
+  const prefab = node.instance && library.get(node.instance.prefabId)
+  if (!prefab) return []
+  return (prefab.props ?? []).flatMap(prop => {
+    const value = node.instance!.values[prop.name] ?? prop.defaultValue
+    const error = prefabValueError(prop, value)
+    return error ? [`has an invalid parameter “${prop.name}” (“${value}”): ${error}`] : []
+  })
+}
+
+/**
+ * Problems that would make a project misbehave in Preview, found without running it. `prefabs` are the saved
+ * components, needed to check the parameters of their instances.
+ */
+export function auditProject(project: Project, prefabs: Prefab[] = []): Issue[] {
+  const library = prefabLookup(prefabs)
   const issues: Issue[] = []
   const defined = new Set(variableNames(project))
   const used = new Set<string>()
@@ -106,6 +123,8 @@ export function auditProject(project: Project): Issue[] {
       const problem = ruleError(rule)
       if (problem) error(IssueKind.InvalidRule, `has the rule “${ruleLabel(rule.type)}” without a number.`)
     }
+
+    for (const problem of parameterProblems(node, library)) error(IssueKind.InvalidParameter, problem)
 
     for (const { kind, severity, predicate } of behaviorOf(node.type).problems?.(node) ?? [])
       report({ kind, severity, message: `${here} ${predicate}`, pageId, node })

@@ -1,10 +1,11 @@
 import { computed, ref, type ComputedRef } from 'vue'
 import {
   childNodes,
+  declarePrefabProps,
   findPrefabPropNames,
   getNodeSlots,
   ROOT_NODE_ID,
-  type PrefabPropValues,
+  type PrefabProp,
   type useUiTreeStore,
   type UiNode,
 } from '../../../entities/ui-node'
@@ -16,21 +17,30 @@ type Store = ReturnType<typeof useUiTreeStore>
 export function useSavePrefabDialog(store: Store, node: ComputedRef<UiNode | null>) {
   const open = ref(false)
   const name = ref('')
-  const defaults = ref<PrefabPropValues>({})
-  /** Parameters the element already uses as `{{props.name}}`; each can get a default. */
+  const parameters = ref<PrefabProp[]>([])
+  /** Names the element already uses as `{{props.name}}`; more parameters can be created by hand. */
   const propNames = computed(() => (node.value ? findPrefabPropNames(node.value) : []))
   const show = () => {
     name.value = node.value?.name ?? ''
-    defaults.value = {}
+    parameters.value = node.value ? declarePrefabProps(node.value) : []
     open.value = true
   }
   const save = () => {
     if (node.value && canSavePrefabName(name.value)) {
-      store.savePrefab(node.value.id, name.value, defaults.value)
+      store.savePrefab(node.value.id, name.value, {}, parameters.value)
       open.value = false
     }
   }
-  return { open, name, defaults, propNames, show, save }
+  const saveParameter = (parameter: PrefabProp) => {
+    const exists = parameters.value.some(item => item.name === parameter.name)
+    parameters.value = exists
+      ? parameters.value.map(item => (item.name === parameter.name ? parameter : item))
+      : [...parameters.value, parameter]
+  }
+  const removeParameter = (parameterName: string) => {
+    parameters.value = parameters.value.filter(item => item.name !== parameterName)
+  }
+  return { open, name, parameters, propNames, show, save, saveParameter, removeParameter }
 }
 
 /** The “Move to…” dialog: every container (and named slot) the selected element can be moved into. */
