@@ -100,3 +100,53 @@ export function readAlignment(style: StyleMap): Alignment | null {
 
 export const isFlex = (style: StyleMap) => style.display === CssValue.Flex
 export const readAxis = (style: StyleMap) => (style.flexDirection === CssValue.Column ? Axis.Column : Axis.Row)
+
+// ─── Stroke ───────────────────────────────────────────────────────────────────
+export const sideWidthProperty = (side: Side) => `border${side}Width`
+const CLEAR_SIDE_WIDTHS = Object.fromEntries(Object.values(Side).map(side => [sideWidthProperty(side), null]))
+
+/** A colour alone draws nothing without a width, so choosing one starts a 1px line; null removes the stroke. */
+export function strokePatch(style: StyleMap, color: string | null): Record<string, string | null> {
+  if (color === null) return { borderColor: null, borderWidth: null, borderStyle: null, ...CLEAR_SIDE_WIDTHS }
+  const hasWidth = style.borderWidth || Object.values(Side).some(side => style[sideWidthProperty(side)])
+  return {
+    borderColor: color,
+    borderStyle: style.borderStyle ?? CssValue.Solid,
+    ...(hasWidth ? {} : { borderWidth: DEFAULT_STROKE_WIDTH }),
+  }
+}
+
+/** The width of one side. Every side is written, starting from what they have now, so the others do not jump. */
+export function sideStrokePatch(style: StyleMap, side: Side, width: number | null): Record<string, string | null> {
+  const widths = Object.fromEntries(
+    Object.values(Side).map(item => [
+      sideWidthProperty(item),
+      style[sideWidthProperty(item)] ?? style.borderWidth ?? '0px',
+    ]),
+  )
+  return {
+    ...widths,
+    [sideWidthProperty(side)]: `${width ?? 0}px`,
+    borderWidth: null,
+    borderStyle: style.borderStyle ?? CssValue.Solid,
+  }
+}
+
+// ─── Shadow ───────────────────────────────────────────────────────────────────
+export enum ShadowLevel {
+  None = 'none',
+  Small = 'sm',
+  Medium = 'md',
+  Large = 'lg',
+}
+
+const SHADOWS: Record<ShadowLevel, string> = {
+  [ShadowLevel.None]: 'none',
+  [ShadowLevel.Small]: '0 1px 3px rgba(0, 0, 0, 0.12)',
+  [ShadowLevel.Medium]: '0 4px 12px rgba(0, 0, 0, 0.12)',
+  [ShadowLevel.Large]: '0 12px 32px rgba(0, 0, 0, 0.18)',
+}
+
+export const shadowValue = (level: ShadowLevel) => SHADOWS[level]
+export const parseShadow = (value: string | undefined) =>
+  Object.values(ShadowLevel).find(level => SHADOWS[level] === value) ?? null

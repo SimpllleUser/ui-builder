@@ -3,6 +3,7 @@
  * where a wrong value falls back to its default, a wrong name or value here is refused with what is allowed.
  */
 import { applyDesignPreset } from './designPresets'
+import { MAX_EXTRA_COLORS, patchExtraColors } from './extraColors'
 import {
   CardStyle,
   ColorPreset,
@@ -29,6 +30,7 @@ export const THEME_CHOICES: Record<keyof ThemeSettings, readonly unknown[] | str
   colorPreset: Object.values(ColorPreset),
   customPrimary: HEX_HINT,
   customSecondary: HEX_HINT,
+  extraColors: `up to ${MAX_EXTRA_COLORS} colours of your own as { name: hex }; null removes one`,
   semanticPreset: Object.values(SemanticPreset),
   surfacePreset: Object.values(SurfacePreset),
   radius: RADIUS_VALUES,
@@ -53,10 +55,11 @@ const describeChoices = (choices: readonly unknown[] | string) =>
 /**
  * The settings with `patch` applied. `preset` sets a whole look first, and the other entries change it.
  * A custom colour given without a colour preset also switches to the custom colours.
+ * `extraColors` adds to the project's own colours, and removes those given as null.
  * Throws for a setting or value the theme does not have, changing nothing.
  */
 export function applyThemePatch(settings: ThemeSettings, patch: Record<string, unknown>): ThemeSettings {
-  const { preset, ...changes } = patch
+  const { preset, extraColors, ...changes } = patch
   const look = DESIGN_PRESET_NAMES.find(name => name === preset)
   if (preset !== undefined && !look)
     throw new Error(`Unknown design preset “${String(preset)}”. Use one of: ${describeChoices(DESIGN_PRESET_NAMES)}.`)
@@ -66,7 +69,9 @@ export function applyThemePatch(settings: ThemeSettings, patch: Record<string, u
     ...(usesCustomColour ? { colorPreset: ColorPreset.Custom } : {}),
     ...changes,
   }
-  const base = look ? applyDesignPreset(settings, look) : settings
+  const looked = look ? applyDesignPreset(settings, look) : settings
+  const base =
+    extraColors === undefined ? looked : { ...looked, extraColors: patchExtraColors(looked.extraColors, extraColors) }
   const next = sanitizeThemeSettings({ ...base, ...asked })
   for (const [name, value] of Object.entries(asked)) {
     if (!isSetting(name))

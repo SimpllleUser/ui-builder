@@ -16,6 +16,7 @@ import {
   SURFACE_PRESET_OPTIONS,
 } from '../model/options'
 import DesignPresetGrid from './DesignPresetGrid.vue'
+import ExtraColors from './ExtraColors.vue'
 import FontSelect from './FontSelect.vue'
 import OptionToggle from './OptionToggle.vue'
 import SettingSection from './SettingSection.vue'
@@ -74,6 +75,10 @@ const colorOptions = computed(() => [
                   <label> Primary <input v-model="settings.customPrimary" type="color" /> </label>
                   <label> Secondary <input v-model="settings.customSecondary" type="color" /> </label>
                 </div>
+              </SettingSection>
+
+              <SettingSection title="Your own colours">
+                <ExtraColors />
               </SettingSection>
 
               <SettingSection title="Status colours">

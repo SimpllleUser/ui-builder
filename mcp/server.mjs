@@ -446,8 +446,13 @@ tool(
 )
 tool(
   'set_theme',
-  "Change theme settings of the open project; settings not named stay. { preset } applies a whole design preset first. Giving customPrimary or customSecondary switches to custom colours. radius null keeps each component's own. An unknown name or value changes nothing. Not an undo step and not allowed in batch: read get_theme first to be able to put it back.",
-  { settings: z.record(z.string(), z.union([z.string(), z.number(), z.null()])) },
+  'Change theme settings of the open project; settings not named stay. { preset } applies a whole design preset first. Giving customPrimary or customSecondary switches to custom colours. radius null keeps each component\'s own. extraColors adds colours of your own ({ "cobalt": "#1B3FD1" }, null removes one): use them as color="cobalt" on a component or theme-cobalt in set_style. An unknown name or value changes nothing. Not an undo step and not allowed in batch: read get_theme first to be able to put it back.',
+  {
+    settings: z.record(
+      z.string(),
+      z.union([z.string(), z.number(), z.null(), z.record(z.string(), z.string().nullable())]),
+    ),
+  },
 )
 tool(
   'edit_saved_component',

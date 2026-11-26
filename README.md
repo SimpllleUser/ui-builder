@@ -171,6 +171,7 @@ Tools (60):
 - **Saved components:** `save_component`, `insert_saved_component`, `update_instance`, `detach_instance`, `edit_saved_component` / `close_saved_component` (change the original with the usual tools), `delete_saved_component`, `list_deleted_components`, `restore_saved_component`.
 - **Look:** `preview_screenshot` returns a picture of a page (any width, so phones too) taken in a headless Chrome of its own; set `UI_BUILDER_CHROME` if Chrome is somewhere unusual.
 - **Several tabs:** commands go to a tab that edits its project, not to one showing the locked screen; among several editing tabs, to the one loaded last.
+- **Own colours:** the theme can hold up to 8 named colours (Theme → Your own colours, or `set_theme` with `extraColors`). They are Vuetify theme colours, appear beside the theme's in the Design colour fields and are part of the exported theme. The Design tab also sets the stroke per side, a shadow, and font size and weight, each from the screen size being edited up.
 - **Theme:** `get_theme` (settings and what each accepts), `set_theme` (change some, or apply a design preset).
 - **Change:** `update_node`, `set_style` (numbers are px, theme colour names such as `primary`, and values win over utility classes, like the Design tab; `breakpoint` `sm`–`xl` styles a larger screen only), `set_binding`, `set_event`, `set_state`, and the table tools (`add_/update_/remove_table_column`, `add_/update_/remove_table_row`).
 - **Pages:** `add_page`, `set_route`, `select_page`, `duplicate_page`, `move_page`, `delete_page`, `edit_layout`.

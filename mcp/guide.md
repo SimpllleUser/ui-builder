@@ -23,6 +23,7 @@ Work in this order: `get_document` → build → **look** (`preview_screenshot`)
 - Vuetify utility classes (`d-flex`, `ga-4`, `text-h5`) go in `classes`.
 
 ## Theme
+- Colours of your own instead of hex values in styles: `set_theme { settings: { extraColors: { cobalt: "#1B3FD1" } } }`, then `color: "cobalt"` on a component or `theme-cobalt` in `set_style`.
 - **`get_theme`** / **`set_theme`** read and change the project's look: `{ settings: { preset: "minimal" } }`, `{ settings: { radius: 12, spacing: "airy", customPrimary: "#7c3aed" } }`. Spacing, radius and typography set what the tokens stand for, so elements that use tokens follow.
 - The theme is not part of undo, history or checkpoints: read it first and ask before changing a look the person chose. These tools do not work in `batch`.
 

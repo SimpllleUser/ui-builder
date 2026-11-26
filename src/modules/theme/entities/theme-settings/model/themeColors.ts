@@ -25,7 +25,9 @@ export function colorOverrides(settings: ThemeSettings, variant: ThemeVariant): 
   const semantic = settings.semanticPreset === SemanticPreset.Default ? null : SEMANTIC_COLORS[settings.semanticPreset]
   const surface =
     settings.surfacePreset === SurfacePreset.Default ? null : SURFACE_COLORS[settings.surfacePreset][variant]
+  const extras = Object.entries(settings.extraColors).map(([name, color]) => withText(name, color))
   return {
+    ...Object.assign({}, ...extras),
     ...(brand && { ...withText('primary', brand.primary), ...withText('secondary', brand.secondary) }),
     ...(semantic && Object.assign({}, ...Object.entries(semantic).map(([name, color]) => withText(name, color)))),
     ...surface,

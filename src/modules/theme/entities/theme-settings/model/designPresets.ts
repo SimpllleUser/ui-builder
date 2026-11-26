@@ -15,9 +15,15 @@ import {
 import { DEFAULT_THEME_SETTINGS, type ThemeSettings } from './themeSettings'
 
 /** Everything a preset decides. Light or dark mode and the user's custom colours are not part of a look. */
-export type DesignLook = Omit<ThemeSettings, 'mode' | 'customPrimary' | 'customSecondary'>
+export type DesignLook = Omit<ThemeSettings, 'mode' | 'customPrimary' | 'customSecondary' | 'extraColors'>
 
-const { mode: _mode, customPrimary: _primary, customSecondary: _secondary, ...MATERIAL_LOOK } = DEFAULT_THEME_SETTINGS
+const {
+  mode: _mode,
+  customPrimary: _primary,
+  customSecondary: _secondary,
+  extraColors: _extras,
+  ...MATERIAL_LOOK
+} = DEFAULT_THEME_SETTINGS
 
 export const DESIGN_PRESETS: Record<DesignPreset, DesignLook> = {
   [DesignPreset.Material]: MATERIAL_LOOK,
