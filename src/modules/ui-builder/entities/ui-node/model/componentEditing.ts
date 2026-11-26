@@ -6,9 +6,10 @@ import {
   savePrefab as savePrefabMutation,
   type PrefabMutationContext,
 } from './prefabMutations'
-import { reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
+import { prefabPropErrors, prefabPropNameError } from './prefabParameters'
+import { declarePrefabProps, type PrefabPropValues } from './prefabProps'
 import type { usePrefabSync } from './prefabSync'
-import type { Prefab } from './types'
+import type { Prefab, PrefabProp } from './types'
 
 interface ComponentEditingSources {
   context: PrefabMutationContext
@@ -28,8 +29,39 @@ export function useComponentEditing(sources: ComponentEditingSources) {
   const { context, prefabs, prefabSync, editingPrefab, editingPrefabId } = sources
   const { editTarget, selectedNodeIds, insertionTargetId, loadHistory, setNotice } = sources
 
-  const savePrefab = (nodeId: string, name: string, defaults: PrefabPropValues = {}) =>
-    savePrefabMutation(context, nodeId, name, defaults)
+  const savePrefab = (nodeId: string, name: string, defaults: PrefabPropValues = {}, definitions: PrefabProp[] = []) =>
+    savePrefabMutation(context, nodeId, name, defaults, definitions)
+
+  /** Changes the parameters of a saved component as one step of its history. */
+  const changeParameters = (prefab: Prefab, next: PrefabProp[]) => {
+    context.commit()
+    prefab.props = next
+    context.commit()
+  }
+  /** Creates a parameter, or replaces the one with the same name. Returns why it could not, or null. */
+  const setPrefabParameter = (prefabId: string, parameter: PrefabProp): string | null => {
+    const prefab = prefabs.value.find(item => item.prefabId === prefabId)
+    if (!prefab) return 'There is no such component.'
+    const current = prefab.props ?? []
+    const exists = current.some(item => item.name === parameter.name)
+    // The name of an existing parameter comes from the component, so only a new one is checked.
+    const nameError = exists ? null : prefabPropNameError(parameter.name, [])
+    const error = nameError ?? Object.values(prefabPropErrors(parameter))[0]
+    if (error) return error
+    changeParameters(
+      prefab,
+      exists ? current.map(item => (item.name === parameter.name ? parameter : item)) : [...current, parameter],
+    )
+    return null
+  }
+  /** Removes a parameter. One that the component still uses comes back as plain text. */
+  const removePrefabParameter = (prefabId: string, name: string) => {
+    const prefab = prefabs.value.find(item => item.prefabId === prefabId)
+    if (!prefab) return false
+    const others = (prefab.props ?? []).filter(item => item.name !== name)
+    changeParameters(prefab, declarePrefabProps(prefab.node, others))
+    return true
+  }
   const insertPrefab = (
     prefabId: string,
     parentId = insertionTargetId.value,
@@ -74,7 +106,7 @@ export function useComponentEditing(sources: ComponentEditingSources) {
     node => {
       const prefab = editingPrefab.value
       if (!prefab || !node) return
-      const next = reconcilePrefabProps(node, prefab.props)
+      const next = declarePrefabProps(node, prefab.props)
       if (JSON.stringify(next) !== JSON.stringify(prefab.props)) prefab.props = next
     },
     { deep: true, flush: 'sync' },
@@ -82,6 +114,8 @@ export function useComponentEditing(sources: ComponentEditingSources) {
 
   return {
     savePrefab,
+    setPrefabParameter,
+    removePrefabParameter,
     insertPrefab,
     editPrefab,
     stopEditingPrefab,

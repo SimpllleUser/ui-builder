@@ -6,6 +6,7 @@ import {
   prefabLookup,
   syncInstances,
 } from './componentInstances'
+import { prefabValuesError } from './prefabParameters'
 import type { PrefabPropValues } from './prefabProps'
 import { findParentAndIndex, getNodeList } from './treeUtils'
 import type { Prefab, UiNode } from './types'
@@ -51,6 +52,11 @@ export function useComponentInstances({ rootNode, prefabs, commit, setNotice }: 
     const location = findParentAndIndex(id, rootNode.value)
     const prefab = originalOf(id)
     if (!location || !prefab) return false
+    const invalid = prefabValuesError(prefab.props ?? [], values)
+    if (invalid) {
+      setNotice(invalid)
+      return false
+    }
     const list = getNodeList(location)
     const node = list[location.index]
     const link = createInstanceLink(prefab, { ...node.instance!.values, ...values })

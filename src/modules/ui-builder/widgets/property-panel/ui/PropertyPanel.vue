@@ -24,6 +24,7 @@ import { useDesignTabPreference } from '../model/useDesignTabPreference'
 import { useTabScroll } from '../model/useTabScroll'
 import EmptyState from '../../../../../shared/ui/EmptyState.vue'
 import DesignTab from './design/DesignTab.vue'
+import ComponentParameters from './ComponentParameters.vue'
 import InstancePanel from './InstancePanel.vue'
 import AdvancedProperties from './AdvancedProperties.vue'
 import InteractionsEditor from './InteractionsEditor.vue'
@@ -154,6 +155,7 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
         @click="moveDialog.show"
         >Move to…</VBtn
       >
+      <ComponentParameters v-if="isRoot && store.editingPrefab" :prefab="store.editingPrefab" />
       <InstancePanel v-if="selectedNode.instance" :key="selectedNode.id" :node="selectedNode" />
       <VTextField
         v-if="searchable && !isInstance"
@@ -300,9 +302,10 @@ const fieldKey = (field: { kind: string; prop?: string }) => field.kind + (field
       v-model="prefabDialog.open.value"
       :name="prefabDialog.name.value"
       :prop-names="prefabDialog.propNames.value"
-      :defaults="prefabDialog.defaults.value"
+      :parameters="prefabDialog.parameters.value"
       @update:name="prefabDialog.name.value = $event"
-      @update:default="(propName, value) => (prefabDialog.defaults.value[propName] = value)"
+      @save-parameter="prefabDialog.saveParameter"
+      @remove-parameter="prefabDialog.removeParameter"
       @save="prefabDialog.save"
     />
     <MoveNodeDialog

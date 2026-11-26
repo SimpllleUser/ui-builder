@@ -74,3 +74,42 @@ test('every tool of the MCP server has a command in the editor', async () => {
   assert.deepEqual(missing, [])
   assert.ok(tools.includes('restore_saved_component'))
 })
+
+test('an agent gives parameters types, and the check finds instances they no longer accept', async () => {
+  const { executeMcpCommand } = await load()
+  const run = (command, args) => executeMcpCommand(store, command, args)
+  const { id } = run('add_component', { type: 'VBtn', text: '{{props.count}}' })
+  assert.throws(
+    () => run('save_component', { id, name: 'Counter', parameters: [{ name: 'count', type: 'date' }] }),
+    /type is one of/,
+  )
+  assert.throws(
+    () =>
+      run('save_component', {
+        id,
+        name: 'Counter',
+        props: { count: 'x' },
+        parameters: [{ name: 'count', type: 'number' }],
+      }),
+    /count: Enter a number/,
+  )
+  const { prefabId } = run('save_component', { id, name: 'Counter' })
+  run('delete_node', { id })
+  run('insert_saved_component', { prefabId, props: { count: 'many' } })
+  const instanceId = store.selectedNodeId
+  const invalid = () => run('check_project').issues.filter(issue => issue.kind === 'invalid-parameter')
+  assert.deepEqual(invalid(), [])
+
+  run('set_parameter', { prefabId, parameter: { name: 'count', type: 'number', max: 9 } })
+  assert.equal(invalid()[0].nodeId, instanceId)
+  assert.match(invalid()[0].message, /“count” \(“many”\): Enter a number/)
+  assert.throws(() => run('update_instance', { id: instanceId, props: { count: '10' } }), /9 or less/)
+  run('update_instance', { id: instanceId, props: { count: '3' } })
+  assert.deepEqual(invalid(), [])
+
+  assert.throws(() => run('set_parameter', { prefabId, parameter: { name: 'ref' } }), /reserves/)
+  run('set_parameter', { prefabId, parameter: { name: 'tone', type: 'choice', options: ['a'] } })
+  assert.equal(run('remove_parameter', { prefabId, name: 'tone' }).stillUsed, false)
+  assert.equal(run('remove_parameter', { prefabId, name: 'count' }).stillUsed, true)
+  assert.throws(() => run('remove_parameter', { prefabId, name: 'tone' }), /has no parameter/)
+})

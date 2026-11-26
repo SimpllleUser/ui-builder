@@ -2,13 +2,14 @@ import { expressionToJs, helperSources, type HelperName } from './expressionToJs
 import { jsLiteral, jsString } from './jsLiteral'
 import { withDependencies } from './computedVariables'
 import { emptyLike } from './dataSources'
-import { ActionType } from './enums'
+import { ActionType, PrefabPropType } from './enums'
+import { prefabPropType, typedPrefabValue } from './prefabParameters'
 import { eventEntries } from './events'
 import { variableNameError } from './projectMutations'
 import { walkNodes } from './treeUtils'
 import { AMBIENT_NAMES, variablesOfNode } from './variableUsage'
 import { styleClassSheet } from './styleClasses'
-import type { Page, Prefab, Project, UiNode } from './types'
+import type { Page, Prefab, PrefabProp, Project, UiNode } from './types'
 import { renderNodes, type ExportedForm, type TemplateContext } from './vueTemplate'
 
 const INDENT = '  '
@@ -122,6 +123,42 @@ interface ScriptParts {
   prefab?: Prefab
 }
 
+const VUE_TYPES: Record<PrefabPropType, string> = {
+  [PrefabPropType.Text]: 'String',
+  [PrefabPropType.Number]: 'Number',
+  [PrefabPropType.Boolean]: 'Boolean',
+  [PrefabPropType.Choice]: 'String',
+  [PrefabPropType.Color]: 'String',
+  [PrefabPropType.Link]: 'String',
+}
+
+/** The checks Vue can make itself on top of the type. */
+function propValidator(prop: PrefabProp): string | null {
+  const type = prefabPropType(prop)
+  if (type === PrefabPropType.Choice && prop.options?.length)
+    return `value => [${prop.options.map(jsString).join(', ')}].includes(value)`
+  if (type === PrefabPropType.Text && prop.maxLength !== undefined) return `value => value.length <= ${prop.maxLength}`
+  const bounds = [
+    ...(prop.min === undefined ? [] : [`value >= ${prop.min}`]),
+    ...(prop.max === undefined ? [] : [`value <= ${prop.max}`]),
+  ]
+  return type === PrefabPropType.Number && bounds.length ? `value => ${bounds.join(' && ')}` : null
+}
+
+function propDeclaration(prop: PrefabProp): string {
+  const type = prefabPropType(prop)
+  const isText = VUE_TYPES[type] === VUE_TYPES[PrefabPropType.Text]
+  const value = typedPrefabValue(prop, prop.defaultValue)
+  const validator = propValidator(prop)
+  const options = [
+    `type: ${VUE_TYPES[type]}`,
+    // An empty default of a number or boolean would be a value of the wrong type.
+    ...(isText || value !== '' ? [`default: ${jsLiteral(value, 0)}`] : []),
+    ...(validator ? [`validator: ${validator}`] : []),
+  ]
+  return `{ ${options.join(', ')} }`
+}
+
 function renderScript({ variables, state, settings, context, source, prefab }: ScriptParts): string {
   const { helpers, usage, forms } = context
   const isShared = source === StateSource.Shared && variables.length > 0
@@ -142,9 +179,7 @@ function renderScript({ variables, state, settings, context, source, prefab }: S
   const sections: string[][] = []
   if (imports.length) sections.push(imports)
   if (prefab?.props?.length) {
-    const declared = prefab.props.map(
-      ({ name, defaultValue }) => `${INDENT}${name}: { type: String, default: ${jsLiteral(defaultValue)} },`,
-    )
+    const declared = prefab.props.map(prop => `${INDENT}${prop.name}: ${propDeclaration(prop)},`)
     sections.push(['const props = defineProps({', ...declared, '})'])
   }
   if (usage.router) sections.push(['const router = useRouter()'])

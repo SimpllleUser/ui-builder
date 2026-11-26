@@ -1,3 +1,4 @@
+import { typedPrefabValue } from './prefabParameters'
 import { childNodes } from './treeUtils'
 import type { PrefabProp, UiNode } from './types'
 
@@ -47,10 +48,22 @@ export function findPrefabPropNames(node: UiNode): string[] {
   return [...names]
 }
 
-/** Parameters to offer for an element: every name used in it, with the given default or an empty one. */
-export function declarePrefabProps(node: UiNode, defaults: PrefabPropValues = {}): PrefabProp[] {
-  return findPrefabPropNames(node).map(name => ({ name, defaultValue: defaults[name] ?? '' }))
+/**
+ * The parameters of an element: every name used in it, with its known definition or as plain text, followed by the
+ * ones created by hand that nothing uses yet.
+ */
+export function declarePrefabProps(node: UiNode, definitions: PrefabProp[] = []): PrefabProp[] {
+  const used = findPrefabPropNames(node)
+  const known = new Map(definitions.map(prop => [prop.name, prop]))
+  return [
+    ...used.map(name => known.get(name) ?? { name, defaultValue: '' }),
+    ...definitions.filter(prop => prop.isDeclared && !used.includes(prop.name)),
+  ]
 }
+
+const WHOLE_PLACEHOLDER = /^\{\{\s*props\.([A-Za-z_]\w*)\s*\}\}$/
+/** Properties that are text whatever the parameter's type is. */
+const TEXT_PROPERTIES = new Set(['class', 'style'])
 
 /** Copy of the element with its placeholders replaced by the given values, or the defaults for missing ones. */
 export function applyPrefabProps(node: UiNode, props: PrefabProp[], values: PrefabPropValues = {}): UiNode {
@@ -70,16 +83,25 @@ export function applyPrefabProps(node: UiNode, props: PrefabProp[], values: Pref
         if (value === undefined) return placeholder
         return value.trim() !== '' && Number.isFinite(Number(value)) ? value.trim() : JSON.stringify(value)
       })
+  const definitions = new Map(props.map(prop => [prop.name, prop]))
+  /** A property that is one placeholder and nothing else gets the value in the parameter's type. */
+  const fillProperty = (text: string): unknown => {
+    const definition = definitions.get(WHOLE_PLACEHOLDER.exec(text)?.[1] ?? '')
+    return definition ? typedPrefabValue(definition, resolved.get(definition.name) ?? '') : fill(text)
+  }
+  const fillProperties = (properties: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(properties).map(([key, value]) => [
+        key,
+        typeof value === 'string' && !TEXT_PROPERTIES.has(key) ? fillProperty(value) : mapStrings(value, fill),
+      ]),
+    )
   const apply = (current: UiNode): UiNode => ({
     ...mapStrings(ownContent(current), fill),
+    props: fillProperties(current.props),
     ...(current.vIf ? { vIf: fillCondition(current.vIf) } : {}),
     children: current.children.map(apply),
     slots: Object.fromEntries(Object.entries(current.slots).map(([slot, nodes]) => [slot, nodes.map(apply)])),
   })
   return apply(node)
-}
-
-/** The parameters of an edited component: the names it uses now, keeping the defaults already chosen. */
-export function reconcilePrefabProps(node: UiNode, current: PrefabProp[] = []): PrefabProp[] {
-  return declarePrefabProps(node, Object.fromEntries(current.map(prop => [prop.name, prop.defaultValue])))
 }

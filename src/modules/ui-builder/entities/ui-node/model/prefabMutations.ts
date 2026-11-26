@@ -1,7 +1,8 @@
 import { createInstanceLink, materializeInstance, prefabLookup, wouldRecurse } from './componentInstances'
 import { cloneNode, createNodeId } from './nodeUtils'
+import { prefabValuesError } from './prefabParameters'
 import { declarePrefabProps, type PrefabPropValues } from './prefabProps'
-import type { Prefab, UiNode } from './types'
+import type { Prefab, PrefabProp, UiNode } from './types'
 import type { NodeMutationContext } from './nodeMutations'
 
 export interface PrefabMutationContext extends NodeMutationContext {
@@ -18,6 +19,7 @@ export function savePrefab(
   nodeId: string,
   name: string,
   defaults: PrefabPropValues = {},
+  definitions: PrefabProp[] = [],
 ): void {
   const node = context.findNodeById(nodeId)
   const trimmedName = name.trim()
@@ -32,7 +34,10 @@ export function savePrefab(
       prefabId: createNodeId('prefab'),
       name: trimmedName,
       node: original,
-      props: declarePrefabProps(node, defaults),
+      props: declarePrefabProps(node, definitions).map(prop => ({
+        ...prop,
+        defaultValue: defaults[prop.name] ?? prop.defaultValue,
+      })),
     },
   ])
   context.setNotice(`Saved ${trimmedName} to My components.`)
@@ -61,6 +66,12 @@ export function insertPrefab(
     while (parent && !context.canContain(parent)) {
       parent = context.findParentAndIndex(parent.id)?.parent ?? null
     }
+  }
+
+  const invalid = prefabValuesError(prefab.props ?? [], propValues)
+  if (invalid) {
+    context.setNotice(invalid)
+    return false
   }
 
   const link = createInstanceLink(prefab, propValues)

@@ -1,19 +1,31 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useUiTreeStore, type UiNode } from '../../../entities/ui-node'
+import { computed, ref } from 'vue'
+import { prefabValueError, useUiTreeStore, type PrefabProp, type UiNode } from '../../../entities/ui-node'
+import { ParameterValueField } from '../../../features/component-parameters'
 
 /** What can be done with a component instance: fill its parameters, edit the original or detach the copy. */
 const props = defineProps<{ node: UiNode }>()
 const store = useUiTreeStore()
 
 const original = computed(() => store.originalOf(props.node.id))
+/** Values typed but not valid yet: they stay in their field with the reason, and the instance keeps the last good one. */
+const drafts = ref<Record<string, string>>({})
 const parameters = computed(() =>
-  (original.value?.props ?? []).map(({ name, defaultValue }) => ({
-    name,
-    value: props.node.instance?.values[name] ?? defaultValue,
+  (original.value?.props ?? []).map(definition => ({
+    definition,
+    value: drafts.value[definition.name] ?? props.node.instance?.values[definition.name] ?? definition.defaultValue,
   })),
 )
-const update = (name: string, value: string) => store.setInstanceProps(props.node.id, { [name]: value })
+const update = (definition: PrefabProp, value: string) => {
+  const { name } = definition
+  if (prefabValueError(definition, value)) {
+    drafts.value = { ...drafts.value, [name]: value }
+    return
+  }
+  const { [name]: _applied, ...others } = drafts.value
+  drafts.value = others
+  store.setInstanceProps(props.node.id, { [name]: value })
+}
 </script>
 
 <template>
@@ -23,17 +35,13 @@ const update = (name: string, value: string) => store.setInstanceProps(props.nod
         <VIcon icon="mdi-puzzle-outline" size="16" aria-hidden="true" />
         Instance of <strong>{{ original.name }}</strong>. It changes when the original does.
       </p>
-      <VTextField
+      <ParameterValueField
         v-for="parameter in parameters"
-        :key="parameter.name"
+        :key="parameter.definition.name"
+        :parameter="parameter.definition"
         :model-value="parameter.value"
-        :label="parameter.name"
-        variant="outlined"
-        density="compact"
-        hide-details
-        class="mb-2"
-        @update:model-value="value => update(parameter.name, value)"
-        @blur="store.commit()"
+        @update:model-value="value => update(parameter.definition, value)"
+        @focusout="store.commit()"
       />
       <div class="instance-panel__actions">
         <VBtn size="small" variant="tonal" prepend-icon="mdi-pencil" @click="store.editPrefab(original.prefabId)">
