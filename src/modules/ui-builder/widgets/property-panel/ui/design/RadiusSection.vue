@@ -9,6 +9,7 @@ import DesignSection from './DesignSection.vue'
 import IconToggle from './IconToggle.vue'
 import NumberField from './NumberField.vue'
 import TokenChips from './TokenChips.vue'
+import './designGrid.css'
 
 const PRESETS = [0, 4, 8, 16, 9999]
 const RADIUS_TOKENS = Object.values(RadiusToken)
@@ -72,7 +73,7 @@ const cornerValue = (corner: Corner) => parsePx(style.value[cornerProperty(corne
       </button>
     </div>
     <TokenChips label="Radius" :tokens="RADIUS_TOKENS" :selected="token" @pick="setToken" />
-    <div v-if="perCorner" class="radius-corners">
+    <div v-if="perCorner" class="design-grid">
       <NumberField
         v-for="item in CORNERS"
         :key="item.corner"
@@ -110,11 +111,5 @@ const cornerValue = (corner: Corner) => parsePx(style.value[cornerProperty(corne
   border-color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), 0.1);
   color: rgb(var(--v-theme-primary));
-}
-.radius-corners {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 8px;
 }
 </style>

@@ -1,0 +1,62 @@
+/* How elements drawn by NodeRenderer look while they are edited on the canvas. */
+.ui-builder-element {
+  outline: 1px dashed rgba(var(--v-theme-on-surface), 0.2);
+  min-height: 24px;
+  position: relative;
+}
+.ui-builder-element.is-selected {
+  outline: 2px solid rgb(var(--v-theme-primary)) !important;
+}
+.ui-builder-element.is-drag-over {
+  outline: 2px dashed rgb(var(--v-theme-primary)) !important;
+  background: rgba(var(--v-theme-primary), 0.08) !important;
+}
+/* A small marker names the behavior an element has (repeat, condition, link, click), so logic is visible while editing. */
+.ui-builder-element[data-behavior]::after {
+  content: attr(data-behavior);
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(var(--v-theme-info));
+  color: rgb(var(--v-theme-on-info));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.v-card.ui-builder-element {
+  min-height: 80px;
+}
+.v-row.ui-builder-element {
+  min-height: 80px;
+}
+.v-col.ui-builder-element {
+  min-height: 60px;
+}
+.ui-builder-element[data-node-id='root-canvas'] {
+  min-height: 1600px;
+  background: rgb(var(--v-theme-background)) !important;
+}
+.overlay-placeholder {
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(var(--v-theme-primary), 0.05);
+}
+.overlay-placeholder__label {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 6px;
+}
+.outlet-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  font-size: 13px;
+  opacity: 0.75;
+  background: rgba(var(--v-theme-primary), 0.05);
+}
