@@ -8,22 +8,41 @@ const hasOwnNames = (owner: UiNode, child: UiNode) =>
     ([slot, nodes]) => nodes.includes(child) && behaviorOf(owner.type).slotParams?.(slot).length,
   )
 
+export interface PreviewReach {
+  /**
+   * One entry for each copy of the element a person can use now, in the order shown, holding the names that exist
+   * only in that copy (`item` and `index` of a repeat).
+   */
+  copies: Scope[]
+  /** Why there is no such copy, or null. */
+  obstacle: string | null
+}
+
 /**
- * Why a person could not use the last element of `path` in Preview now, or null when they could. Below a repeat or
- * a table cell the conditions read values that differ from copy to copy, so those are not judged.
+ * Which copies of the last element of `path` a person could use in Preview now. Below a table cell the conditions
+ * read values of their row, so those are not judged.
  */
-export function previewObstacle(path: UiNode[], state: Scope): string | null {
+export function previewReach(path: UiNode[], state: Scope): PreviewReach {
   const target = path[path.length - 1]
+  let copies: Scope[] = [{}]
+  const blocked = (reason: string): PreviewReach => ({ copies: [], obstacle: `“${target.name}” ${reason}` })
+
   for (const [index, node] of path.entries()) {
-    const items = repeatItems(node.vFor, state)
-    if (items && !items.length) return `“${target.name}” is not shown: there is nothing to repeat.`
-    if (items) return null
     const named = node === target ? '' : ` (inside “${node.name}”)`
-    if (node.vIf && !evaluateCondition(node.vIf, state))
-      return `“${target.name}” is hidden${named}: its condition ${node.vIf} is not met.`
-    if (interpolateProps(node.props, state).disabled === true) return `“${target.name}” is disabled${named}.`
+    if (node.vFor) {
+      copies = copies.flatMap(own =>
+        (repeatItems(node.vFor, { ...state, ...own }) ?? []).map((item, at) => ({ ...own, item, index: at })),
+      )
+      if (!copies.length) return blocked('is not shown: there is nothing to repeat.')
+    }
+    if (node.vIf) {
+      copies = copies.filter(own => evaluateCondition(node.vIf, { ...state, ...own }))
+      if (!copies.length) return blocked(`is hidden${named}: its condition ${node.vIf} is not met.`)
+    }
+    copies = copies.filter(own => interpolateProps(node.props, { ...state, ...own }).disabled !== true)
+    if (!copies.length) return blocked(`is disabled${named}.`)
     const next = path[index + 1]
-    if (next && hasOwnNames(node, next)) return null
+    if (next && hasOwnNames(node, next)) break
   }
-  return null
+  return { copies, obstacle: null }
 }

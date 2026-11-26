@@ -11,9 +11,13 @@ import '@fontsource-variable/unbounded'
 import '@fontsource-variable/playfair-display'
 import '@fontsource-variable/jetbrains-mono'
 import './shared/tableStyles.css'
-import { createApp } from 'vue'
+import { createApp, defineAsyncComponent } from 'vue'
 import { createPinia } from 'pinia'
 import App from './app/App.vue'
 import vuetify from './app/vuetify'
 
-createApp(App).use(createPinia()).use(vuetify).mount('#app')
+// Only the MCP server, a development tool, asks for this page.
+const isScreenshot = import.meta.env.DEV && new URLSearchParams(window.location.search).has('screenshot')
+const root = isScreenshot ? defineAsyncComponent(() => import('./app/ScreenshotApp.vue')) : App
+
+createApp(root).use(createPinia()).use(vuetify).mount('#app')

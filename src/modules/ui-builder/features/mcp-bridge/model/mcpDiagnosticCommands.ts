@@ -29,15 +29,15 @@ export const MCP_DIAGNOSTIC_COMMANDS: Record<string, McpCommand> = {
     return store.describePreview()
   },
   preview_click: (store, a) => {
-    store.previewClick(String(a.id), a.row)
+    store.previewClick(String(a.id), a.row, a.copy)
     return store.describePreview()
   },
   preview_submit: (store, a) => {
-    const errors = store.previewSubmit(String(a.id))
+    const errors = store.previewSubmit(String(a.id), a.copy)
     return { submitted: !errors.length, errors, ...store.describePreview() }
   },
   preview_input: (store, a) => {
-    store.previewInput(String(a.id), a.value)
+    store.previewInput(String(a.id), a.value, a.copy)
     return store.describePreview()
   },
   preview_navigate: (store, a) => {

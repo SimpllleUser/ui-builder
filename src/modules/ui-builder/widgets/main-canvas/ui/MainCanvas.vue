@@ -4,7 +4,6 @@ import { PREVIEW_FRAME_STYLE } from '../model/previewFrameStyle'
 import { PREVIEW_DEVICES } from '../model/previewDevices'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useTheme } from 'vuetify'
 import {
   explainHiddenElements,
   isNodeEmpty,
@@ -15,7 +14,6 @@ import {
   NodeRenderer,
   canvasDragTargetId,
   BREAKPOINT_WIDTHS,
-  responsiveStylesheet,
 } from '../../../entities/ui-node'
 import { mirrorStyles } from '../../../../../shared/lib/mirrorStyles'
 import { ThemeDefaultsProvider } from '../../../../theme/entities/theme-settings'
@@ -23,6 +21,8 @@ import HoverBadge from './HoverBadge.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
 import BreakpointSwitcher from './BreakpointSwitcher.vue'
 import PreviewMessage from './PreviewMessage.vue'
+import PreviewPage from './PreviewPage.vue'
+import { usePreviewStyles } from '../model/usePreviewStyles'
 import MeasureOverlay from './MeasureOverlay.vue'
 import ResizeHandles from './ResizeHandles.vue'
 /** `previewOnly` shows the project without any way back to editing it. */
@@ -30,15 +30,12 @@ const props = defineProps<{ previewOnly?: boolean }>()
 const emit = defineEmits<{ 'open-components': []; 'add-template': [kind: TemplateKind] }>()
 const store = useUiTreeStore()
 const { rootNode, canUndo, canRedo, isPreviewMode, selectedNodeIds } = storeToRefs(store)
-const theme = useTheme()
 const modifierKey = platformModifierKey()
 const viewport = ref(1280)
 const zoom = ref(100)
 const previewTarget = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLElement>()
 const empty = computed(() => isNodeEmpty(rootNode.value))
-// A new key draws the page anew, so elements appear again. A shared layout stays while its pages change.
-const previewKey = computed(() => `${store.project.layout ? 'layout' : store.previewPage.id}:${store.previewRun}`)
 // In Preview the page itself may be empty even when a shared layout fills the screen around it.
 const previewPageEmpty = computed(() => isNodeEmpty(store.previewPage.root))
 const variables = computed(() =>
@@ -53,16 +50,7 @@ const pageItems = computed(() => store.pages.map(page => ({ title: page.name, su
 const canvasWidth = computed(() =>
   store.editingBreakpoint ? `${BREAKPOINT_WIDTHS[store.editingBreakpoint]}px` : undefined,
 )
-// Preview has a real width, so elements that differ per size need their media queries in the page.
-const previewStyles = computed(() =>
-  isPreviewMode.value
-    ? responsiveStylesheet([
-        ...store.pages.map(page => page.root),
-        ...(store.project.layout ? [store.project.layout] : []),
-        store.previewRoot,
-      ])
-    : '',
-)
+const previewStyles = usePreviewStyles()
 // The frame follows the editor's styles, so theme changes reach an open preview.
 let stopMirroringStyles = () => {}
 onMounted(() => {
@@ -306,13 +294,7 @@ const leaveCanvas = (event: DragEvent) => {
         />
       </div>
       <Teleport v-if="previewTarget" :to="previewTarget">
-        <div class="v-application preview-app" :class="`v-theme--${theme.global.name.value}`">
-          <component :is="'style'">{{ previewStyles }}</component>
-          <ThemeDefaultsProvider>
-            <NodeRenderer :key="previewKey" :node="store.previewRoot" :in-page="!store.project.layout" />
-          </ThemeDefaultsProvider>
-          <PreviewMessage />
-        </div>
+        <PreviewPage />
       </Teleport>
     </div>
     <div

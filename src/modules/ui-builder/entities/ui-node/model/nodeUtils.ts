@@ -34,3 +34,11 @@ function regenerateNodeIds(node: UiNode, rename: (id: string) => string | null):
 /** A container with no elements inside it, neither as children nor in any named slot. */
 export const isNodeEmpty = (node: UiNode): boolean =>
   !node.children.length && !Object.values(node.slots).some(nodes => nodes.length)
+
+/** `Data table`, then `Data table 2`, `Data table 3`… so similar elements can be told apart in Layers. */
+export function uniqueName(name: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(name)) return name
+  let copy = 2
+  while (taken.has(`${name} ${copy}`)) copy++
+  return `${name} ${copy}`
+}

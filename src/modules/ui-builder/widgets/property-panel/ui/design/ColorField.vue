@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useTheme } from 'vuetify'
+import { useThemeSettings } from '../../../../../theme/entities/theme-settings'
 import { inputValue } from '../../../../../../shared/lib/dom'
-import { THEME_COLORS, ThemeColor, parseThemeColor, themeColorValue } from '../../../../../../shared/lib/themeColors'
+import { THEME_COLORS, parseThemeColor, themeColorValue } from '../../../../../../shared/lib/themeColors'
 
 const DEFAULT_COLOR = '#000000'
 const HEX_COLOR = /^#[0-9a-f]{6}$/i
@@ -15,14 +16,16 @@ const props = defineProps<{ modelValue: string | undefined; label: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 
 const theme = useTheme()
-const shown = (color: ThemeColor) => theme.current.value.colors[color] ?? DEFAULT_COLOR
-const selected = computed(() => parseThemeColor(props.modelValue))
+const { settings } = useThemeSettings()
+const ownColors = computed(() => Object.keys(settings.value.extraColors))
+const swatches = computed(() => [...THEME_COLORS, ...ownColors.value])
+const shown = (color: string) => theme.current.value.colors[color] ?? DEFAULT_COLOR
+const selected = computed(() => parseThemeColor(props.modelValue, ownColors.value))
 const pickerValue = computed(() =>
   props.modelValue && HEX_COLOR.test(props.modelValue) ? props.modelValue : DEFAULT_COLOR,
 )
 
-const choose = (color: ThemeColor) =>
-  emit('update:modelValue', selected.value === color ? null : themeColorValue(color))
+const choose = (color: string) => emit('update:modelValue', selected.value === color ? null : themeColorValue(color))
 const typed = (event: Event) => emit('update:modelValue', inputValue(event).trim() || null)
 const picked = (event: Event) => emit('update:modelValue', inputValue(event))
 </script>
@@ -59,7 +62,7 @@ const picked = (event: Event) => emit('update:modelValue', inputValue(event))
     </div>
     <div class="color-field__presets" role="group" :aria-label="`${label}: theme colours`">
       <button
-        v-for="color in THEME_COLORS"
+        v-for="color in swatches"
         :key="color"
         type="button"
         class="color-field__preset"

@@ -7,11 +7,14 @@ import { randomUUID } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
+import { takeScreenshot } from './screenshot.mjs'
+import { pickTab } from './tabs.mjs'
 
 const PORT = Number(process.env.UI_BUILDER_MCP_PORT ?? 3002)
 const TIMEOUT_MS = 10_000
 const RETRY_LISTEN_MS = 3_000
-// Open editor tabs, each with the time its page was loaded.
+// Open editor tabs by their event stream: the tab's id, when its page was loaded, the address it is served from and
+// whether it edits its project now.
 const clients = new Map()
 const pending = new Map()
 
@@ -23,8 +26,28 @@ const bridge = http.createServer((req, res) => {
   if (url.pathname === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')
-    clients.set(res, Number(url.searchParams.get('loaded')) || 0)
+    clients.set(res, {
+      id: url.searchParams.get('tab'),
+      loaded: Number(url.searchParams.get('loaded')) || 0,
+      origin: req.headers.origin,
+      editing: url.searchParams.get('editing') !== 'false',
+    })
     req.on('close', () => clients.delete(res))
+    return
+  }
+  // A tab says when it starts or stops editing its project, such as after “Edit here” in another tab.
+  if (req.url === '/tab' && req.method === 'POST') {
+    let data = ''
+    req.on('data', c => {
+      data += c
+    })
+    req.on('end', () => {
+      try {
+        const { tab, editing } = JSON.parse(data)
+        for (const client of clients.values()) if (client.id === tab) client.editing = editing === true
+      } catch {}
+      res.writeHead(204).end()
+    })
     return
   }
   if (req.url === '/result' && req.method === 'POST') {
@@ -66,11 +89,15 @@ bridge.on('error', e => {
 })
 listen()
 
+/** The event stream of the tab that gets the commands, with what is known about it; empty when none is open. */
+const currentTab = () => {
+  const best = pickTab(clients.values())
+  return [...clients].find(([, tab]) => tab === best) ?? []
+}
+
 function call(command, args = {}) {
   if (bridgeProblem) return Promise.reject(new Error(bridgeProblem))
-  // The most recently loaded tab is the one the person has just opened or reloaded. An old tab left open must not take
-  // the commands, and tabs reconnect in any order after the server restarts, so the order of connecting says nothing.
-  const [client] = [...clients].sort(([, loadedA], [, loadedB]) => loadedB - loadedA)[0] ?? []
+  const [client] = currentTab()
   if (!client)
     return Promise.reject(
       new Error(`No editor connected. Run "npm run dev" and open http://localhost:3001 in a browser.`),
@@ -101,7 +128,7 @@ const server = new McpServer(
   { name: 'ui-builder', version: '0.2.0' },
   {
     instructions:
-      'Edits the project open in the UI Builder editor. Read the ui-builder://guide resource first. Build with add_subtree or batch (one Undo step), style with set_style, then run check_project and try the page with preview_start and preview_click.',
+      'Edits the project open in the UI Builder editor. Read the ui-builder://guide resource first. Build with add_subtree or batch (one Undo step), style with set_style, look at the result with preview_screenshot, then run check_project and try the page with preview_start and preview_click.',
   },
 )
 server.registerResource(
@@ -307,7 +334,7 @@ tool(
 )
 tool(
   'set_computed',
-  'Define a variable worked out from others, e.g. total = length(rows) or fullName = first + " " + last. Operators of conditions and length, empty, contains. null removes it.',
+  'Define a variable worked out from others, e.g. total = length(rows) or fullName = first + " " + last. Operators of conditions and length, empty, contains, lower. null removes it.',
   { name: z.string(), expression: z.union([z.string(), z.null()]) },
 )
 tool(
@@ -320,7 +347,16 @@ tool(
     loadingVariable: z.string().optional(),
   },
 )
-tool('preview_submit', 'Submit a form in Preview. Returns the broken rules, or runs the submit actions.', { id })
+const copyNumber = z
+  .number()
+  .int()
+  .min(0)
+  .optional()
+  .describe('Which copy of a repeated element, 0-based in the order shown')
+tool('preview_submit', 'Submit a form in Preview. Returns the broken rules, or runs the submit actions.', {
+  id,
+  copy: copyNumber,
+})
 const subtree = z.lazy(() =>
   z.object({
     type: z.string().describe('Component type, e.g. VCard, VBtn, div'),
@@ -410,8 +446,13 @@ tool(
 )
 tool(
   'set_theme',
-  "Change theme settings of the open project; settings not named stay. { preset } applies a whole design preset first. Giving customPrimary or customSecondary switches to custom colours. radius null keeps each component's own. An unknown name or value changes nothing. Not an undo step and not allowed in batch: read get_theme first to be able to put it back.",
-  { settings: z.record(z.string(), z.union([z.string(), z.number(), z.null()])) },
+  'Change theme settings of the open project; settings not named stay. { preset } applies a whole design preset first. Giving customPrimary or customSecondary switches to custom colours. radius null keeps each component\'s own. extraColors adds colours of your own ({ "cobalt": "#1B3FD1" }, null removes one): use them as color="cobalt" on a component or theme-cobalt in set_style. An unknown name or value changes nothing. Not an undo step and not allowed in batch: read get_theme first to be able to put it back.',
+  {
+    settings: z.record(
+      z.string(),
+      z.union([z.string(), z.number(), z.null(), z.record(z.string(), z.string().nullable())]),
+    ),
+  },
 )
 tool(
   'edit_saved_component',
@@ -441,16 +482,51 @@ tool(
   'Start Preview from the initial variable values and return what is shown: variables, texts, hidden elements, inputs and tables.',
   {},
 )
+const PHONE_WIDTH = 390
+server.registerTool(
+  'preview_screenshot',
+  {
+    description: `A picture of a page as Preview shows it, with the project's theme. Use it to check your design: look at what you built, and again at width ${PHONE_WIDTH} for a phone. While Preview runs, it shows the current page and variables (after your clicks and input); otherwise the page open in the editor with starting values. Data that has not arrived yet in Preview shows as loading. Does not touch the person's editor. Needs Chrome on this computer.`,
+    inputSchema: {
+      path: z.string().optional().describe('Route of the page, e.g. /tickets; default: the page shown'),
+      width: z.number().int().min(320).max(2560).optional().describe('Window width in px, default 1280'),
+      height: z.number().int().min(320).max(2000).optional().describe('Window height in px, default 800'),
+      fullPage: z.boolean().optional().describe('Include what is below the window (default true)'),
+    },
+  },
+  async ({ path, width = 1280, height = 800, fullPage = true }) => {
+    try {
+      const source = await call('screenshot_source', path === undefined ? {} : { path })
+      const origin = currentTab()[1]?.origin
+      const shot = await takeScreenshot({ origin, source, width, height, fullPage })
+      const note = `${source.path} at ${shot.width}×${shot.height}px`
+      const cut = shot.contentHeight > shot.height && fullPage ? ' (cut off: the page is taller)' : ''
+      return {
+        content: [
+          { type: 'image', data: shot.data, mimeType: 'image/png' },
+          { type: 'text', text: note + cut },
+        ],
+      }
+    } catch (e) {
+      return { isError: true, content: [{ type: 'text', text: e.message }] }
+    }
+  },
+)
 tool('preview_state', 'What Preview shows now: variables, texts, hidden elements, inputs, table rows.', {})
 tool(
   'preview_click',
-  'Click an element in Preview. For a table with a row click action pass row (0-based). Refused for an element a person could not click: hidden by a condition or disabled.',
+  'Click an element in Preview. For a table with a row click action pass row (0-based). Refused for an element a person could not click: hidden by a condition or disabled. For an element a repeat shows several times, pass copy: 0 is the first one shown.',
   {
     id,
     row: z.number().optional(),
+    copy: copyNumber,
   },
 )
-tool('preview_input', 'Type into an input in Preview (sets the variable it is linked to).', { id, value: z.unknown() })
+tool('preview_input', 'Type into an input in Preview (sets the variable it is linked to).', {
+  id,
+  value: z.unknown(),
+  copy: copyNumber,
+})
 tool('preview_navigate', 'Go to a page by route in Preview.', { path: z.string() })
 tool('preview_reset', 'Put every variable back to its starting value and return to the first page.', {})
 tool('preview_stop', 'Leave Preview and return to editing.', {})

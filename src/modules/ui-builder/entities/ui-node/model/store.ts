@@ -2,35 +2,20 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch, onScopeDispose } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { getComponentDef, getNodeSlots } from './componentDefinitions'
-import {
-  HISTORY_COMMIT_DELAY_MS,
-  MAX_CHECKPOINTS,
-  MAX_HISTORY_ENTRIES,
-  MAX_RECENT_COMPONENTS,
-  OUTLET_NODE_TYPE,
-  ROOT_NODE_ID,
-  TEXT_NODE_TYPE,
-} from './constants'
+import { MAX_RECENT_COMPONENTS, ROOT_NODE_ID } from './constants'
 import { emptyProject, parseProject, serializeProject } from './document'
 import { UnsavedChanges, type OpenedProject } from './persistence'
 import { useDocumentPersistence } from './documentPersistence'
-import { describeChange } from './historyLabels'
-import { cloneNodeWithNewIds, createNodeId } from './nodeUtils'
-import { parseElements, pasteElements as pasteElementsMutation, pickedElements, serializeElements } from './clipboard'
+import { cloneNodeWithNewIds, uniqueName } from './nodeUtils'
 import type { ClipboardMutationContext } from './clipboard'
-import { patchNodeStyle, setOverride } from './responsiveStyle'
-import * as tableMutations from './tableMutations'
-import { usePreviewRuntime } from './previewRuntime'
+import { createNode } from './createNode'
+import { useComponentEditing } from './componentEditing'
+import { useEditorHistory } from './editorHistory'
+import { useNodeEditing } from './nodeEditing'
+import { usePreviewSession } from './previewSession'
 import { usePrefabSync } from './prefabSync'
-import { usePrefabEditLock } from './prefabEditLock'
-import { holdsRecursion, prefabLookup } from './componentInstances'
-import { LOCKED_NOTICE, useComponentInstances } from './instanceStore'
-import { snapshotPreview } from './previewSnapshot'
-import { previewObstacle } from './previewReach'
-import { resolveTableData } from './tableBindings'
-import { actionsOf } from './events'
-import { createRuntimeState, isComputed } from './computedVariables'
-import { enclosingForm, formErrors, isForm, isSubmitButton, submitActions } from './forms'
+import { useComponentInstances } from './instanceStore'
+import { isComputed } from './computedVariables'
 import {
   addPage as addPageMutation,
   deletePage as deletePageMutation,
@@ -48,52 +33,26 @@ import {
 } from './projectMutations'
 import {
   findNodeById as findNodeByIdInTree,
-  findPath,
   findParentAndIndex as findParentAndIndexInTree,
   getNodeList,
   walkNodes,
   type NodeLocation,
 } from './treeUtils'
-import { createHistory, type HistoryEntry } from './history'
-import { OUTSIDE_CHANGE_LABEL, useComponentHistory } from './componentHistory'
-import { useDeletedPrefabs } from './deletedPrefab'
 import {
   editedPrefabId,
   isOnLayout,
   LAYOUT_TARGET,
   leavePrefabTarget,
-  openPrefabTarget,
   PAGE_TARGET,
   withoutLayout,
   type EditTarget,
 } from './editTarget'
-import {
-  appendNode,
-  updateNodeLogic as updateNodeLogicMutation,
-  type NodeLogicPatch,
-  canReorder as canReorderNode,
-  deleteNode as deleteNodeMutation,
-  duplicateNode as duplicateNodeMutation,
-  moveNode as moveNodeMutation,
-  reorderNode as reorderNodeMutation,
-} from './nodeMutations'
-import {
-  areNodesSiblings as areNodesSiblingsMutation,
-  getUnwrapReason,
-  unwrapNode as unwrapNodeMutation,
-  wrapNodes as wrapNodesMutation,
-  type ContainerMutationContext,
-} from './containerMutations'
-import {
-  deletePrefab as deletePrefabMutation,
-  insertPrefab as insertPrefabMutation,
-  savePrefab as savePrefabMutation,
-  type PrefabMutationContext,
-} from './prefabMutations'
+import { appendNode } from './nodeMutations'
+import type { ContainerMutationContext } from './containerMutations'
+import { deletePrefab as deletePrefabMutation, type PrefabMutationContext } from './prefabMutations'
 import { addTemplate as addTemplateMutation, type TemplateContext, type TemplateProps } from './templateFactory'
-import { EventName, type Breakpoint, type StepDirection, type TemplateKind } from './enums'
-import { applyPrefabProps, reconcilePrefabProps, type PrefabPropValues } from './prefabProps'
-import type { DataSource, DeletedPrefab, HistoryCheckpoint, Project, UiAction, UiNode, Prefab } from './types'
+import type { Breakpoint, StepDirection, TemplateKind } from './enums'
+import type { DataSource, DeletedPrefab, Project, UiNode, Prefab } from './types'
 
 export const useUiTreeStore = defineStore('ui-tree', () => {
   const notice = ref('')
@@ -152,8 +111,6 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const editingBreakpoint = ref<Breakpoint | null>(null)
   /** Component types added lately, newest first. The library lists them up front. */
   const recentComponentTypes = useStorage<string[]>('ui-builder:recent-components', [])
-  const checkpoints = ref<HistoryCheckpoint[]>([])
-  let historyTimer: ReturnType<typeof setTimeout> | undefined
 
   const findNodeById = (id: string, node: UiNode = rootNode.value): UiNode | null => findNodeByIdInTree(id, node)
 
@@ -168,162 +125,22 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     activePageId.value = activePage.value.id
     selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
   }
-  // Anything that was removed can be brought back from the message that says so.
-  const offerUndo = (entry: HistoryEntry) => {
-    // Something was edited since a component was deleted, so Undo takes that back now.
-    if (entry.label !== OUTSIDE_CHANGE_LABEL) deletion.forget()
-    if (/^(Deleted|Removed)/.test(entry.label)) setNotice(`${entry.label}.`, true)
-  }
-  const deletion = useDeletedPrefabs(prefabs, deletedPrefabs)
-  const history = createHistory({
-    serialize: () => JSON.stringify(project.value),
-    applySnapshot: applyProjectSnapshot,
-    maxEntries: MAX_HISTORY_ENTRIES,
-    describe: describeChange,
-    onCommit: offerUndo,
-  })
-  const { commit: commitHistory } = history
-  // While a transaction runs, steps are not saved one by one: they become a single version at the end.
-  let transactionDepth = 0
-  const componentHistory = useComponentHistory({
+  const history = useEditorHistory({
+    project,
     prefabs,
+    deletedPrefabs,
+    prefabSync,
+    editingPrefab,
     editingPrefabId,
-    read: prefabId => prefabSync.readHistory(prefabId),
-    write: (prefabId, saved) => void prefabSync.writeHistory(prefabId, saved),
-    isHeld: () => transactionDepth > 0,
-    onCommit: offerUndo,
-    onRestored: () => {
+    applySnapshot: applyProjectSnapshot,
+    pruneSelection: () => {
       selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
     },
+    removePrefab: prefabId => deletePrefabMutation(mutationContext, prefabId),
+    writeToStorage: persistence.write,
+    setNotice,
   })
-  // A saved component being edited has a history of its own; otherwise it is the project's.
-  /** What the history being shown says: the component's while one is edited, otherwise the project's. */
-  const shown = <T>(ofComponent: { readonly value: T }, ofProject: { readonly value: T }) =>
-    computed(() => (editingPrefab.value ? ofComponent.value : ofProject.value))
-  const shownCanUndo = shown(componentHistory.canUndo, history.canUndo)
-  const canUndo = computed(() => !!deletion.undoableId.value || shownCanUndo.value)
-  const shownCanRedo = shown(componentHistory.canRedo, history.canRedo)
-  const canRedo = computed(() => !!deletion.redoableId.value || shownCanRedo.value)
-  const historyVersions = shown(componentHistory.versions, history.versions)
-  const historyPending = shown(componentHistory.pending, history.pending)
-  const commitProject = () => {
-    clearTimeout(historyTimer)
-    if (transactionDepth === 0 && !history.isRestoring.value) commitHistory()
-  }
-  const commit = () => {
-    commitProject()
-    componentHistory.commit()
-  }
-  /**
-   * Runs several changes as one undo step. If one of them fails, everything it changed is put back and the error is passed on.
-   * Used by agents (MCP) that build a page in many small steps.
-   */
-  const transaction = <T>(run: () => T): T => {
-    if (transactionDepth > 0) return run()
-    commit()
-    const before = JSON.stringify(project.value)
-    const componentBefore = componentHistory.snapshot()
-    transactionDepth++
-    try {
-      return run()
-    } catch (error) {
-      if (componentBefore) componentHistory.restore(componentBefore)
-      applyProjectSnapshot(before)
-      throw error
-    } finally {
-      transactionDepth--
-      commit()
-    }
-  }
-  /**
-   * Holds back history while something is dragged, so the whole drag is one undo step.
-   * The returned function ends the gesture and records it.
-   */
-  const startGesture = () => {
-    commit()
-    transactionDepth++
-    let ended = false
-    return () => {
-      if (ended) return
-      ended = true
-      transactionDepth--
-      commit()
-    }
-  }
-  const restorePrefab = (prefabId: string) => {
-    // Changes not recorded yet come before the restoring.
-    commit()
-    const prefab = deletion.restore(prefabId)
-    if (prefab) setNotice(`Restored ${prefab.name} to My components.`)
-    return !!prefab
-  }
-  const deletePrefab = (prefabId: string) => {
-    const name = prefabs.value.find(prefab => prefab.prefabId === prefabId)?.name
-    if (name === undefined) return
-    commit()
-    deletion.remember(prefabId)
-    deletePrefabMutation(mutationContext, prefabId)
-    setNotice(`Deleted component ${name}.`, true)
-  }
-  const undo = () => {
-    // Changes not recorded yet are newer than a deletion.
-    if (deletion.undoableId.value) commit()
-    const deletedId = deletion.undoableId.value
-    if (deletedId && restorePrefab(deletedId)) {
-      deletion.redoableId.value = deletedId
-      return
-    }
-    if (editingPrefab.value) return componentHistory.undo()
-    clearTimeout(historyTimer)
-    history.undo()
-  }
-  const redo = () => {
-    if (deletion.redoableId.value) commit()
-    const restoredId = deletion.redoableId.value
-    if (restoredId) return deletePrefab(restoredId)
-    if (editingPrefab.value) return componentHistory.redo()
-    clearTimeout(historyTimer)
-    history.redo()
-  }
-  const restoreHistoryVersion = (index: number) => {
-    if (editingPrefab.value) return componentHistory.restoreVersion(index)
-    clearTimeout(historyTimer)
-    history.restore(index)
-  }
-  const createCheckpoint = (name: string) => {
-    const trimmedName = name.trim()
-    if (!trimmedName) return false
-    commit()
-    const checkpoint: HistoryCheckpoint = {
-      checkpointId: createNodeId('checkpoint'),
-      name: trimmedName,
-      createdAt: Date.now(),
-      snapshot: JSON.stringify(project.value),
-    }
-    const all = [checkpoint, ...checkpoints.value]
-    checkpoints.value = all.slice(0, MAX_CHECKPOINTS)
-    persistence.write(target => target.saveCheckpoint(checkpoint))
-    for (const dropped of all.slice(MAX_CHECKPOINTS)) {
-      persistence.write(target => target.deleteCheckpoint(dropped.checkpointId))
-    }
-    return true
-  }
-  const restoreCheckpoint = (checkpointId: string) => {
-    const checkpoint = checkpoints.value.find(item => item.checkpointId === checkpointId)
-    if (!checkpoint) return false
-    clearTimeout(historyTimer)
-    try {
-      history.restoreSnapshot(checkpoint.snapshot)
-      return true
-    } catch {
-      setNotice('This checkpoint is invalid and could not be restored.')
-      return false
-    }
-  }
-  const deleteCheckpoint = (checkpointId: string) => {
-    checkpoints.value = checkpoints.value.filter(item => item.checkpointId !== checkpointId)
-    persistence.write(target => target.deleteCheckpoint(checkpointId))
-  }
+  const { commit } = history
 
   const instances = useComponentInstances({ rootNode, prefabs, commit, setNotice })
   const projectRoots = () => [
@@ -337,8 +154,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     isRefreshing = true
     try {
       instances.syncLibrary()
-      commitProject()
-      if (instances.syncRoots(projectRoots()) && transactionDepth === 0) history.amend()
+      history.follow(() => instances.syncRoots(projectRoots()))
     } finally {
       isRefreshing = false
     }
@@ -350,15 +166,12 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     () => {
       if (isOpening) return
       persistence.markChanged()
-      if (!history.isRestoring.value) {
-        clearTimeout(historyTimer)
-        historyTimer = setTimeout(commitProject, HISTORY_COMMIT_DELAY_MS)
-      }
+      history.scheduleCommit()
     },
     { deep: true, flush: 'sync' },
   )
   onScopeDispose(() => {
-    clearTimeout(historyTimer)
+    history.cancelScheduled()
     persistence.stop()
     prefabSync.stop()
   })
@@ -397,56 +210,6 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     commit()
     return true
   }
-  const updateSlotChildren = (id: string, slotName: string, children: UiNode[]) => {
-    if (instances.isLocked(id)) return instances.refuse(false)
-    const node = findNodeById(id)
-    if (!node || !getNodeSlots(node).some(slot => slot.name === slotName)) return false
-    node.slots[slotName] = children
-    return true
-  }
-  const updateNodeClasses = (id: string, classes: string[]) => {
-    if (instances.isLocked(id)) return instances.refuse(false)
-    const node = findNodeById(id)
-    if (!node) return false
-    node.classes = classes
-    return true
-  }
-  const updateNodeName = (id: string, name: string) => {
-    const node = findNodeById(id)
-    if (!node) return false
-    if (instances.isInsideInstance(id)) return instances.refuse(false)
-    if (isPageRoot(id)) {
-      // Typing in the name field: keep the page name and its root in step (an empty name is not allowed).
-      if (!name.trim()) return false
-      activePage.value.name = name
-    }
-    node.name = name
-    return true
-  }
-  /** `Data table`, then `Data table 2`, `Data table 3`… so similar elements can be told apart in Layers. */
-  const uniqueNodeName = (name: string) => {
-    const taken = new Set<string>()
-    for (const node of walkNodes(rootNode.value)) taken.add(node.name)
-    if (!taken.has(name)) return name
-    let n = 2
-    while (taken.has(`${name} ${n}`)) n++
-    return `${name} ${n}`
-  }
-  /** Replaces all properties of an element at once (the JSON view edits them as one object). */
-  const updateNodeProps = (id: string, props: Record<string, unknown>) => {
-    if (instances.isLocked(id)) return instances.refuse(false)
-    const node = findNodeById(id)
-    if (!node) return false
-    node.props = props
-    return true
-  }
-  const updateNodeProp = (id: string, prop: string, value: unknown) => {
-    if (instances.isLocked(id)) return instances.refuse(false)
-    const node = findNodeById(id)
-    if (!node) return false
-    node.props[prop] = value
-    return true
-  }
   const mutationContext: ContainerMutationContext & PrefabMutationContext & TemplateContext & ClipboardMutationContext =
     {
       getRoot: () => rootNode.value,
@@ -461,7 +224,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       clearDeletedSelection: () => {
         selectedNodeIds.value = selectedNodeIds.value.filter(id => findNodeById(id))
       },
-      createNode: (type, name) => createNode(type, name),
+      createNode,
       getComponentDef,
       setSelectedNodeIds: ids => {
         selectedNodeIds.value = ids
@@ -470,7 +233,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
       setPrefabs: value => {
         prefabs.value = value
       },
-      uniqueName: uniqueNodeName,
+      uniqueName: name => uniqueName(name, new Set([...walkNodes(rootNode.value)].map(node => node.name))),
       getInsertionTargetId: () => insertionTarget.value.id,
       getEditingPrefabId: () => editingPrefabId.value,
       appendNode: (parentId, node, slotName, prepare?: () => void) =>
@@ -491,30 +254,6 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
         }
       },
     }
-  const createNode = (type: string, name?: string): UiNode => {
-    const def = getComponentDef(type)
-    if (!def) throw new Error('Unknown component type')
-    const id = createNodeId()
-    return {
-      id,
-      type,
-      name: name ?? def.label,
-      props: { ...def.defaultProps },
-      classes: [...def.defaultClasses],
-      slots: {},
-      children: def.defaultTextChild
-        ? [{ id: `${id}_text`, type: TEXT_NODE_TYPE, name: def.label, props: {}, classes: [], children: [], slots: {} }]
-        : (def.defaultChildren ?? []).map(child => {
-            if (typeof child === 'string') return createNode(child)
-            const childNode = createNode(child.type, child.name)
-            Object.assign(childNode.props, child.props)
-            if (child.name && childNode.children[0]?.type === TEXT_NODE_TYPE) {
-              childNode.children[0].name = child.name
-            }
-            return childNode
-          }),
-    }
-  }
   const append = (parentId: string, node: UiNode, slotName: string | null = null) =>
     appendNode(mutationContext, parentId, node, slotName)
   const addComponent = (type: string, parentId = insertionTarget.value.id) => {
@@ -527,123 +266,37 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     }
     return added
   }
-  const savePrefab = (nodeId: string, name: string, defaults: PrefabPropValues = {}) =>
-    savePrefabMutation(mutationContext, nodeId, name, defaults)
-  const insertPrefab = (
-    prefabId: string,
-    parentId = insertionTarget.value.id,
-    slotName: string | null = null,
-    propValues: PrefabPropValues = {},
-  ) => insertPrefabMutation(mutationContext, prefabId, parentId, slotName, propValues)
-  const editPrefab = (prefabId: string) => {
-    const prefab = prefabs.value.find(item => item.prefabId === prefabId)
-    if (!prefab) return false
-    editTarget.value = openPrefabTarget(editTarget.value, prefabId)
-    // The component's own settings open at once: the properties panel stays collapsed while nothing is selected.
-    selectedNodeIds.value = [prefab.node.id]
-    return true
-  }
-  const stopEditingPrefab = () => {
-    if (!editingPrefabId.value) return
-    editTarget.value = leavePrefabTarget(editTarget.value)
-    selectedNodeIds.value = []
-  }
-  const prefabEditLock = usePrefabEditLock(editingPrefabId, {
-    lock: prefabSync.lock,
-    save: prefabSync.flush,
-    onGranted: async prefabId => {
-      // What the tab that edited it before wrote last may not have arrived yet.
-      await prefabSync.refresh()
-      await componentHistory.load(prefabId)
-    },
-    onRefused: prefabId => {
-      const name = prefabs.value.find(prefab => prefab.prefabId === prefabId)?.name ?? 'This component'
-      stopEditingPrefab()
-      setNotice(`“${name}” is being edited in another tab.`)
+  const components = useComponentEditing({
+    context: mutationContext,
+    prefabs,
+    prefabSync,
+    editingPrefab,
+    editingPrefabId,
+    editTarget,
+    selectedNodeIds,
+    insertionTargetId: computed(() => insertionTarget.value.id),
+    loadHistory: history.loadComponentHistory,
+    setNotice,
+  })
+  const nodes = useNodeEditing({
+    context: mutationContext,
+    instances,
+    project,
+    prefabs,
+    editingPrefabId,
+    editingBreakpoint,
+    rootNode,
+    selectedNodeIds,
+    isPageRoot,
+    renamePage: name => {
+      activePage.value.name = name
     },
   })
-  // The component being edited was removed, for example in another tab.
-  watch(editingPrefab, prefab => {
-    if (!prefab && editingPrefabId.value) stopEditingPrefab()
-  })
-  // Writing `{{props.name}}` in the edited component adds a parameter for it, deleting the last one removes it.
-  watch(
-    () => editingPrefab.value?.node,
-    node => {
-      const prefab = editingPrefab.value
-      if (!prefab || !node) return
-      const next = reconcilePrefabProps(node, prefab.props)
-      if (JSON.stringify(next) !== JSON.stringify(prefab.props)) prefab.props = next
-    },
-    { deep: true, flush: 'sync' },
-  )
-  /** The selected elements as clipboard text, or null when there is nothing to copy. */
-  const copySelection = () => {
-    const picked = pickedElements(rootNode.value, selectedNodeIds.value)
-    if (!picked.length) return null
-    setNotice(`Copied ${picked.length === 1 ? picked[0].name : `${picked.length} elements`}.`)
-    return serializeElements(picked, project.value)
-  }
-  /** Whether the clipboard text would put the edited component inside itself. */
-  const pastesIntoItself = (text: string) => {
-    const ownerId = editingPrefabId.value
-    if (!ownerId) return false
-    try {
-      return holdsRecursion(prefabLookup(prefabs.value), parseElements(text)?.nodes ?? [], ownerId)
-    } catch {
-      // Damaged text is reported by the paste itself.
-      return false
-    }
-  }
-  const pasteElements = (text: string) => {
-    if (!pastesIntoItself(text)) return pasteElementsMutation(mutationContext, text, selectedNodeIds.value)
-    setNotice('A component cannot contain itself.')
-    return false
-  }
-  /** Changes the element's style on the screen size being edited; `null` removes a property there. */
-  const updateNodeStyle = (id: string, patch: Record<string, string | null>) => {
-    if (instances.isLocked(id)) return instances.refuse(false)
-    const node = findNodeById(id)
-    if (!node) return false
-    patchNodeStyle(node, editingBreakpoint.value, patch)
-    return true
-  }
-  /** Drops what the screen size being edited changes, so the element looks as on larger screens again. */
-  const resetNodeOverrides = (id: string) => {
-    if (instances.isLocked(id)) return instances.refuse(false)
-    const node = findNodeById(id)
-    if (!node || !editingBreakpoint.value) return false
-    commit()
-    setOverride(node, editingBreakpoint.value, {})
-    commit()
-    return true
-  }
-  const duplicateNode = (id: string) =>
-    instances.unless(instances.isInsideInstance(id), undefined, () => duplicateNodeMutation(mutationContext, id))
-  const deleteNode = (id: string) =>
-    instances.unless(instances.isInsideInstance(id), false, () => deleteNodeMutation(mutationContext, id))
-  const areNodesSiblings = (ids: string[]) => areNodesSiblingsMutation(mutationContext, ids)
-  const wrapNodes = (ids: string[], type: string) =>
-    instances.unless(ids.some(instances.isInsideInstance), undefined, () =>
-      wrapNodesMutation(mutationContext, ids, type),
-    )
-  const unwrapReason = (id: string) => (instances.isLocked(id) ? LOCKED_NOTICE : getUnwrapReason(mutationContext, id))
-  const unwrapNode = (id: string) =>
-    instances.unless(instances.isLocked(id), false, () => unwrapNodeMutation(mutationContext, id))
   const pathTo = (id: string): UiNode[] => {
     const node = findNodeById(id)
     if (!node) return []
     const parent = findParentAndIndex(id)?.parent
     return [...(parent ? pathTo(parent.id) : []), node]
-  }
-  const moveNode = (id: string, parentId: string, slotName: string | null = null) =>
-    instances.unless(instances.isInsideInstance(id), false, () =>
-      moveNodeMutation(mutationContext, id, parentId, slotName),
-    )
-  const canReorder = (id: string, direction: StepDirection) =>
-    !instances.isInsideInstance(id) && canReorderNode(mutationContext, id, direction)
-  const reorderNode = (id: string, direction: StepDirection) => {
-    if (canReorder(id, direction)) reorderNodeMutation(mutationContext, id, direction)
   }
   const importDocument = (text: string) => {
     const imported = parseProject(text)
@@ -665,7 +318,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
   const openProject = (opened: OpenedProject, unsaved = UnsavedChanges.Write) => {
     const next = parseProject(opened.document)
     persistence.connect(opened.storage, unsaved)
-    clearTimeout(historyTimer)
+    history.cancelScheduled()
     isOpening = true
     try {
       isPreviewMode.value = false
@@ -679,9 +332,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
         noticeUndo.value = false
       }
       activePageId.value = (next.pages.find(page => page.id === opened.activePageId) ?? next.pages[0]).id
-      checkpoints.value = [...opened.checkpoints]
-      history.reset()
-      deletion.forget()
+      history.reset(opened.checkpoints)
     } finally {
       isOpening = false
     }
@@ -708,114 +359,29 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     },
     commit,
     setNotice,
-    createNode: (type, name) => createNode(type, name),
+    createNode,
   }
-  const updateNodeLogic = (id: string, patch: NodeLogicPatch) =>
-    instances.unless(instances.isLocked(id), false, () => updateNodeLogicMutation(mutationContext, id, patch))
-  const preview = usePreviewRuntime({ project, activePage, isPreviewMode, setNotice })
-  /** Starts Preview at once, so what follows already sees the starting values. */
-  const startPreview = () => {
-    isPreviewMode.value = true
-    preview.start()
-  }
-  /** What Preview draws: a component being edited with its default parameters, otherwise the layout or the page. */
-  const previewRoot = computed(() =>
-    editingPrefab.value
-      ? applyPrefabProps(editingPrefab.value.node, editingPrefab.value.props ?? [])
-      : preview.root.value,
-  )
-  // Preview draws the page and, around it, the shared layout; a click can land on either.
-  const previewTrees = computed(() =>
-    editingPrefab.value
-      ? [previewRoot.value]
-      : [preview.page.value.root, ...(project.value.layout ? [project.value.layout] : [])],
-  )
-  /** The elements around one of Preview, from the top of what is drawn; a page sits where the layout puts it. */
-  const pathInPreview = (id: string): UiNode[] | null => {
-    for (const root of previewTrees.value) {
-      const path = findPath(id, root)
-      if (!path) continue
-      const layout = project.value.layout
-      if (!layout || editingPrefab.value || root === layout) return path
-      const outlet = [...walkNodes(layout)].find(node => node.type === OUTLET_NODE_TYPE)
-      return [...((outlet && findPath(outlet.id, layout)) ?? []), ...path]
-    }
-    return null
-  }
-  /** The element of Preview with the form it is in. Throws when a person could not use it now. */
-  const needInPreview = (id: string) => {
-    if (!isPreviewMode.value) throw new Error('Preview is not running. Start it first.')
-    const path = pathInPreview(id)
-    if (!path) throw new Error(`Node not found on the preview page: ${id}`)
-    const obstacle = previewObstacle(path, preview.state.value)
-    if (obstacle) throw new Error(obstacle)
-    const root = previewTrees.value.find(tree => findNodeByIdInTree(id, tree))!
-    return { node: path[path.length - 1], form: enclosingForm(root, id) }
-  }
-  /** Submits a form as a person would: its actions run only when every rule is satisfied. */
-  const submitForm = (form: UiNode) => {
-    const errors = formErrors(form, preview.state.value)
-    if (!errors.length) preview.runActions(submitActions(form), { form })
-    return errors
-  }
-  /** Clicks an element in Preview as a person would. For a table row, `row` says which one was clicked. */
-  const previewClick = (id: string, row?: number) => {
-    const { node, form } = needInPreview(id)
-    const actions = actionsOf(node.events, EventName.Click)
-    const submits = !!form && isSubmitButton(node)
-    if (!actions.length && !submits) throw new Error(`“${node.name}” has no click action.`)
-    const data = { ...node.props, ...resolveTableData(node.props, preview.state.value) }
-    const item = row === undefined ? undefined : (Array.isArray(data.items) ? data.items : [])[row]
-    if (row !== undefined && item === undefined) throw new Error(`The table has no row ${row}.`)
-    preview.runActions(actions, { form, scope: row === undefined ? {} : { item, index: row } })
-    return submits ? submitForm(form) : []
-  }
-  /** Types into an input in Preview: sets the variable the input is linked to, then runs its change actions. */
-  const previewInput = (id: string, value: unknown) => {
-    const { node, form } = needInPreview(id)
-    const actions = actionsOf(node.events, EventName.Change)
-    if (!node.model && !actions.length) throw new Error('That element is not linked to a variable.')
-    if (node.model) preview.state.value[node.model] = value
-    preview.runActions(actions, { form, scope: { value } })
-  }
-  const previewSubmit = (id: string) => {
-    const { node } = needInPreview(id)
-    if (!isForm(node)) throw new Error(`“${node.name}” is not a form.`)
-    return submitForm(node)
-  }
-  const describePreview = () =>
-    snapshotPreview(
-      project.value,
-      editingPrefab.value ? { ...preview.page.value, root: previewRoot.value } : preview.page.value,
-      preview.state.value,
-      preview.message.value?.text,
-    )
-  /** What the canvas draws bindings with: every variable at its starting value, computed ones worked out. */
-  const startingState = computed(() => createRuntimeState(project.value.state, project.value.computed))
+  const preview = usePreviewSession({ project, activePage, editingPrefab, isPreviewMode, setNotice })
 
   const addTemplate = (kind: TemplateKind, props: TemplateProps = {}) =>
     addTemplateMutation(mutationContext, kind, props)
 
   return {
+    ...components,
+    ...nodes,
+    ...preview,
     project,
     pages,
     activePage,
     activePageId,
     editingLayout,
     editingPrefab,
-    editPrefab,
-    stopEditingPrefab,
-    prefabEditSettled: prefabEditLock.settled,
     rootNode,
     selectedNodeIds,
     selectedNodeId,
     isPreviewMode,
     editingBreakpoint,
-    startGesture,
-    copySelection,
-    pasteElements,
-    updateNodeStyle,
-    resetNodeOverrides,
+    startGesture: history.startGesture,
     prefabs,
     recentComponentTypes,
     notice,
@@ -823,24 +389,24 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     noticeSerial,
     setNotice,
     saveState,
-    canUndo,
-    canRedo,
-    historyVersions,
-    historyPending,
-    checkpoints,
-    undo,
-    redo,
-    restoreHistoryVersion,
-    createCheckpoint,
-    restoreCheckpoint,
-    deleteCheckpoint,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+    historyVersions: history.versions,
+    historyPending: history.pending,
+    checkpoints: history.checkpoints,
+    undo: history.undo,
+    redo: history.redo,
+    restoreHistoryVersion: history.restoreHistoryVersion,
+    createCheckpoint: history.createCheckpoint,
+    restoreCheckpoint: history.restoreCheckpoint,
+    deleteCheckpoint: history.deleteCheckpoint,
     commit,
     saveDocument,
     flush,
     openProject,
     openPrefabLibrary: prefabSync.open,
     flushPrefabs: () => {
-      componentHistory.commit()
+      history.commitComponent()
       return prefabSync.flush()
     },
     hasUnsavedPrefabs: prefabSync.pending,
@@ -856,43 +422,7 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     removeLayout: () => removeLayoutMutation(projectContext),
     setStateVariable: (name: string, value: unknown) => setStateVariableMutation(projectContext, name, value),
     removeStateVariable: (name: string) => removeStateVariableMutation(projectContext, name),
-    updateNodeLogic,
-    table: {
-      addColumn: (id: string, column?: Partial<tableMutations.TableColumn>) =>
-        instances.unless(instances.isLocked(id), null, () => tableMutations.addColumn(mutationContext, id, column)),
-      updateColumn: (id: string, key: string, patch: Partial<tableMutations.TableColumn>) =>
-        instances.unless(instances.isLocked(id), false, () =>
-          tableMutations.updateColumn(mutationContext, id, key, patch),
-        ),
-      removeColumn: (id: string, key: string) =>
-        instances.unless(instances.isLocked(id), false, () => tableMutations.removeColumn(mutationContext, id, key)),
-      addRow: (id: string, values?: tableMutations.TableRow, index?: number) =>
-        instances.unless(instances.isLocked(id), null, () => tableMutations.addRow(mutationContext, id, values, index)),
-      updateRow: (id: string, index: number, values: tableMutations.TableRow) =>
-        instances.unless(instances.isLocked(id), false, () =>
-          tableMutations.updateRow(mutationContext, id, index, values),
-        ),
-      removeRow: (id: string, index: number) =>
-        instances.unless(instances.isLocked(id), false, () => tableMutations.removeRow(mutationContext, id, index)),
-    },
-    resetPreview: preview.reset,
-    startPreview,
-    previewClick,
-    previewInput,
-    previewSubmit,
-    startingState,
-    describePreview,
-    transaction,
-    runtimeState: preview.state,
-    previewPageId: preview.pageId,
-    previewPage: preview.page,
-    previewRoot,
-    navigate: preview.navigate,
-    previewMessage: preview.message,
-    previewRun: preview.run,
-    runActions: preview.runActions,
-    runAppearActions: preview.runAppearActions,
-    dispatchAction: (action: UiAction) => preview.runActions([action]),
+    transaction: history.transaction,
     setComputed: (name: string, formula: string | null) => setComputedMutation(projectContext, name, formula),
     setDataSource: (name: string, source: DataSource | null) => setDataSourceMutation(projectContext, name, source),
     nodeLabel,
@@ -904,26 +434,17 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
     insertionTarget,
     addComponent,
     addTemplate,
-    duplicateNode,
-    deleteNode,
-    savePrefab,
-    insertPrefab,
     isLocked: instances.isLocked,
     isInsideInstance: instances.isInsideInstance,
     selectableId: instances.selectableId,
     originalOf: instances.originalOf,
     setInstanceProps: instances.setInstanceProps,
     detachInstance: instances.detachInstance,
-    deletePrefab,
+    deletePrefab: history.deletePrefab,
     deletedPrefabs,
-    restorePrefab,
+    restorePrefab: history.restorePrefab,
     selectNode,
     renameNode,
-    updateSlotChildren,
-    updateNodeClasses,
-    updateNodeName,
-    updateNodeProp,
-    updateNodeProps,
     toggleMultiSelect: (id: string) => {
       if (!findNodeById(id)) return
       const target = instances.selectableId(id)
@@ -931,13 +452,6 @@ export const useUiTreeStore = defineStore('ui-tree', () => {
         ? selectedNodeIds.value.filter(i => i !== target)
         : [...selectedNodeIds.value, target]
     },
-    areNodesSiblings,
-    wrapNodes,
-    unwrapReason,
-    unwrapNode,
-    moveNode,
-    reorderNode,
-    canReorder,
     appendChild: (id: string, node: UiNode) => append(id, node),
     appendToSlot: (id: string, slot: string, node: UiNode) => append(id, node, slot),
   }

@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { CssValue, DEFAULT_STROKE_WIDTH } from '../../model/designStyle'
-import { parsePx, toPx } from '../../../../../../shared/lib/inlineStyle'
 import { inputValue } from '../../../../../../shared/lib/dom'
 import { useNodeStyle } from '../../model/useNodeStyle'
 import { type UiNode } from '../../../../entities/ui-node'
 import ColorField from './ColorField.vue'
 import DesignSection from './DesignSection.vue'
-import NumberField from './NumberField.vue'
 
 const PERCENT = 100
 
-/** Fill, text colour, stroke (border) and opacity. Colours can come from the theme or be custom. */
+/** Fill, text colour and opacity. Colours can come from the theme or be custom. */
 const props = defineProps<{ node: UiNode }>()
 const { style, apply } = useNodeStyle(() => props.node)
 
@@ -18,19 +15,6 @@ const opacityPercent = () =>
   style.value.opacity === undefined ? PERCENT : Math.round(Number(style.value.opacity) * PERCENT)
 const setOpacity = (percent: number | null) =>
   apply({ opacity: percent === null || percent >= PERCENT ? null : String(percent / PERCENT) })
-// A colour alone draws nothing without a width, so choosing one starts a 1px line.
-const setStrokeColor = (color: string | null) =>
-  apply(
-    color === null
-      ? { borderColor: null, borderWidth: null, borderStyle: null }
-      : {
-          borderColor: color,
-          borderStyle: style.value.borderStyle ?? CssValue.Solid,
-          borderWidth: style.value.borderWidth ?? DEFAULT_STROKE_WIDTH,
-        },
-  )
-const setStrokeWidth = (width: number | null) =>
-  apply({ borderWidth: toPx(width), borderStyle: width ? (style.value.borderStyle ?? CssValue.Solid) : null })
 </script>
 
 <template>
@@ -41,18 +25,6 @@ const setStrokeWidth = (width: number | null) =>
       @update:model-value="value => apply({ backgroundColor: value })"
     />
     <ColorField label="Text" :model-value="style.color" @update:model-value="value => apply({ color: value })" />
-    <ColorField label="Stroke" :model-value="style.borderColor" @update:model-value="setStrokeColor" />
-    <div class="appearance-row">
-      <span class="appearance-row__name">Width</span>
-      <NumberField
-        label="W"
-        title="Stroke width"
-        :model-value="parsePx(style.borderWidth)"
-        :min="0"
-        placeholder="0"
-        @update:model-value="setStrokeWidth"
-      />
-    </div>
     <div class="appearance-row">
       <span class="appearance-row__name">Opacity</span>
       <input

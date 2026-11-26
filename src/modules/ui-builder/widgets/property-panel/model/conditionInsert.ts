@@ -33,6 +33,7 @@ export const FUNCTION_SNIPPETS: ConditionSnippet[] = [
   functionSnippet('empty', 'True for nothing, empty text or an empty list'),
   functionSnippet('contains', 'contains(text or list, piece or item)'),
   functionSnippet('length', 'The length of a text or list'),
+  functionSnippet('lower', 'A text in small letters, to compare whatever the case'),
 ]
 
 const PARTIAL_NAME = /[A-Za-z_$][\w$]*$/

@@ -70,3 +70,59 @@ test('the wizard takes the words of its controls from the settings', () => {
   for (const word of ['Далі', 'Крок 2 з 3', 'Позивний']) assert.ok(all.includes(word), word)
   assert.ok(!all.includes('Next'))
 })
+
+test('one copy of a repeated element is clicked, with its own item', async () => {
+  const run = await runner()
+  run('set_state', { name: 'query', value: '' })
+  run('set_state', { name: 'chosen', value: 'none' })
+  run('set_state', { name: 'cities', value: ['Mars', 'Moon', 'Titan'] })
+  const { refs } = run('add_subtree', {
+    tree: {
+      type: 'div',
+      children: [
+        {
+          type: 'VBtn',
+          ref: 'city',
+          text: '{{item}}',
+          vFor: 'cities',
+          vIf: 'empty(query) or contains(lower(item), lower(query))',
+          click: { type: 'set', key: 'chosen', value: '{{item}}' },
+        },
+      ],
+    },
+  })
+  const id = refs.city
+  run('preview_start')
+  assert.throws(() => run('preview_click', { id }), /shown 3 times: say which with copy \(0 to 2\)/)
+  run('preview_click', { id, copy: 1 })
+  assert.equal(store.runtimeState.chosen, 'Moon')
+
+  // The number is that of the copies shown, as a person counts them.
+  store.runtimeState.query = 'T'
+  run('preview_click', { id, copy: 0 })
+  assert.equal(store.runtimeState.chosen, 'Titan')
+  assert.throws(() => run('preview_click', { id, copy: 1 }), /has no copy 1/)
+  store.runtimeState.query = 'venus'
+  assert.throws(() => run('preview_click', { id }), /hidden/)
+})
+
+test('lower() compares texts whatever their case, in Preview and in exported code', async () => {
+  const model = '/src/modules/ui-builder/entities/ui-node/model/'
+  const { evaluateExpression, expressionError } = await server.ssrLoadModule(`${model}expression.ts`)
+  const { expressionToJs, helperSources } = await server.ssrLoadModule(`${model}expressionToJs.ts`)
+  const text = 'contains(lower(name), lower(query))'
+  const helpers = new Set()
+  const code = expressionToJs(text, new Set(['name', 'query']), helpers)
+  const exported = new Function('name', 'query', `${helperSources(helpers).join('\n')}\nreturn ${code}`)
+  for (const [name, query, expected] of [
+    ['Марс', 'марс', true],
+    ['Mars', 'AR', true],
+    ['Mars', 'x', false],
+    ['Mars', null, true],
+  ]) {
+    assert.equal(evaluateExpression(text, { name, query }), expected, `${name}/${query}`)
+    assert.equal(exported(name, query), expected, `exported ${name}/${query}`)
+  }
+  assert.equal(evaluateExpression('lower(missing)', {}), '')
+  assert.match(expressionError('upper(name)'), /length, empty, lower, contains/)
+})

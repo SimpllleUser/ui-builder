@@ -59,6 +59,16 @@ const PROJECT_COMMANDS: Record<string, (projects: McpProjects, args: Args) => Pr
 
 export const PROJECT_COMMAND_NAMES = Object.keys(PROJECT_COMMANDS)
 
+/** What the server needs to picture the project: the file, the page, and where a running Preview stands. */
+async function screenshotSource(store: Store, host: McpHost, args: Args) {
+  if (store.editingPrefab) throw new Error('Screenshots show pages. Call close_saved_component first.')
+  const shown = store.isPreviewMode ? store.previewPage : store.activePage
+  const path = args.path === undefined ? shown.path : String(args.path)
+  if (!store.pages.some(page => page.path === path)) throw new Error(`No page with path ${path}.`)
+  const state = store.isPreviewMode ? store.runtimeState : null
+  return { document: await host.exportFile(), path, state }
+}
+
 /** Project commands always run, so an agent can move away from a locked project; editor commands may be refused. */
 export async function runMcpCommand(store: Store, host: McpHost, command: string, args: Args = {}) {
   const projectCommand = PROJECT_COMMANDS[command]
@@ -66,6 +76,7 @@ export async function runMcpCommand(store: Store, host: McpHost, command: string
   const reason = host.refusal()
   if (reason) throw new Error(reason)
   if (command === 'export_document') return host.exportFile()
+  if (command === 'screenshot_source') return screenshotSource(store, host, args)
   if (command === 'get_theme') return host.theme.describe()
   if (command === 'set_theme') return host.theme.change(args.settings ?? {})
   const result = executeMcpCommand(store, command, args)

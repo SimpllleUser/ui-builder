@@ -104,7 +104,7 @@ For one element the order is: repeat (once per item), then the condition of each
 | Logic | `&&`, `and`, `||`, `or`, `!`, `not`, `a ? b : c`, parentheses |
 | Compare | `==`, `!=` (compared as text, so `3` equals `"3"`), `===`, `!==` (same type required), `<`, `<=`, `>`, `>=` (both sides read as numbers) |
 | Arithmetic | `+`, `-`, `*`, `/`, `%`; `+` joins text when either side is text |
-| Functions | `length(x)` (text or list), `empty(x)` (nothing, empty text or an empty list), `contains(x, y)` (text contains a piece, or a list contains an item) |
+| Functions | `length(x)` (text or list), `empty(x)` (nothing, empty text or an empty list), `contains(x, y)` (text contains a piece, or a list contains an item), `lower(x)` (text in small letters, so `contains(lower(name), lower(query))` ignores case) |
 
 Rules worth knowing:
 
@@ -169,6 +169,9 @@ Tools (60):
 - **Read:** `get_document`, `get_node`, `list_components`, `describe_component`, `list_pages`, `get_table`, `export_document`.
 - **Build:** `add_subtree` (a whole nested tree in one call and one Undo step; `ref` names come back as ids), `batch` (several tools as one Undo step; `"$0.id"` uses the result of step 0; if a step fails, all are undone), `add_component`, `add_template`, `move_node`, `duplicate_node`, `delete_node`, `import_document`.
 - **Saved components:** `save_component`, `insert_saved_component`, `update_instance`, `detach_instance`, `edit_saved_component` / `close_saved_component` (change the original with the usual tools), `delete_saved_component`, `list_deleted_components`, `restore_saved_component`.
+- **Look:** `preview_screenshot` returns a picture of a page (any width, so phones too) taken in a headless Chrome of its own; set `UI_BUILDER_CHROME` if Chrome is somewhere unusual.
+- **Several tabs:** commands go to a tab that edits its project, not to one showing the locked screen; among several editing tabs, to the one loaded last.
+- **Own colours:** the theme can hold up to 8 named colours (Theme → Your own colours, or `set_theme` with `extraColors`). They are Vuetify theme colours, appear beside the theme's in the Design colour fields and are part of the exported theme. The Design tab also sets the stroke per side, a shadow, and font size and weight, each from the screen size being edited up.
 - **Theme:** `get_theme` (settings and what each accepts), `set_theme` (change some, or apply a design preset).
 - **Change:** `update_node`, `set_style` (numbers are px, theme colour names such as `primary`, and values win over utility classes, like the Design tab; `breakpoint` `sm`–`xl` styles a larger screen only), `set_binding`, `set_event`, `set_state`, and the table tools (`add_/update_/remove_table_column`, `add_/update_/remove_table_row`).
 - **Pages:** `add_page`, `set_route`, `select_page`, `duplicate_page`, `move_page`, `delete_page`, `edit_layout`.

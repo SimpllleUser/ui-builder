@@ -9,6 +9,7 @@ export enum HelperName {
   IsEmpty = 'isEmpty',
   Contains = 'contains',
   LengthOf = 'lengthOf',
+  LowerText = 'lowerText',
   CopyOf = 'copyOf',
   StatusChipColor = 'statusChipColor',
   StatusChipKeys = 'statusChipKeys',
@@ -26,6 +27,7 @@ export const HELPER_SOURCE: Record<HelperName, string> = {
     "const contains = (collection, item) => typeof collection === 'string' ? collection.includes(String(item)) : Array.isArray(collection) && collection.some(entry => looseEquals(entry, item))",
   [HelperName.LengthOf]:
     "const lengthOf = value => (typeof value === 'string' || Array.isArray(value) ? value.length : 0)",
+  [HelperName.LowerText]: "const lowerText = value => String(value ?? '').toLowerCase()",
   [HelperName.CopyOf]: 'const copyOf = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)))',
   [HelperName.StatusChipColor]: `const statusChipColors = ${jsLiteral(STATUS_COLORS)}
 const statusChipColor = value => {
@@ -66,6 +68,7 @@ const FUNCTION_HELPERS: Record<string, HelperName> = {
   length: HelperName.LengthOf,
   empty: HelperName.IsEmpty,
   contains: HelperName.Contains,
+  lower: HelperName.LowerText,
 }
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])

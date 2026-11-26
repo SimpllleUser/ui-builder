@@ -156,12 +156,14 @@ const changeVariant = (store, variant) => {
 /** Opens the component and waits until the tab holds it and has read its history. */
 const edit = async (store, prefabId) => {
   store.editPrefab(prefabId)
-  await settle()
+  // Not a fixed pause: under load the lock and the history can take longer.
+  await store.prefabEditSettled()
 }
 const leave = async store => {
   store.stopEditingPrefab()
+  // The lock is released only once everything is written.
+  await store.prefabEditSettled()
   await store.flushPrefabs()
-  await settle()
 }
 
 test('the history of a component survives closing the app', async () => {

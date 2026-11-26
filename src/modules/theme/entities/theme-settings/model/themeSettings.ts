@@ -12,6 +12,7 @@ import {
   SpacingScale,
   TypographyStyle,
 } from './enums'
+import { sanitizeExtraColors, type ExtraColors } from './extraColors'
 import { DEFAULT_CUSTOM_PRIMARY, DEFAULT_CUSTOM_SECONDARY, RADIUS_VALUES } from './presets'
 import { isHexColor } from '../../../../../shared/lib/hexColor'
 
@@ -20,6 +21,8 @@ export interface ThemeSettings {
   colorPreset: ColorPreset
   customPrimary: string
   customSecondary: string
+  /** Colours the project names itself, by name. */
+  extraColors: ExtraColors
   semanticPreset: SemanticPreset
   surfacePreset: SurfacePreset
   /** Corner radius in pixels; null keeps each component's own. */
@@ -41,6 +44,7 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   colorPreset: ColorPreset.Default,
   customPrimary: DEFAULT_CUSTOM_PRIMARY,
   customSecondary: DEFAULT_CUSTOM_SECONDARY,
+  extraColors: {},
   semanticPreset: SemanticPreset.Default,
   surfacePreset: SurfacePreset.Default,
   radius: null,
@@ -75,6 +79,7 @@ export function sanitizeThemeSettings(raw: unknown): ThemeSettings {
     colorPreset: pickEnum(ColorPreset, source.colorPreset, defaults.colorPreset),
     customPrimary: color(source.customPrimary, defaults.customPrimary),
     customSecondary: color(source.customSecondary, defaults.customSecondary),
+    extraColors: sanitizeExtraColors(source.extraColors),
     semanticPreset: pickEnum(SemanticPreset, source.semanticPreset, defaults.semanticPreset),
     surfacePreset: pickEnum(SurfacePreset, source.surfacePreset, defaults.surfacePreset),
     radius: RADIUS_VALUES.find(radius => radius === source.radius) ?? defaults.radius,

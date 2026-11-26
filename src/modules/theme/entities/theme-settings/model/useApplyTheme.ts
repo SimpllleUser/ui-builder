@@ -14,16 +14,21 @@ export function useApplyTheme() {
   const theme = useTheme()
   const { settings } = useThemeSettings()
 
+  /** Names of the project's own colours the theme holds now, so those removed since are taken out. */
+  let ownColors: string[] = []
   watch(
     settings,
     current => {
       theme.global.name.value = current.mode
       for (const variant of Object.values(ThemeVariant)) {
-        theme.themes.value[variant].colors = {
-          ...theme.themes.value[variant].colors,
-          ...resolveThemeColors(current, variant),
+        const { colors } = theme.themes.value[variant]
+        for (const name of ownColors) {
+          delete colors[name]
+          delete colors[`on-${name}`]
         }
+        theme.themes.value[variant].colors = { ...colors, ...resolveThemeColors(current, variant) }
       }
+      ownColors = Object.keys(current.extraColors)
     },
     { immediate: true, deep: true },
   )

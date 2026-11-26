@@ -31,6 +31,8 @@ jsep.removeBinaryOp('>>>')
 const FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   length: value => (typeof value === 'string' || Array.isArray(value) ? value.length : 0),
   empty: value => value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0),
+  /** For comparing texts whatever their case: `contains(lower(name), lower(query))`. */
+  lower: value => String(value ?? '').toLowerCase(),
   contains: (collection, item) =>
     typeof collection === 'string'
       ? collection.includes(String(item))
@@ -45,6 +47,9 @@ export function isCoreExpression(node: jsep.Expression): node is jsep.CoreExpres
 /** `{{ path }}` is allowed inside a condition (it is how saved-component parameters look) and means just `path`. */
 const BINDING = /\{\{\s*([^{}]+?)\s*\}\}/g
 const stripBindings = (text: string) => text.replace(BINDING, '$1')
+
+const FUNCTION_NAMES = Object.keys(FUNCTIONS)
+const unavailable = (name: string) => `Function ${name || '?'} is not available. Use ${FUNCTION_NAMES.join(', ')}.`
 
 const parsed = new Map<string, jsep.Expression>()
 
@@ -145,7 +150,7 @@ function evaluateBinary(node: jsep.BinaryExpression, scope: Scope): unknown {
 function evaluateCall(node: jsep.CallExpression, scope: Scope): unknown {
   const callee = isCoreExpression(node.callee) && node.callee.type === 'Identifier' ? node.callee.name : ''
   const run = Object.hasOwn(FUNCTIONS, callee) ? FUNCTIONS[callee] : undefined
-  if (!run) throw new Error(`Function ${callee || '?'} is not available. Use length, empty or contains.`)
+  if (!run) throw new Error(unavailable(callee))
   return run(...node.arguments.map(argument => evaluateNode(argument, scope)))
 }
 
@@ -193,8 +198,7 @@ function assertSupported(node: jsep.Expression): void {
       return
     case 'CallExpression': {
       const name = isCoreExpression(node.callee) && node.callee.type === 'Identifier' ? node.callee.name : ''
-      if (!Object.hasOwn(FUNCTIONS, name))
-        throw new Error(`Function ${name || '?'} is not available. Use length, empty or contains.`)
+      if (!Object.hasOwn(FUNCTIONS, name)) throw new Error(unavailable(name))
       node.arguments.forEach(assertSupported)
       return
     }

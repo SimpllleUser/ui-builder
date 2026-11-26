@@ -5,6 +5,8 @@ import GridSection from './GridSection.vue'
 import AppearanceSection from './AppearanceSection.vue'
 import LayoutSection from './LayoutSection.vue'
 import RadiusSection from './RadiusSection.vue'
+import ShadowSection from './ShadowSection.vue'
+import StrokeSection from './StrokeSection.vue'
 import SizeSection from './SizeSection.vue'
 import SpacingSection from './SpacingSection.vue'
 import TypographySection from './TypographySection.vue'
@@ -26,6 +28,8 @@ defineProps<{ node: UiNode }>()
     <RadiusSection :node="node" />
     <TypographySection :node="node" />
     <AppearanceSection :node="node" />
+    <StrokeSection :node="node" />
+    <ShadowSection :node="node" />
     <p class="design-tab__note">
       These settings are saved as the element's own style and take priority over the classes set in the other tabs.
     </p>
